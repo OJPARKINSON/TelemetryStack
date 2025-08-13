@@ -259,11 +259,11 @@ services:
       - ./config/grafana:/etc/grafana/provisioning:ro
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin123}
-      GF_USERS_ALLOW_SIGN_UP: false
+      GF_USERS_ALLOW_SIGN_UP: 0
       GF_SERVER_ROOT_URL: https://${LOCAL_DOMAIN:-pi.local}/grafana
-      GF_SERVER_SERVE_FROM_SUB_PATH: true
+      GF_SERVER_SERVE_FROM_SUB_PATH: 1
       GF_INSTALL_PLUGINS: grafana-clock-panel
-      GF_PROVISIONING_AUTO_ASSIGN_ORG: true
+      GF_PROVISIONING_AUTO_ASSIGN_ORG: 1
       GF_PROVISIONING_AUTO_ASSIGN_ORG_ROLE: Admin
     networks:
       - telemetry-network

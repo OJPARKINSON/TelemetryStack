@@ -1,7 +1,6 @@
 {
-  "dashboard": {
-    "id": null,
-    "title": "System Monitoring",
+  "id": null,
+  "title": "System Monitoring",
     "tags": ["system", "monitoring"],
     "timezone": "browser",
     "refresh": "30s",
@@ -192,5 +191,4 @@
     "schemaVersion": 36,
     "version": 1,
     "links": []
-  }
 }

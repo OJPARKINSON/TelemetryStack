@@ -1,7 +1,6 @@
 {
-  "dashboard": {
-    "id": null,
-    "title": "IRacing Telemetry Overview",
+  "id": null,
+  "title": "IRacing Telemetry Overview",
     "tags": ["iracing", "telemetry"],
     "timezone": "browser",
     "refresh": "5s",
@@ -191,5 +190,4 @@
     "schemaVersion": 36,
     "version": 1,
     "links": []
-  }
 }
