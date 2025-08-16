@@ -50,7 +50,7 @@ public class Subscriber
             HostName = "rabbitmq",
             Port = 5672,
             UserName = "guest",
-            Password = "guest",
+            Password = "changeme",
             RequestedHeartbeat = TimeSpan.FromSeconds(30),
             AutomaticRecoveryEnabled = true,
             NetworkRecoveryInterval = TimeSpan.FromSeconds(10)
