@@ -46,7 +46,7 @@ public class Subscriber
     {
         var factory = new ConnectionFactory();
 
-        factory.Uri = new Uri("amqp://guest:changeme@rabbitmq:5672/vhost");
+        factory.Uri = new Uri("amqp://admin:changeme@rabbitmq:5672/vhost");
 
         Console.WriteLine($"Connecting to RabbitMQ at {factory.HostName}:{factory.Port} with user {factory.UserName}");
 
