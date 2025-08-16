@@ -1,7 +1,7 @@
 tls:
   certificates:
-    - certFile: /certs/localhost.crt
-      keyFile: /certs/localhost.key
+    - certFile: /certs/local.crt
+      keyFile: /certs/local.key
   options:
     default:
       minVersion: "VersionTLS12"

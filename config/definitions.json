@@ -9,6 +9,20 @@
     }
   ],
   "topic_permissions": [],
+  "users": [
+    {
+        "name": "admin",
+        "password_hash": "FTwEjnDO5R8xMjBYrEULfrr5Y3sT8Ky1D1qoJwqMeUPKQjr2",
+        "tags": ["administrator"]
+    }
+  ],
+  "permissions": [{
+    "user": "admin",
+    "vhost": "/",
+    "configure": ".*",
+    "write": ".*",
+    "read": ".*"
+  }],
   "parameters": [],
   "global_parameters": [],
   "policies": [],

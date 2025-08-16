@@ -8,6 +8,13 @@ public class QuestDbService
 {
     private ISender? _sender;
     private QuestDbSchemaManager? _schemaManager;
+    
+    // Circuit breaker properties
+    private int _consecutiveErrors = 0;
+    private DateTime _lastErrorTime = DateTime.MinValue;
+    private const int MaxConsecutiveErrors = 5;
+    private const int CircuitBreakerTimeoutMinutes = 2;
+    private bool _circuitBreakerOpen = false;
 
     public QuestDbService()
     {
@@ -20,7 +27,7 @@ public class QuestDbService
 
         _schemaManager = new QuestDbSchemaManager(url);
 
-        _sender = Sender.New($"http::addr={url.Replace("http://", "")};auto_flush_rows=10000;auto_flush_interval=1000;");
+        _sender = Sender.New($"http::addr={url.Replace("http://", "")};auto_flush_rows=2000;auto_flush_interval=500;");
         
         _ = Task.Run(async () => 
         {
@@ -109,6 +116,22 @@ public class QuestDbService
             Console.WriteLine("ERROR: QuestDB sender is not initialized");
             return;
         }
+        
+        // Check circuit breaker
+        if (_circuitBreakerOpen)
+        {
+            if (DateTime.UtcNow - _lastErrorTime > TimeSpan.FromMinutes(CircuitBreakerTimeoutMinutes))
+            {
+                _circuitBreakerOpen = false;
+                _consecutiveErrors = 0;
+                Console.WriteLine("🔄 Circuit breaker CLOSED - Resuming QuestDB writes");
+            }
+            else
+            {
+                Console.WriteLine("⛔ Circuit breaker OPEN - Skipping QuestDB write");
+                return;
+            }
+        }
 
         try
         {
@@ -169,10 +192,23 @@ public class QuestDbService
             
             await _sender.SendAsync();
             Console.WriteLine($"Successfully wrote {telData.Records.Count} telemetry points");
+            
+            // Reset error count on successful write
+            _consecutiveErrors = 0;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"ERROR writing to QuestDB: {ex.Message}");
+            
+            // Increment error count and check circuit breaker
+            _consecutiveErrors++;
+            _lastErrorTime = DateTime.UtcNow;
+            
+            if (_consecutiveErrors >= MaxConsecutiveErrors)
+            {
+                _circuitBreakerOpen = true;
+                Console.WriteLine($"⛔ Circuit breaker OPENED after {_consecutiveErrors} consecutive errors - Stopping writes for {CircuitBreakerTimeoutMinutes} minutes");
+            }
             
             try
             {
@@ -180,7 +216,7 @@ public class QuestDbService
                 string? url = Environment.GetEnvironmentVariable("QUESTDB_URL");
                 if (url != null)
                 {
-                    _sender = Sender.New($"http::addr={url.Replace("http://", "")};auto_flush_rows=10000;auto_flush_interval=1000;");
+                    _sender = Sender.New($"http::addr={url.Replace("http://", "")};auto_flush_rows=2000;auto_flush_interval=500;");
                     Console.WriteLine("🔄 QuestDB sender reset after error");
                 }
             }

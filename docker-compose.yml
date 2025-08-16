@@ -1,29 +1,50 @@
 services:
+  ts-traefik:
+    image: tailscale/tailscale:latest
+    container_name: test-ts-traefik
+    hostname: test-traefik-1
+    environment:
+      - TS_AUTHKEY=tskey-auth-kMQ5RFMew421CNTRL-WtcnR6FrnedkTXHRgwquedHaf57Zm8cRR
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_SOCKET=/var/run/tailscale/tailscaled.sock
+    volumes:
+      - ./tailscale/data:/var/lib/tailscale:rw
+      - ./tailscale:/var/run/tailscale
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - net_admin
+      - sys_module
+    restart: unless-stopped
+
   traefik:
     image: traefik:v3.5
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
     ports:
-      - "80:80"     
-      - "443:443"   
-      - "8080:8080" 
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./traefik:/etc/traefik:ro  # Config directory
-      - ./certs:/certs:ro
-      - traefik-logs:/var/log/traefik  # Logs volume
+      - "80:80"
+      - "443:443"  
+      - "8080:8080"
     networks:
       - telemetry-network
+      - default
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik:/etc/traefik:ro
+      - ./certs:/certs:ro
+      - traefik-logs:/var/log/traefik
     environment:
       - TRAEFIK_DASHBOARD_AUTH=${TRAEFIK_DASHBOARD_AUTH}
-      - LOCAL_DOMAIN=${LOCAL_DOMAIN:-pi.local}
-      - TAILSCALE_DOMAIN=${TAILSCALE_DOMAIN:-your-tailscale-name}
+      - LOCAL_DOMAIN=${LOCAL_DOMAIN:-192.168.1.202}
+      - TAILSCALE_DOMAIN=${TAILSCALE_DOMAIN:-raspberrypi.tail95aa0e.ts.net}
     deploy:
       resources:
         limits:
-          cpus: 0.5
-          memory: 512m
+          cpus: '1.0'
+          memory: 1g
+        reservations:
+          cpus: '0.25'
+          memory: 256m
     healthcheck:
       test: ["CMD", "traefik", "healthcheck"]
       interval: 30s
@@ -32,15 +53,16 @@ services:
     labels:
       - "traefik.enable=true"
       # Dashboard accessible via both domains with enhanced security
-      - "traefik.http.routers.dashboard-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+      - "traefik.http.routers.dashboard-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && (PathPrefix(`/api`) || PathPrefix(`/net-dash`))"
       - "traefik.http.routers.dashboard-local.entrypoints=websecure"
       - "traefik.http.routers.dashboard-local.service=api@internal"
       - "traefik.http.routers.dashboard-local.tls=true"
       - "traefik.http.routers.dashboard-local.middlewares=dashboard-auth,secure-dashboard@file"
-      - "traefik.http.routers.dashboard-tailscale.rule=Host(`${TAILSCALE_DOMAIN:-your-tailscale-name}.ts.net`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+      - "traefik.http.routers.dashboard-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/net-dash`))"
       - "traefik.http.routers.dashboard-tailscale.entrypoints=websecure"
       - "traefik.http.routers.dashboard-tailscale.service=api@internal"
       - "traefik.http.routers.dashboard-tailscale.tls=true"
+      - "traefik.http.routers.dashboard-tailscale.tls.certresolver=tailscale"
       - "traefik.http.routers.dashboard-tailscale.middlewares=dashboard-auth,secure-dashboard@file"
       - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
 
@@ -49,7 +71,7 @@ services:
     container_name: rabbitmq
     restart: unless-stopped
     ports:
-      - "5672:5672"   # AMQP
+      - "5672:5672"
       - "15672:15672" # Management UI
       - "15692:15692" # Prometheus metrics
     volumes:
@@ -59,8 +81,8 @@ services:
       - rabbitmq-data:/var/lib/rabbitmq
     environment:
       # Create default admin user automatically
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-changeme}
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: changeme
       # Enable management load definitions
       RABBITMQ_MANAGEMENT_LOAD_DEFINITIONS: /etc/rabbitmq/definitions.json
     networks:
@@ -81,51 +103,18 @@ services:
       start_period: 30s
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.rabbitmq-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && PathPrefix(`/rabbitmq`)"
+      - "traefik.http.routers.rabbitmq-local.rule=Host(`${LOCAL_DOMAIN}`) && PathPrefix(`/rabbitmq`)"
       - "traefik.http.routers.rabbitmq-local.entrypoints=websecure"
       - "traefik.http.routers.rabbitmq-local.tls=true"
       - "traefik.http.routers.rabbitmq-local.middlewares=rabbitmq-stripprefix,secure-management@file"
-      - "traefik.http.routers.rabbitmq-tailscale.rule=Host(`${TAILSCALE_DOMAIN:-your-tailscale-name}.ts.net`) && PathPrefix(`/rabbitmq`)"
+      - "traefik.http.routers.rabbitmq-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/rabbitmq`)"
       - "traefik.http.routers.rabbitmq-tailscale.entrypoints=websecure"
       - "traefik.http.routers.rabbitmq-tailscale.tls=true"
+      - "traefik.http.routers.rabbitmq-tailscale.tls.certresolver=tailscale"
       - "traefik.http.routers.rabbitmq-tailscale.middlewares=rabbitmq-stripprefix,secure-management@file"
       - "traefik.http.middlewares.rabbitmq-stripprefix.stripprefix.prefixes=/rabbitmq"
+      - "traefik.http.services.rabbitmq.loadbalancer.server.port=5672"
       - "traefik.http.services.rabbitmq.loadbalancer.server.port=15672"
-
-  rabbitmq-setup:
-    image: rabbitmq:4.0-management
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    networks:
-      - telemetry-network
-    environment:
-      RABBITMQ_USER: ${RABBITMQ_USER:-admin}
-      RABBITMQ_PASS: ${RABBITMQ_PASS:-changeme}
-    command: >
-      sh -c "
-        echo 'Setting up RabbitMQ users...' &&
-        rabbitmqctl -n rabbit@rabbitmq await_startup &&
-        echo 'RabbitMQ is ready' &&
-        
-        # Create guest user if it doesn't exist
-        if ! rabbitmqctl -n rabbit@rabbitmq list_users | grep -q '^guest'; then
-          echo 'Creating guest user...' &&
-          rabbitmqctl -n rabbit@rabbitmq add_user guest $$RABBITMQ_PASS &&
-          rabbitmqctl -n rabbit@rabbitmq set_user_tags guest administrator &&
-          rabbitmqctl -n rabbit@rabbitmq set_permissions -p / guest '.*' '.*' '.*' &&
-          echo 'Guest user created successfully'
-        else
-          echo 'Guest user already exists, updating password...' &&
-          rabbitmqctl -n rabbit@rabbitmq change_password guest $$RABBITMQ_PASS
-        fi &&
-        
-        # Ensure admin user has correct permissions
-        rabbitmqctl -n rabbit@rabbitmq set_user_tags $$RABBITMQ_USER administrator &&
-        rabbitmqctl -n rabbit@rabbitmq set_permissions -p / $$RABBITMQ_USER '.*' '.*' '.*' &&
-        echo 'RabbitMQ setup completed!'
-      "
-    restart: "no"
 
   questdb:
     image: questdb/questdb:latest
@@ -138,9 +127,8 @@ services:
       - "9003:9003" 
     volumes:
       - questdb-data:/var/lib/questdb
-      - ./config/questdb.conf:/var/lib/questdb/conf/server.conf:ro
     environment:
-      JAVA_OPTS: "-Xmx4g -Xms2g -Dquestdb.conf=/var/lib/questdb/conf/server.conf"
+      JAVA_OPTS: "-Xmx2g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=100"
       QDB_HTTP_ENABLED: "true"
       QDB_PG_ENABLED: "true"
       QDB_LINE_TCP_ENABLED: "true"
@@ -149,90 +137,44 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '3.0'     
-          memory: 6g      
+          cpus: '2.0'     
+          memory: 3g      
         reservations:
-          cpus: '2.0'      
-          memory: 2g       
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9000/ || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+          cpus: '1.0'      
+          memory: 1g       
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.questdb-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && PathPrefix(`/questdb`)"
+      # QuestDB API routes (no web UI, direct API access)
+      - "traefik.http.routers.questdb-local.rule=Host(`${LOCAL_DOMAIN}`) && PathPrefix(`/questdb`)"
       - "traefik.http.routers.questdb-local.entrypoints=websecure"
       - "traefik.http.routers.questdb-local.tls=true"
-      - "traefik.http.routers.questdb-local.middlewares=questdb-stripprefix,secure-management@file"
-      - "traefik.http.routers.questdb-tailscale.rule=Host(`${TAILSCALE_DOMAIN:-your-tailscale-name}.ts.net`) && PathPrefix(`/questdb`)"
+      - "traefik.http.routers.questdb-local.middlewares=questdb-stripprefix"
+      - "traefik.http.routers.questdb-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/questdb`)"
       - "traefik.http.routers.questdb-tailscale.entrypoints=websecure"
       - "traefik.http.routers.questdb-tailscale.tls=true"
-      - "traefik.http.routers.questdb-tailscale.middlewares=questdb-stripprefix,secure-management@file"
+      - "traefik.http.routers.questdb-tailscale.tls.certresolver=tailscale"
+      - "traefik.http.routers.questdb-tailscale.middlewares=questdb-stripprefix"
       - "traefik.http.middlewares.questdb-stripprefix.stripprefix.prefixes=/questdb"
       - "traefik.http.services.questdb.loadbalancer.server.port=9000"
-
-  questdb-setup:
-    image: curlimages/curl:latest
-    depends_on:
-      questdb:
-        condition: service_healthy
-    networks:
-      - telemetry-network
-    command: >
-      sh -c "
-        echo 'Setting up QuestDB tables...' &&
-        sleep 5 &&
-        
-        echo 'Creating TelemetryTicks table...' &&
-        curl -G 'http://questdb:9000/exec' \
-          --data-urlencode 'query=CREATE TABLE IF NOT EXISTS TelemetryTicks (
-            session_id SYMBOL,
-            track_name SYMBOL,
-            timestamp TIMESTAMP,
-            Speed DOUBLE,
-            RPM DOUBLE,
-            Throttle DOUBLE,
-            Brake DOUBLE,
-            SteeringWheelAngle DOUBLE,
-            Gear INT,
-            Lap INT,
-            LapDistance DOUBLE,
-            SessionTime DOUBLE,
-            CarId INT,
-            DriverName SYMBOL
-          ) TIMESTAMP(timestamp) PARTITION BY DAY;' &&
-        
-        echo 'Creating indexes for performance...' &&
-        curl -G 'http://questdb:9000/exec' \
-          --data-urlencode 'query=CREATE INDEX IF NOT EXISTS idx_session ON TelemetryTicks (session_id);' &&
-        
-        curl -G 'http://questdb:9000/exec' \
-          --data-urlencode 'query=CREATE INDEX IF NOT EXISTS idx_track ON TelemetryTicks (track_name);' &&
-        
-        echo 'QuestDB setup completed!'
-      "
-    restart: "no"
 
   telemetry-service:
     image: ghcr.io/ojparkinson/iracing-telemetryservice:latest
     container_name: telemetry-service
     restart: unless-stopped
     depends_on:
-      rabbitmq-setup:
-        condition: service_completed_successfully
-      questdb-setup:
-        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      # questdb:
+      #   condition: service_healthy
     networks:
       - telemetry-network
     environment:
-      QUESTDB_URL: ${QUESTDB_TCP_URL:-tcp::addr=questdb:9009;}
+      QUESTDB_URL: questdb:9000;username=admin;password=quest
       
       RABBITMQ_HOST: rabbitmq
-      RABBITMQ_USER: ${RABBITMQ_USER:-admin}
-      RABBITMQ_PASS: ${RABBITMQ_PASS:-changeme}
-      RABBITMQ_URL: ${RABBITMQ_URL}
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: changeme
+      RABBITMQ_URL: amqp://guest:changeme@rabbitmq:5672/
       
       # Application settings
       DOTNET_ENVIRONMENT: Production
@@ -256,9 +198,6 @@ services:
     image: ghcr.io/ojparkinson/iracing-display:latest
     container_name: telemetry-dashboard
     restart: unless-stopped
-    depends_on:
-      questdb-setup:
-        condition: service_completed_successfully
     environment:
       # QuestDB connection for READING data (uses PostgreSQL wire protocol)
       QUESTDB_URL: postgresql://admin:quest@questdb:8812/qdb
@@ -270,7 +209,7 @@ services:
       
       # Application settings optimized for high concurrency
       NODE_ENV: production
-      NODE_OPTIONS: "--max-old-space-size=768"  # Optimize Node.js heap
+      NODE_OPTIONS: "--max-old-space-size=768 --max-semi-space-size=128"  # Optimize Node.js heap
       NEXT_PUBLIC_APP_URL: https://${LOCAL_DOMAIN:-pi.local}/dashboard
       NEXT_PUBLIC_BACKEND_URL: https://${LOCAL_DOMAIN:-pi.local}/api
     networks:
@@ -280,14 +219,6 @@ services:
         limits:
           cpus: '1.0'      # 1 core for web server and API
           memory: 1g       # Large heap for high concurrency
-        reservations:
-          cpus: '0.25'     # Minimum resources
-          memory: 256m
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
     labels:
       - "traefik.enable=true"
       # Dashboard main routes
@@ -295,18 +226,20 @@ services:
       - "traefik.http.routers.telemetry-dashboard-local.entrypoints=websecure"
       - "traefik.http.routers.telemetry-dashboard-local.tls=true"
       - "traefik.http.routers.telemetry-dashboard-local.middlewares=dashboard-stripprefix,default-security@file"
-      - "traefik.http.routers.telemetry-dashboard-tailscale.rule=Host(`${TAILSCALE_DOMAIN:-your-tailscale-name}.ts.net`) && PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.telemetry-dashboard-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/dashboard`)"
       - "traefik.http.routers.telemetry-dashboard-tailscale.entrypoints=websecure"
       - "traefik.http.routers.telemetry-dashboard-tailscale.tls=true"
+      - "traefik.http.routers.telemetry-dashboard-tailscale.tls.certresolver=tailscale"
       - "traefik.http.routers.telemetry-dashboard-tailscale.middlewares=dashboard-stripprefix,default-security@file"
       # Static assets routes (higher priority)
       - "traefik.http.routers.dashboard-static-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && PathPrefix(`/_next/static`)"
       - "traefik.http.routers.dashboard-static-local.entrypoints=websecure"
       - "traefik.http.routers.dashboard-static-local.tls=true"
       - "traefik.http.routers.dashboard-static-local.priority=200"
-      - "traefik.http.routers.dashboard-static-tailscale.rule=Host(`${TAILSCALE_DOMAIN:-your-tailscale-name}.ts.net`) && PathPrefix(`/_next/static`)"
+      - "traefik.http.routers.dashboard-static-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/_next/static`)"
       - "traefik.http.routers.dashboard-static-tailscale.entrypoints=websecure"
       - "traefik.http.routers.dashboard-static-tailscale.tls=true"
+      - "traefik.http.routers.dashboard-static-tailscale.tls.certresolver=tailscale"
       - "traefik.http.routers.dashboard-static-tailscale.priority=200"
       # Middlewares and services
       - "traefik.http.middlewares.dashboard-stripprefix.stripprefix.prefixes=/dashboard"
@@ -317,9 +250,6 @@ services:
     image: grafana/grafana:10.4.8
     container_name: grafana
     restart: unless-stopped
-    depends_on:
-      questdb-setup:
-        condition: service_completed_successfully
     volumes:
       - grafana-data:/var/lib/grafana
       - ./config/grafana:/etc/grafana/provisioning:ro
@@ -339,8 +269,8 @@ services:
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
       
-      # QuestDB connection for Grafana (uses PostgreSQL wire protocol)
-      GF_DATABASE_URL: postgresql://admin:quest@questdb:8812/qdb
+      # Remove problematic database URL - use default SQLite
+      # GF_DATABASE_URL: postgresql://admin:quest@questdb:8812/qdb
     networks:
       - telemetry-network
     deploy:
@@ -357,9 +287,10 @@ services:
       - "traefik.http.routers.grafana-local.entrypoints=websecure"
       - "traefik.http.routers.grafana-local.tls=true"
       - "traefik.http.routers.grafana-local.middlewares=secure-management@file"
-      - "traefik.http.routers.grafana-tailscale.rule=Host(`${TAILSCALE_DOMAIN:-your-tailscale-name}.ts.net`) && PathPrefix(`/grafana`)"
+      - "traefik.http.routers.grafana-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/grafana`)"
       - "traefik.http.routers.grafana-tailscale.entrypoints=websecure"
       - "traefik.http.routers.grafana-tailscale.tls=true"
+      - "traefik.http.routers.grafana-tailscale.tls.certresolver=tailscale"
       - "traefik.http.routers.grafana-tailscale.middlewares=secure-management@file"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
 
@@ -396,9 +327,10 @@ services:
       - "traefik.http.routers.prometheus-local.entrypoints=websecure"
       - "traefik.http.routers.prometheus-local.tls=true"
       - "traefik.http.routers.prometheus-local.middlewares=prometheus-stripprefix,secure-management@file"
-      - "traefik.http.routers.prometheus-tailscale.rule=Host(`${TAILSCALE_DOMAIN:-your-tailscale-name}.ts.net`) && PathPrefix(`/prometheus`)"
+      - "traefik.http.routers.prometheus-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/prometheus`)"
       - "traefik.http.routers.prometheus-tailscale.entrypoints=websecure"
       - "traefik.http.routers.prometheus-tailscale.tls=true"
+      - "traefik.http.routers.prometheus-tailscale.tls.certresolver=tailscale"
       - "traefik.http.routers.prometheus-tailscale.middlewares=prometheus-stripprefix,secure-management@file"
       - "traefik.http.middlewares.prometheus-stripprefix.stripprefix.prefixes=/prometheus"
       - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
@@ -458,4 +390,4 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.20.0.0/16
+        - subnet: 172.22.0.0/16

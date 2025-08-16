@@ -5,7 +5,10 @@ global:
 # API and Dashboard
 api:
   dashboard: true
-  insecure: false
+  insecure: true
+
+# Ping endpoint for healthcheck
+ping: {}
 
 # Entry Points
 entryPoints:
@@ -18,24 +21,22 @@ entryPoints:
           scheme: https
   websecure:
     address: ":443"
-    http:
-      tls:
-        options: default
 
 # Providers
 providers:
   docker:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
-    network: "iracing-display_telemetry-network"
     watch: true
   
   file:
     directory: /etc/traefik
     watch: true
 
-# Certificates (none configured - using static certificates)
-# certificatesResolvers:
+# Certificate Resolvers
+certificatesResolvers:
+  tailscale:
+    tailscale: {}
 
 # Logging
 log:

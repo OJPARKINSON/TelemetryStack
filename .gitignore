@@ -36,6 +36,7 @@ go.work.sum
 api_keys/
 tokens/
 credentials/
+auth_credentials.txt
 ingest/go/ibt_files/*.ibt
 *.DS_Store
 .DS_Store
