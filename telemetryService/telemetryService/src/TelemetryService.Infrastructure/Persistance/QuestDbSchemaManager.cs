@@ -252,7 +252,7 @@ public class QuestDbSchemaManager
     {
         var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
         Console.WriteLine($"🔄 Starting table optimization process...");
-        
+
         try
         {
             var currentStats = await GetTableStats();
@@ -263,10 +263,10 @@ public class QuestDbSchemaManager
 
             Console.WriteLine("   Creating backup of existing table...");
             await ExecuteQuery($"RENAME TABLE TelemetryTicks TO TelemetryTicks_backup_{timestamp}");
-            
+
             Console.WriteLine("   Creating optimized table structure...");
             await CreateOptimizedTable();
-            
+
             var migrationSql = $@"
                 INSERT INTO TelemetryTicks 
                 SELECT 
@@ -329,23 +329,23 @@ public class QuestDbSchemaManager
                     timestamp
                 FROM TelemetryTicks_backup_{timestamp};
             ";
-            
+
             await ExecuteQuery(migrationSql);
-            
+
             await AddOptimizedIndexes();
-            
+
             var newStats = await GetTableStats();
             if (newStats.TryGetValue("row_count", out var newRowCountObj))
             {
                 Console.WriteLine($"   Migration verified: {newRowCountObj} records in optimized table");
             }
-            
+
 
         }
         catch (Exception ex)
         {
             Console.WriteLine($"❌ Migration failed: {ex.Message}");
-            
+
             // Attempt rollback
             try
             {
@@ -359,7 +359,7 @@ public class QuestDbSchemaManager
                 Console.WriteLine($"❌ Rollback failed: {rollbackEx.Message}");
                 Console.WriteLine($"⚠️  Manual intervention required. Backup table: TelemetryTicks_backup_{timestamp}");
             }
-            
+
             throw;
         }
     }
@@ -371,6 +371,9 @@ public class QuestDbSchemaManager
             await ExecuteQuery("ALTER TABLE TelemetryTicks ADD INDEX session_lap_idx (session_id, lap_id)");
             await ExecuteQuery("ALTER TABLE TelemetryTicks ADD INDEX track_session_idx (track_name, session_id)");
             await ExecuteQuery("ALTER TABLE TelemetryTicks ADD INDEX session_time_idx (session_id, session_time)");
+
+            await ExecuteQuery("ALTER TABLE TelemetryTicks DEDUP ENABLE UPSERT KEYS (car_id, timestamp)");
+
             
             Console.WriteLine("✅ Composite indexes added successfully");
         }
