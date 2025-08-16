@@ -44,17 +44,9 @@ public class Subscriber
 
     private async Task ConnectAndSubscribeAsync()
     {
-        var factory = new ConnectionFactory
-        {
-            // Potentially need to use localhost when running locally
-            HostName = "rabbitmq",
-            Port = 5672,
-            UserName = "guest",
-            Password = "changeme",
-            RequestedHeartbeat = TimeSpan.FromSeconds(30),
-            AutomaticRecoveryEnabled = true,
-            NetworkRecoveryInterval = TimeSpan.FromSeconds(10)
-        };
+        var factory = new ConnectionFactory();
+
+        factory.Uri = new Uri("amqp://guest:changeme@rabbitmq:5672/vhost");
 
         Console.WriteLine($"Connecting to RabbitMQ at {factory.HostName}:{factory.Port} with user {factory.UserName}");
 
