@@ -68,11 +68,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.5'      
-          memory: 3g       
+          cpus: '2.0'      
+          memory: 5g       
         reservations:
           cpus: '0.5'      
-          memory: 512m     
+          memory: 1g     
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 30s

@@ -114,8 +114,7 @@ public class QuestDbService
         {
             foreach (var tel in telData.Records)
             {
-
-                _sender.Table("TelemetryTicks")
+                await _sender.Table("TelemetryTicks")
                     .Symbol("session_id", tel.SessionId)
                     .Symbol("track_name", tel.TrackName)
                     .Symbol("track_id", tel.TrackId)
@@ -165,7 +164,7 @@ public class QuestDbService
                     .Column("rFtempM", (float)tel.RFtempM)
                     .Column("lRtempM", (float)tel.LRtempM)
                     .Column("rRtempM", (float)tel.RRtempM)
-                    .At(tel.TickTime.ToDateTime());
+                    .AtAsync(tel.TickTime.ToDateTime());
             }
             
             await _sender.SendAsync();
@@ -174,6 +173,21 @@ public class QuestDbService
         catch (Exception ex)
         {
             Console.WriteLine($"ERROR writing to QuestDB: {ex.Message}");
+            
+            try
+            {
+                _sender?.Dispose();
+                string? url = Environment.GetEnvironmentVariable("QUESTDB_URL");
+                if (url != null)
+                {
+                    _sender = Sender.New($"http::addr={url.Replace("http://", "")};auto_flush_rows=10000;auto_flush_interval=1000;");
+                    Console.WriteLine("🔄 QuestDB sender reset after error");
+                }
+            }
+            catch (Exception resetEx)
+            {
+                Console.WriteLine($"⚠️  Failed to reset sender: {resetEx.Message}");
+            }
         }
     }
 }
