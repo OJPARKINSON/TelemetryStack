@@ -182,11 +182,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'      # 1 core for telemetry processing
-          memory: 1g       # Generous memory for .NET runtime
+          cpus: '1.25'      # 1 core for telemetry processing
+          memory: 8g       # Much more memory for high-volume telemetry processing
         reservations:
           cpus: '0.25'     # Minimum guaranteed resources
-          memory: 256m
+          memory: 1g
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
       interval: 30s

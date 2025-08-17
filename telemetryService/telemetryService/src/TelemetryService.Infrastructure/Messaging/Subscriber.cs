@@ -11,7 +11,7 @@ public class Subscriber
 {
     private const int MaxRetryAttempts = 10;
     private const int RetryDelayMs = 5000;
-    private const int MaxConcurrentProcessing = 15;
+    private const int MaxConcurrentProcessing = 50;
     private const double MemoryThresholdPercent = 0.80;
     private readonly QuestDbService _questDbService;
     private readonly SemaphoreSlim _processingSemaphore = new(MaxConcurrentProcessing, MaxConcurrentProcessing);
@@ -59,7 +59,7 @@ public class Subscriber
         Console.WriteLine("Successfully connected to RabbitMQ!");
 
         using var channel = await connection.CreateChannelAsync();
-        await channel.BasicQosAsync(0, 50, false);
+        await channel.BasicQosAsync(0, 200, false);
         Console.WriteLine("Channel created successfully");
 
         await channel.ExchangeDeclareAsync(
@@ -141,8 +141,8 @@ public class Subscriber
             var process = System.Diagnostics.Process.GetCurrentProcess();
             var memoryUsagePercent = (double)process.WorkingSet64 / (1024 * 1024 * 1024); // Convert to GB
             
-            // Simple heuristic: if working set > 800MB, pause processing
-            var shouldPause = memoryUsagePercent > 0.8;
+            // Simple heuristic: if working set > 5GB (83% of 6GB limit), pause processing
+            var shouldPause = memoryUsagePercent > 5.0;
             
             if (shouldPause != _pauseProcessing)
             {
