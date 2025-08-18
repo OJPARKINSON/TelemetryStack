@@ -5,6 +5,7 @@ datasources:
     type: prometheus
     access: proxy
     url: http://prometheus:9090
+    uid: PBFA97CFB590B2093
     isDefault: true
     editable: true
     jsonData:
@@ -17,6 +18,7 @@ datasources:
     url: questdb:8812
     database: qdb
     user: admin
+    uid: questdb
     secureJsonData:
       password: quest
     jsonData:
@@ -29,6 +31,7 @@ datasources:
     type: loki
     access: proxy
     url: http://loki:3100
+    uid: loki
     editable: true
     jsonData:
       maxLines: 1000

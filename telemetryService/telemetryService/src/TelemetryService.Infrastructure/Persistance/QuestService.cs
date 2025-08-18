@@ -8,13 +8,6 @@ public class QuestDbService
 {
     private ISender? _sender;
     private QuestDbSchemaManager? _schemaManager;
-    
-    // Circuit breaker properties
-    private int _consecutiveErrors = 0;
-    private DateTime _lastErrorTime = DateTime.MinValue;
-    private const int MaxConsecutiveErrors = 5;
-    private const int CircuitBreakerTimeoutMinutes = 2;
-    private bool _circuitBreakerOpen = false;
 
     public QuestDbService()
     {
@@ -116,28 +109,12 @@ public class QuestDbService
             Console.WriteLine("ERROR: QuestDB sender is not initialized");
             return;
         }
-        
-        // Check circuit breaker
-        if (_circuitBreakerOpen)
-        {
-            if (DateTime.UtcNow - _lastErrorTime > TimeSpan.FromMinutes(CircuitBreakerTimeoutMinutes))
-            {
-                _circuitBreakerOpen = false;
-                _consecutiveErrors = 0;
-                Console.WriteLine("🔄 Circuit breaker CLOSED - Resuming QuestDB writes");
-            }
-            else
-            {
-                Console.WriteLine("⛔ Circuit breaker OPEN - Skipping QuestDB write");
-                return;
-            }
-        }
 
         try
         {
             foreach (var tel in telData.Records)
             {
-                await _sender.Table("TelemetryTicks")
+                _sender.Table("TelemetryTicks")
                     .Symbol("session_id", tel.SessionId)
                     .Symbol("track_name", tel.TrackName)
                     .Symbol("track_id", tel.TrackId)
@@ -187,27 +164,36 @@ public class QuestDbService
                     .Column("rFtempM", (float)tel.RFtempM)
                     .Column("lRtempM", (float)tel.LRtempM)
                     .Column("rRtempM", (float)tel.RRtempM)
-                    .AtAsync(tel.TickTime.ToDateTime());
+                    .At(tel.TickTime.ToDateTime());
             }
             
             await _sender.SendAsync();
             Console.WriteLine($"Successfully wrote {telData.Records.Count} telemetry points");
+        }
+        catch (OutOfMemoryException ex)
+        {
+            Console.WriteLine($"❌ CRITICAL: OutOfMemoryException in QuestDB write operation");
+            Console.WriteLine($"   Message: {ex.Message}");
+            Console.WriteLine($"   Stack Trace: {ex.StackTrace}");
+            Console.WriteLine($"   Batch Size: {telData.Records.Count} records");
             
-            // Reset error count on successful write
-            _consecutiveErrors = 0;
+            // Log memory state
+            var process = System.Diagnostics.Process.GetCurrentProcess();
+            var memoryUsageGB = (double)process.WorkingSet64 / (1024 * 1024 * 1024);
+            var gcMemoryMB = GC.GetTotalMemory(false) / (1024 * 1024);
+            Console.WriteLine($"   Current Memory Usage: {memoryUsageGB:F2}GB (Working Set)");
+            Console.WriteLine($"   GC Memory: {gcMemoryMB:F2}MB");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"ERROR writing to QuestDB: {ex.Message}");
+            Console.WriteLine($"❌ ERROR writing to QuestDB: {ex.GetType().Name}");
+            Console.WriteLine($"   Message: {ex.Message}");
+            Console.WriteLine($"   Stack Trace: {ex.StackTrace}");
+            Console.WriteLine($"   Batch Size: {telData.Records.Count} records");
             
-            // Increment error count and check circuit breaker
-            _consecutiveErrors++;
-            _lastErrorTime = DateTime.UtcNow;
-            
-            if (_consecutiveErrors >= MaxConsecutiveErrors)
+            if (ex.InnerException != null)
             {
-                _circuitBreakerOpen = true;
-                Console.WriteLine($"⛔ Circuit breaker OPENED after {_consecutiveErrors} consecutive errors - Stopping writes for {CircuitBreakerTimeoutMinutes} minutes");
+                Console.WriteLine($"   Inner Exception: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
             }
             
             try
