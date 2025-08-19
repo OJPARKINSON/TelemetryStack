@@ -1,6 +1,7 @@
 http:
   middlewares:
     # Security Headers Middleware
+    # Works with both Tailscale certificates and local self-signed certificates
     security-headers:
       headers:
         customFrameOptionsValue: "SAMEORIGIN"

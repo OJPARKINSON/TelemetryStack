@@ -1,21 +1,4 @@
 services:
-  ts-traefik:
-    image: tailscale/tailscale:latest
-    container_name: test-ts-traefik
-    hostname: test-traefik-1
-    environment:
-      - TS_AUTHKEY=tskey-auth-kMQ5RFMew421CNTRL-WtcnR6FrnedkTXHRgwquedHaf57Zm8cRR
-      - TS_STATE_DIR=/var/lib/tailscale
-      - TS_SOCKET=/var/run/tailscale/tailscaled.sock
-    volumes:
-      - ./tailscale/data:/var/lib/tailscale:rw
-      - ./tailscale:/var/run/tailscale
-      - /dev/net/tun:/dev/net/tun
-    cap_add:
-      - net_admin
-      - sys_module
-    restart: unless-stopped
-
   traefik:
     image: traefik:v3.5
     restart: unless-stopped
@@ -23,7 +6,7 @@ services:
       - no-new-privileges:true
     ports:
       - "80:80"
-      - "443:443"  
+      - "8443:443"  
       - "8080:8080"
     networks:
       - telemetry-network
@@ -31,9 +14,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik:/etc/traefik:ro
-      - ./certs:/certs:ro
       - traefik-logs:/var/log/traefik
-      - ./tailscale:/var/run/tailscale:ro
+      - /var/run/tailscale:/var/run/tailscale:ro
     environment:
       - TRAEFIK_DASHBOARD_AUTH=${TRAEFIK_DASHBOARD_AUTH}
       - LOCAL_DOMAIN=${LOCAL_DOMAIN:-192.168.1.202}
