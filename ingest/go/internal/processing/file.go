@@ -3,6 +3,7 @@ package processing
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -23,10 +24,11 @@ type FileProcessor struct {
 }
 
 type ProcessResult struct {
-	RecordCount int
-	BatchCount  int
-	SessionID   string
-	TrackName   string
+	RecordCount      int
+	BatchCount       int
+	SessionID        string
+	TrackName        string
+	MessagingMetrics *messaging.PublishMetrics
 }
 
 func NewFileProcessor(cfg *config.Config, workerID int, pool *messaging.ConnectionPool) (*FileProcessor, error) {
@@ -85,14 +87,29 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 	totalRecords := 0
 	totalBatches := 0
 
+	processors := make([]*loaderProcessor, 0, len(groups))
+
 	for groupNumber, group := range groups {
 		select {
 		case <-ctx.Done():
+			// Graceful shutdown: flush all active processors
+			log.Printf("Context cancelled, flushing %d active processors", len(processors))
+			for i, proc := range processors {
+				if flushErr := proc.FlushPendingData(); flushErr != nil {
+					log.Printf("Failed to flush processor %d: %v", i, flushErr)
+				}
+			}
 			return nil, ctx.Err()
 		default:
 		}
 		processor := NewLoaderProcessor(fp.pubSub, groupNumber, fp.config, fp.workerID)
+		processors = append(processors, processor)
+
 		if err := ibt.Process(ctx, group, processor); err != nil {
+			// Try to flush this processor before returning error
+			if flushErr := processor.FlushPendingData(); flushErr != nil {
+				log.Printf("Failed to flush processor on error: %v", flushErr)
+			}
 			return nil, err
 		}
 
@@ -107,12 +124,28 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 
 	ibt.CloseAllStubs(groups)
 
+	// Collect messaging metrics if pubSub exists
+	var messagingMetrics *messaging.PublishMetrics
+	if fp.pubSub != nil {
+		metrics := fp.pubSub.GetMetrics()
+		messagingMetrics = &metrics
+	}
+
 	return &ProcessResult{
-		RecordCount: totalRecords,
-		BatchCount:  totalBatches,
-		SessionID:   strconv.Itoa(weekendInfo.SubSessionID),
-		TrackName:   weekendInfo.TrackDisplayName,
+		RecordCount:      totalRecords,
+		BatchCount:       totalBatches,
+		SessionID:        strconv.Itoa(weekendInfo.SubSessionID),
+		TrackName:        weekendInfo.TrackDisplayName,
+		MessagingMetrics: messagingMetrics,
 	}, nil
+}
+
+func (fp *FileProcessor) FlushPendingData() error {
+	if fp.pubSub != nil {
+		log.Printf("FileProcessor: Flushing pending data for worker %d", fp.workerID)
+		return fp.pubSub.FlushBatch()
+	}
+	return nil
 }
 
 func (fp *FileProcessor) Close() error {

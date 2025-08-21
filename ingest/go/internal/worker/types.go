@@ -3,6 +3,8 @@ package worker
 import (
 	"os"
 	"time"
+
+	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/messaging"
 )
 
 type WorkItem struct {
@@ -12,21 +14,23 @@ type WorkItem struct {
 }
 
 type WorkResult struct {
-	FilePath       string
-	ProcessedCount int
-	BatchCount     int
-	Duration       time.Duration
-	SessionID      string
-	TrackName      string
-	WorkerID       int
+	FilePath         string
+	ProcessedCount   int
+	BatchCount       int
+	Duration         time.Duration
+	SessionID        string
+	TrackName        string
+	WorkerID         int
+	MessagingMetrics *messaging.PublishMetrics
 }
 
 type WorkError struct {
-	FilePath  string
-	Error     error
-	Retry     bool
-	WorkerID  int
-	Timestamp time.Time
+	FilePath   string
+	Error      error
+	Retry      bool
+	WorkerID   int
+	RetryCount int
+	Timestamp  time.Time
 }
 
 type WorkerMetrics struct {

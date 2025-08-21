@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -18,20 +18,56 @@ import (
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/config"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/processing"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/worker"
+	"go.uber.org/zap"
 )
 
 var progress *worker.ProgressDisplay
+var logger *zap.Logger
 
 func main() {
+	// Define CLI flags
+	var (
+		quiet        = flag.Bool("quiet", false, "Disable progress display entirely")
+		help         = flag.Bool("help", false, "Show help message")
+	)
+	flag.Parse()
+
+	if *help {
+		fmt.Println("IRacing Telemetry Ingest Service")
+		fmt.Println()
+		fmt.Println("Usage: ./ingest-app [options] <telemetry-folder-path>")
+		fmt.Println()
+		fmt.Println("Options:")
+		fmt.Println("  --quiet          Disable progress display entirely")
+		fmt.Println("  --help           Show this help message")
+		os.Exit(0)
+	}
+
 	startTime := time.Now()
+
+	// Initialize Zap logger
+	var err error
+	if *quiet {
+		// Production logger config when quiet
+		logger, err = zap.NewProduction()
+	} else {
+		// Development logger config for better terminal output
+		logger, err = zap.NewDevelopment()
+	}
+	if err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+	defer logger.Sync()
 
 	cfg := config.LoadConfig()
 
 	// Enable profiling if ENABLE_PPROF environment variable is set
 	if os.Getenv("ENABLE_PPROF") == "true" {
 		go func() {
-			log.Println("Starting pprof server on :6060")
-			log.Println(http.ListenAndServe(":6060", nil))
+			logger.Info("Starting pprof server on :6060")
+			if err := http.ListenAndServe(":6060", nil); err != nil {
+				logger.Error("pprof server failed", zap.Error(err))
+			}
 		}()
 	}
 
@@ -39,15 +75,15 @@ func main() {
 	if cpuProfile := os.Getenv("CPU_PROFILE"); cpuProfile != "" {
 		f, err := os.Create(cpuProfile)
 		if err != nil {
-			log.Fatal("Could not create CPU profile: ", err)
+			logger.Fatal("Could not create CPU profile", zap.Error(err))
 		}
 		defer f.Close()
 
 		if err := pprof.StartCPUProfile(f); err != nil {
-			log.Fatal("Could not start CPU profile: ", err)
+			logger.Fatal("Could not start CPU profile", zap.Error(err))
 		}
 		defer pprof.StopCPUProfile()
-		log.Printf("CPU profiling enabled, writing to %s", cpuProfile)
+		logger.Info("CPU profiling enabled", zap.String("file", cpuProfile))
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -57,60 +93,69 @@ func main() {
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-signalCh
-		if progress != nil {
-			progress.AddLog("Received shutdown signal...")
-		}
+		logger.Info("Graceful shutdown initiated - allowing data to be flushed...")
 		cancel()
 	}()
 
-	if len(os.Args) < 2 {
-		log.Fatal("Usage: ./telemetry-app <telemetry-folder-path> [--test-mode]")
+	// Get telemetry folder from remaining args after flag parsing
+	args := flag.Args()
+	if len(args) < 1 {
+		logger.Fatal("Usage: ./ingest-app [options] <telemetry-folder-path>")
 	}
 
-	telemetryFolder := os.Args[1]
+	telemetryFolder := args[0]
 
 	if !strings.HasSuffix(telemetryFolder, string(filepath.Separator)) {
 		telemetryFolder += string(filepath.Separator)
 	}
 
-	pool := worker.NewWorkerPool(cfg)
+	pool := worker.NewWorkerPool(cfg, logger)
 
-	expectedFiles, err := discoverAndQueueFiles(ctx, pool, telemetryFolder, cfg)
+	expectedFiles, err := discoverAndQueueFiles(ctx, pool, telemetryFolder, cfg, logger)
 	if err != nil {
-		log.Printf("Error during file discovery: %v", err)
+		logger.Error("Error during file discovery", zap.Error(err))
 		return
 	}
 
-	progress = worker.NewProgressDisplay(cfg.WorkerCount, expectedFiles)
-	pool.SetProgressDisplay(progress)
+	// Initialize progress display - bottom status is now the only mode
+	if !*quiet {
+		progress = worker.NewProgressDisplay(cfg.WorkerCount, expectedFiles)
+		// Zap logs will flow above the bottom status bar
 
-	// Temporarily disable log discarding to see error messages
-	log.SetOutput(io.Discard)
+		pool.SetProgressDisplay(progress)
+		progress.Start()
+		defer progress.Stop()
 
-	progress.Start()
-	defer progress.Stop()
-
-	progress.AddLog(fmt.Sprintf("Starting %d workers for %d files", cfg.WorkerCount, expectedFiles))
+		logger.Info("Starting ingest service",
+			zap.Int("workers", cfg.WorkerCount),
+			zap.Int("files", expectedFiles))
+	} else {
+		logger.Info("Starting ingest service in quiet mode",
+			zap.Int("workers", cfg.WorkerCount),
+			zap.Int("files", expectedFiles))
+	}
 
 	pool.Start()
 	defer pool.Stop()
 
-	waitForCompletion(ctx, pool, startTime, expectedFiles)
+	waitForCompletion(ctx, pool, startTime, expectedFiles, *quiet)
 
-	progress.AddLog(fmt.Sprintf("Completed in %v", time.Since(startTime)))
+	if !*quiet {
+		logger.Info("Processing completed", zap.Duration("duration", time.Since(startTime)))
+	}
 
 	// Write memory profile if MEM_PROFILE environment variable is set
 	if memProfile := os.Getenv("MEM_PROFILE"); memProfile != "" {
 		f, err := os.Create(memProfile)
 		if err != nil {
-			log.Printf("Could not create memory profile: %v", err)
+			logger.Error("Could not create memory profile", zap.Error(err))
 		} else {
 			defer f.Close()
 			runtime.GC() // get up-to-date statistics
 			if err := pprof.WriteHeapProfile(f); err != nil {
-				log.Printf("Could not write memory profile: %v", err)
+				logger.Error("Could not write memory profile", zap.Error(err))
 			} else {
-				log.Printf("Memory profile written to %s", memProfile)
+				logger.Info("Memory profile written", zap.String("file", memProfile))
 			}
 		}
 	}
@@ -118,8 +163,8 @@ func main() {
 	time.Sleep(2 * time.Second)
 }
 
-func discoverAndQueueFiles(ctx context.Context, pool *worker.WorkerPool, telemetryFolder string, cfg *config.Config) (int, error) {
-	directory := processing.NewDir(telemetryFolder, cfg)
+func discoverAndQueueFiles(ctx context.Context, pool *worker.WorkerPool, telemetryFolder string, cfg *config.Config, logger *zap.Logger) (int, error) {
+	directory := processing.NewDir(telemetryFolder, cfg, logger)
 	files := directory.WatchDir()
 
 	filesQueued := 0
@@ -152,18 +197,24 @@ func discoverAndQueueFiles(ctx context.Context, pool *worker.WorkerPool, telemet
 	return filesQueued, nil
 }
 
-func waitForCompletion(ctx context.Context, pool *worker.WorkerPool, startTime time.Time, expectedFiles int) {
+func waitForCompletion(ctx context.Context, pool *worker.WorkerPool, startTime time.Time, expectedFiles int, quiet bool) {
 	for {
 		select {
 		case <-ctx.Done():
-			progress.AddLog("Shutdown requested...")
+			if !quiet {
+				logger.Info("Shutdown requested")
+			}
 			return
 		default:
 			time.Sleep(20 * time.Millisecond)
 			metrics := pool.GetMetrics()
 
 			if metrics.QueueDepth == 0 && metrics.TotalFilesProcessed >= expectedFiles {
-				progress.AddLog("All files processed!")
+				if !quiet {
+					logger.Info("All files processed",
+						zap.Int("total_files", expectedFiles),
+						zap.Duration("duration", time.Since(startTime)))
+				}
 				return
 			}
 		}

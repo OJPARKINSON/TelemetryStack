@@ -2,13 +2,13 @@ package worker
 
 import (
 	"context"
-	"log"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/config"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/messaging"
+	"go.uber.org/zap"
 )
 
 // Helper to convert os.FileInfo to os.DirEntry for retry logic
@@ -36,9 +36,16 @@ type WorkerPool struct {
 	mu          sync.Mutex
 
 	rabbitPool *messaging.ConnectionPool
+	logger     *zap.Logger
 
 	workerMetrics   []WorkerMetrics
 	progressDisplay *ProgressDisplay
+	
+	// Data loss monitoring
+	totalRabbitMQFailures     int
+	totalPersistedBatches     int
+	totalCircuitBreakerEvents int
+	totalMemoryPressureEvents int
 }
 
 type PoolMetrics struct {
@@ -50,17 +57,24 @@ type PoolMetrics struct {
 	ActiveWorkers         int
 	QueueDepth            int
 	WorkerMetrics         []WorkerMetrics
+	
+	// Data loss tracking
+	RabbitMQFailures      int
+	PersistedBatches      int
+	CircuitBreakerEvents  int
+	MemoryPressureEvents  int
+	DataLossRate          float64 // Percentage of data that was lost vs persisted
 }
 
-func NewWorkerPool(cfg *config.Config) *WorkerPool {
+func NewWorkerPool(cfg *config.Config, logger *zap.Logger) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	rabbitPool, err := messaging.NewConnectionPool(cfg.RabbitMQURL, cfg.RabbitMQPoolSize)
 	if err != nil {
-		log.Fatalf("Failed to create RabbitMQ connection pool: %v", err)
+		logger.Fatal("Failed to create RabbitMQ connection pool", zap.Error(err))
 	}
 
-	log.Printf("Created RabbitMQ connection pool with %d connections", cfg.RabbitMQPoolSize)
+	logger.Info("Created RabbitMQ connection pool", zap.Int("connections", cfg.RabbitMQPoolSize))
 
 	workerMetrics := make([]WorkerMetrics, cfg.WorkerCount)
 	for i := range workerMetrics {
@@ -79,6 +93,7 @@ func NewWorkerPool(cfg *config.Config) *WorkerPool {
 		ctx:           ctx,
 		cancel:        cancel,
 		rabbitPool:    rabbitPool,
+		logger:        logger,
 		workerMetrics: workerMetrics,
 		metrics: PoolMetrics{
 			StartTime:     time.Now(),
@@ -92,7 +107,7 @@ func (wp *WorkerPool) SetProgressDisplay(pd *ProgressDisplay) {
 }
 
 func (wp *WorkerPool) Start() {
-	log.Printf("Starting worker pool with %d workers", wp.config.WorkerCount)
+	wp.logger.Info("Starting worker pool", zap.Int("workers", wp.config.WorkerCount))
 
 	wp.wg.Add(1)
 	go func() {
@@ -119,7 +134,7 @@ func (wp *WorkerPool) Start() {
 	wp.metrics.ActiveWorkers = wp.config.WorkerCount
 	wp.mu.Unlock()
 
-	log.Printf("Worker pool started successfully")
+	wp.logger.Info("Worker pool started successfully")
 }
 
 func (wp *WorkerPool) SubmitFile(item WorkItem) error {
@@ -135,24 +150,33 @@ func (wp *WorkerPool) SubmitFile(item WorkItem) error {
 }
 
 func (wp *WorkerPool) Stop() {
-	log.Println("Stopping worker pool...")
+	wp.logger.Info("Stopping worker pool")
 
+	// First close the file queue to prevent new work
 	close(wp.fileQueue)
 
+	// Give workers a chance to finish current files and flush data
+	wp.logger.Info("Waiting for workers to complete current tasks and flush data")
+	
+	// Wait a short time before cancelling context to allow graceful completion
+	time.Sleep(2 * time.Second)
+
+	// Now cancel the context for any remaining operations
 	wp.cancel()
 
+	// Wait for all workers to finish
 	wp.wg.Wait()
 
 	if wp.rabbitPool != nil {
 		wp.rabbitPool.Close()
-		log.Println("Closed RabbitMQ connection pool")
+		wp.logger.Info("Closed RabbitMQ connection pool")
 	}
 
 	close(wp.resultsChan)
 	close(wp.errorsChan)
 
 	wp.logFinalMetrics()
-	log.Println("Worker pool stopped")
+	wp.logger.Info("Worker pool stopped gracefully")
 }
 
 func (wp *WorkerPool) GetMetrics() PoolMetrics {
@@ -164,6 +188,20 @@ func (wp *WorkerPool) GetMetrics() PoolMetrics {
 
 	metrics.WorkerMetrics = make([]WorkerMetrics, len(wp.workerMetrics))
 	copy(metrics.WorkerMetrics, wp.workerMetrics)
+
+	// Copy data loss tracking metrics
+	metrics.RabbitMQFailures = wp.totalRabbitMQFailures
+	metrics.PersistedBatches = wp.totalPersistedBatches
+	metrics.CircuitBreakerEvents = wp.totalCircuitBreakerEvents
+	metrics.MemoryPressureEvents = wp.totalMemoryPressureEvents
+	
+	// Calculate data loss rate
+	totalBatches := metrics.TotalBatchesProcessed + wp.totalPersistedBatches
+	if totalBatches > 0 {
+		// Data loss rate = (persisted batches / total batches) * 100
+		// This represents the percentage of data that had to be persisted due to RabbitMQ failures
+		metrics.DataLossRate = (float64(wp.totalPersistedBatches) / float64(totalBatches)) * 100
+	}
 
 	return metrics
 }
@@ -239,6 +277,15 @@ func (wp *WorkerPool) handleResult(result WorkResult) {
 	wp.metrics.TotalRecordsProcessed += result.ProcessedCount
 	wp.metrics.TotalBatchesProcessed += result.BatchCount
 	wp.metrics.QueueDepth--
+	
+	// Aggregate messaging metrics from result if available
+	if result.MessagingMetrics != nil {
+		wp.totalRabbitMQFailures += result.MessagingMetrics.FailedBatches
+		wp.totalPersistedBatches += result.MessagingMetrics.PersistedBatches
+		if result.MessagingMetrics.CircuitBreakerOpen {
+			wp.totalCircuitBreakerEvents++
+		}
+	}
 
 	if result.WorkerID >= 0 && result.WorkerID < len(wp.workerMetrics) {
 		wm := &wp.workerMetrics[result.WorkerID]
@@ -276,26 +323,36 @@ func (wp *WorkerPool) handleResult(result WorkResult) {
 		}
 	}
 
-	log.Printf("Worker %d completed file %s: %d records in %d batches (took %v)",
-		result.WorkerID, result.FilePath, result.ProcessedCount,
-		result.BatchCount, result.Duration)
+	wp.logger.Info("Worker completed file",
+		zap.Int("worker_id", result.WorkerID),
+		zap.String("file_path", result.FilePath),
+		zap.Int("records_processed", result.ProcessedCount),
+		zap.Int("batches_processed", result.BatchCount),
+		zap.Duration("processing_time", result.Duration))
 }
 
 func (wp *WorkerPool) handleError(workError WorkError) {
-	log.Printf("WORKER POOL ERROR: Worker %d failed on file %s: %v", workError.WorkerID, workError.FilePath, workError.Error)
+	wp.logger.Error("Worker pool error",
+		zap.Int("worker_id", workError.WorkerID),
+		zap.String("file_path", workError.FilePath),
+		zap.Error(workError.Error))
 	wp.mu.Lock()
 	wp.metrics.TotalErrors++
 	wp.metrics.QueueDepth--
 	wp.mu.Unlock()
 
-	log.Printf("Worker %d error processing %s: %v",
-		workError.WorkerID, workError.FilePath, workError.Error)
+	wp.logger.Error("Worker error processing file",
+		zap.Int("worker_id", workError.WorkerID),
+		zap.String("file_path", workError.FilePath),
+		zap.Error(workError.Error))
 
-	if workError.Retry && workError.WorkerID < wp.config.MaxRetries {
+	if workError.Retry && workError.RetryCount < wp.config.MaxRetries {
 		// Try to get FileInfo for retry
 		fileInfo, err := os.Stat(workError.FilePath)
 		if err != nil {
-			log.Printf("Cannot retry %s: file stat error: %v", workError.FilePath, err)
+			wp.logger.Error("Cannot retry file - stat error",
+				zap.String("file_path", workError.FilePath),
+				zap.Error(err))
 			return
 		}
 
@@ -305,18 +362,21 @@ func (wp *WorkerPool) handleError(workError WorkError) {
 		retryItem := WorkItem{
 			FilePath:   workError.FilePath,
 			FileInfo:   dirEntry,
-			RetryCount: workError.WorkerID + 1,
+			RetryCount: workError.RetryCount + 1,
 		}
 
 		time.AfterFunc(wp.config.RetryDelay, func() {
 			select {
 			case wp.fileQueue <- retryItem:
-				log.Printf("Retrying file %s (attempt %d)", workError.FilePath, retryItem.RetryCount)
+				wp.logger.Info("Retrying file",
+					zap.String("file_path", workError.FilePath),
+					zap.Int("attempt", retryItem.RetryCount))
 			case <-wp.ctx.Done():
 			}
 		})
 	} else {
-		log.Printf("File %s failed permanently after retries", workError.FilePath)
+		wp.logger.Error("File failed permanently after retries",
+			zap.String("file_path", workError.FilePath))
 	}
 }
 
@@ -326,23 +386,45 @@ func (wp *WorkerPool) logFinalMetrics() {
 
 	duration := time.Since(wp.metrics.StartTime)
 
-	log.Printf("=== Final Worker Pool Metrics ===")
-	log.Printf("Total processing time: %v", duration)
-	log.Printf("Files processed: %d", wp.metrics.TotalFilesProcessed)
-	log.Printf("Records processed: %d", wp.metrics.TotalRecordsProcessed)
-	log.Printf("Batches sent: %d", wp.metrics.TotalBatchesProcessed)
-	log.Printf("Errors encountered: %d", wp.metrics.TotalErrors)
+	wp.logger.Info("=== Final Worker Pool Metrics ===")
+	wp.logger.Info("Total processing time", zap.Duration("duration", duration))
+	wp.logger.Info("Files processed", zap.Int("files", wp.metrics.TotalFilesProcessed))
+	wp.logger.Info("Records processed", zap.Int("records", wp.metrics.TotalRecordsProcessed))
+	wp.logger.Info("Batches sent", zap.Int("batches", wp.metrics.TotalBatchesProcessed))
+	wp.logger.Info("Errors encountered", zap.Int("errors", wp.metrics.TotalErrors))
+
+	// Data loss and reliability metrics
+	wp.logger.Info("=== Data Loss Monitoring ===")
+	wp.logger.Info("RabbitMQ failures", zap.Int("failures", wp.totalRabbitMQFailures))
+	wp.logger.Info("Batches persisted", zap.Int("persisted", wp.totalPersistedBatches))
+	wp.logger.Info("Circuit breaker events", zap.Int("events", wp.totalCircuitBreakerEvents))
+	wp.logger.Info("Memory pressure events", zap.Int("events", wp.totalMemoryPressureEvents))
+	
+	totalBatches := wp.metrics.TotalBatchesProcessed + wp.totalPersistedBatches
+	if totalBatches > 0 {
+		dataLossRate := (float64(wp.totalPersistedBatches) / float64(totalBatches)) * 100
+		successRate := (float64(wp.metrics.TotalBatchesProcessed) / float64(totalBatches)) * 100
+		wp.logger.Info("Data persistence rate",
+			zap.Float64("rate_percent", dataLossRate),
+			zap.Int("persisted_batches", wp.totalPersistedBatches),
+			zap.Int("total_batches", totalBatches))
+		wp.logger.Info("RabbitMQ success rate", zap.Float64("success_rate_percent", successRate))
+		
+		if dataLossRate > 5.0 {
+			wp.logger.Warn("High data persistence rate detected! Check RabbitMQ connectivity")
+		}
+	}
 
 	if wp.metrics.TotalFilesProcessed > 0 {
 		avgPerFile := duration / time.Duration(wp.metrics.TotalFilesProcessed)
-		log.Printf("Average time per file: %v", avgPerFile)
+		wp.logger.Info("Average time per file", zap.Duration("avg_time", avgPerFile))
 	}
 
 	if duration.Seconds() > 0 {
 		filesPerSec := float64(wp.metrics.TotalFilesProcessed) / duration.Seconds()
 		recordsPerSec := float64(wp.metrics.TotalRecordsProcessed) / duration.Seconds()
-		log.Println("filesPerSec: ", duration.Milliseconds())
-		log.Println("recordsPerSec: ", duration.Milliseconds())
-		log.Printf("Throughput: %d files/ms, %d records/ms", filesPerSec, recordsPerSec)
+		wp.logger.Info("Throughput",
+			zap.Float64("files_per_sec", filesPerSec),
+			zap.Float64("records_per_sec", recordsPerSec))
 	}
 }

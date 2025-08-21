@@ -2,23 +2,30 @@ package worker
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/fatih/color"
+	"golang.org/x/term"
 )
 
 type ProgressDisplay struct {
-	startTime   time.Time
-	totalFiles  int
-	workers     []*WorkerProgress
-	mu          sync.RWMutex
-	isRunning   bool
-	stopChan    chan bool
-	refreshRate time.Duration
-	logBuffer   []string
-	maxLogs     int
+	startTime     time.Time
+	totalFiles    int
+	workers       []*WorkerProgress
+	mu            sync.RWMutex
+	isRunning     bool
+	stopChan      chan bool
+	refreshRate   time.Duration
+	termWidth     int               // Terminal width
+	termHeight    int               // Terminal height
+	statusLine    int               // Which line the status bar is on
+	resizeChan    chan os.Signal    // Channel for terminal resize signals
+	lastStatus    string            // Last rendered status to avoid unnecessary updates
 }
 
 type WorkerProgress struct {
@@ -68,15 +75,29 @@ func NewProgressDisplay(workerCount, totalFiles int) *ProgressDisplay {
 		}
 	}
 
-	return &ProgressDisplay{
+	pd := &ProgressDisplay{
 		startTime:   time.Now(),
 		totalFiles:  totalFiles,
 		workers:     workers,
-		refreshRate: 200 * time.Millisecond,
+		refreshRate: 1000 * time.Millisecond, // Reduced frequency to reduce flashing
 		stopChan:    make(chan bool),
-		logBuffer:   make([]string, 0),
-		maxLogs:     3,
+		resizeChan:  make(chan os.Signal, 1),
+		lastStatus:  "",
 	}
+	
+	// Get terminal size
+	if width, height, err := term.GetSize(int(os.Stdout.Fd())); err == nil {
+		pd.termWidth = width
+		pd.termHeight = height
+		pd.statusLine = height // Bottom line
+	} else {
+		// Fallback values if terminal size detection fails
+		pd.termWidth = 80
+		pd.termHeight = 24
+		pd.statusLine = 24
+	}
+	
+	return pd
 }
 
 func (pd *ProgressDisplay) Start() {
@@ -84,9 +105,55 @@ func (pd *ProgressDisplay) Start() {
 	pd.isRunning = true
 	pd.mu.Unlock()
 
-	fmt.Print("\033[?25l\033[2J\033[H")
+	// Bottom status mode - hide cursor and reserve bottom line
+	fmt.Print("\033[?25l")
+	pd.initBottomStatus()
+	pd.startResizeMonitoring()
 
 	go pd.displayLoop()
+}
+
+func (pd *ProgressDisplay) initBottomStatus() {
+	// Move cursor to bottom line and clear it
+	fmt.Printf("\033[%d;1H\033[2K", pd.statusLine)
+	// Move cursor back up to allow logs to flow normally
+	fmt.Printf("\033[%d;1H", pd.statusLine-1)
+}
+
+func (pd *ProgressDisplay) startResizeMonitoring() {
+	if pd.resizeChan == nil {
+		return
+	}
+	
+	// Listen for terminal resize signals
+	signal.Notify(pd.resizeChan, syscall.SIGWINCH)
+	
+	go func() {
+		for {
+			select {
+			case <-pd.resizeChan:
+				pd.handleResize()
+			case <-pd.stopChan:
+				return
+			}
+		}
+	}()
+}
+
+func (pd *ProgressDisplay) handleResize() {
+	pd.mu.Lock()
+	defer pd.mu.Unlock()
+	
+	// Get new terminal size
+	if width, height, err := term.GetSize(int(os.Stdout.Fd())); err == nil {
+		pd.termWidth = width
+		pd.termHeight = height
+		pd.statusLine = height // Update bottom line position
+		pd.lastStatus = ""     // Force re-render after resize
+		
+		// Clear and reinitialize status bar at new position
+		fmt.Printf("\033[%d;1H\033[K", pd.statusLine)
+	}
 }
 
 func (pd *ProgressDisplay) Stop() {
@@ -96,7 +163,12 @@ func (pd *ProgressDisplay) Stop() {
 
 	pd.stopChan <- true
 
-	fmt.Print("\033[?25h")
+	// Stop resize monitoring and clear bottom status line
+	if pd.resizeChan != nil {
+		signal.Stop(pd.resizeChan)
+		close(pd.resizeChan)
+	}
+	fmt.Printf("\033[%d;1H\033[K\033[?25h", pd.statusLine)
 }
 
 func (pd *ProgressDisplay) UpdateWorker(workerID int, filesProcessed int, recordsProcessed int64, batchesProcessed int64, currentFile string, status WorkerStatus) {
@@ -145,19 +217,6 @@ func (pd *ProgressDisplay) UpdateWorkerWithTiming(workerID int, filesProcessed i
 	}
 }
 
-func (pd *ProgressDisplay) AddLog(message string) {
-	pd.mu.Lock()
-	defer pd.mu.Unlock()
-
-	timestamp := time.Now().Format("15:04:05")
-	logMsg := fmt.Sprintf("[%s] %s", timestamp, message)
-
-	pd.logBuffer = append(pd.logBuffer, logMsg)
-	if len(pd.logBuffer) > pd.maxLogs {
-		pd.logBuffer = pd.logBuffer[1:]
-	}
-}
-
 func (pd *ProgressDisplay) displayLoop() {
 	ticker := time.NewTicker(pd.refreshRate)
 	defer ticker.Stop()
@@ -165,189 +224,88 @@ func (pd *ProgressDisplay) displayLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			pd.render()
+			pd.renderBottomStatus()
 		case <-pd.stopChan:
 			return
 		}
 	}
 }
 
-func (pd *ProgressDisplay) render() {
-	pd.mu.RLock()
-	defer pd.mu.RUnlock()
-
-	fmt.Print("\033[H")
-
-	accent := color.New(color.FgCyan, color.Bold)
-
-	muted := color.New(color.FgHiBlack)
+func (pd *ProgressDisplay) renderBottomStatus() {
+	pd.mu.Lock()
+	defer pd.mu.Unlock()
 
 	elapsed := time.Since(pd.startTime)
-
 	totalFiles := pd.getTotalFilesProcessed()
 	totalRecords := pd.getTotalRecordsProcessed()
-	totalBatches := pd.getTotalBatchesProcessed()
-
+	
 	overallProgress := float64(totalFiles) / float64(pd.totalFiles) * 100
 	if pd.totalFiles == 0 {
 		overallProgress = 0
 	}
 
-	width := 95
-
-	fmt.Print("┌")
-	fmt.Print(strings.Repeat("─", width-2))
-	fmt.Println("┐")
-
-	fmt.Print("│ ")
-	accent.Print("⚡ IRacing Telemetry Ingest")
-	fmt.Print(" - Performance Monitor")
-	remaining := width - 52
-	fmt.Print(strings.Repeat(" ", remaining))
-	fmt.Println("│")
-
-	fmt.Print("├")
-	fmt.Print(strings.Repeat("─", width-2))
-	fmt.Println("┤")
-
-	fmt.Print("│ Overall: ")
-	pd.renderProgressBar(overallProgress, 35)
-	progressSuffix := fmt.Sprintf(" %.1f%% (%d/%d files)", overallProgress, totalFiles, pd.totalFiles)
-	fmt.Print(progressSuffix)
-	remaining = width - 10 - 37 - len(progressSuffix) - 1
-	if remaining > 0 {
-		fmt.Print(strings.Repeat(" ", remaining))
-	}
-	fmt.Println("│")
-
-	avgTimePerFile := pd.getAverageTimePerFile()
-
-	var perfIcon string
-	if avgTimePerFile > 0 {
-		ms := avgTimePerFile.Milliseconds()
-		if ms < 50 {
-			perfIcon = "🟢" // Green - excellent
-		} else if ms < 100 {
-			perfIcon = "🟡" // Yellow - good
-		} else {
-			perfIcon = "🔴" // Red - needs optimization
+	// Count active workers
+	activeWorkers := 0
+	for _, worker := range pd.workers {
+		if worker.Status == StatusProcessing {
+			activeWorkers++
 		}
-	} else {
-		perfIcon = "⚪" // White - no data
 	}
 
-	statsText := fmt.Sprintf("⏱️  Time: %v  📊 Records: %s  📦 Batches: %s  %s Avg/File: %s",
-		elapsed.Round(time.Second),
-		formatNumber(totalRecords),
-		formatNumber(totalBatches),
-		perfIcon,
-		formatDuration(avgTimePerFile))
-
+	// Calculate processing rate
+	var rateText string
 	if elapsed.Seconds() > 0 {
 		rate := float64(totalRecords) / elapsed.Seconds()
-		statsText += fmt.Sprintf("  🚀 Rate: %s/s", formatNumber(int64(rate)))
+		rateText = fmt.Sprintf(" | %s/s", formatNumber(int64(rate)))
 	}
 
-	fmt.Print("│ ")
-	fmt.Print(statsText)
+	// Build compact progress line
+	progressBar := pd.buildProgressBar(overallProgress, 20)
+	
+	progressLine := fmt.Sprintf("⚡ %s %.1f%% (%d/%d files) | %d workers | %s records | %v%s",
+		progressBar,
+		overallProgress,
+		totalFiles,
+		pd.totalFiles,
+		activeWorkers,
+		formatNumber(totalRecords),
+		elapsed.Round(time.Second),
+		rateText,
+	)
 
-	displayWidth := getDisplayWidth(statsText)
-	remaining = width - displayWidth - 3
-	if remaining > 0 {
-		fmt.Print(strings.Repeat(" ", remaining))
+	// Only update if the status has actually changed
+	if progressLine == pd.lastStatus {
+		return
 	}
-	fmt.Println("│")
+	pd.lastStatus = progressLine
 
-	fmt.Print("├")
-	fmt.Print(strings.Repeat("─", width-2))
-	fmt.Println("┤")
-
-	fmt.Print("│ ")
-	accent.Print("Worker  Status  Files  Records     Batches  Rate/s    Ms/File  Current File")
-	remaining = width - 73
-	fmt.Print(strings.Repeat(" ", remaining))
-	fmt.Println("│")
-
-	fmt.Print("├")
-	fmt.Print(strings.Repeat("─", width-2))
-	fmt.Println("┤")
-
-	for _, worker := range pd.workers {
-		msPerFile := formatDuration(worker.AvgTimePerFile)
-		if worker.FilesProcessed == 0 || worker.AvgTimePerFile == 0 {
-			msPerFile = "-"
-		}
-
-		currentFile := worker.CurrentFile
-		if len(currentFile) > 25 {
-			currentFile = "..." + currentFile[len(currentFile)-22:]
-		}
-
-		lineContent := fmt.Sprintf("W%-2d     %-4s  %-5d  %-10s  %-7s  %-8s  %-7s  %-25s",
-			worker.ID,
-			worker.Status.String(),
-			worker.FilesProcessed,
-			formatNumber(worker.RecordsProcessed),
-			formatNumber(worker.BatchesProcessed),
-			formatRate(worker.ProcessingRate),
-			msPerFile,
-			currentFile)
-
-		contentWidth := len([]rune(lineContent))
-		padding := width - contentWidth - 4
-		if padding < 0 {
-			padding = 0
-		}
-
-		fmt.Printf("│ %s%s │\n", lineContent, strings.Repeat(" ", padding))
-	}
-
-	if len(pd.logBuffer) > 0 {
-		fmt.Print("├")
-		fmt.Print(strings.Repeat("─", width-2))
-		fmt.Println("┤")
-
-		for _, logMsg := range pd.logBuffer {
-			if len(logMsg) > width-4 {
-				logMsg = logMsg[:width-7] + "..."
-			}
-			fmt.Printf("│ %s", logMsg)
-			remaining := width - len(logMsg) - 3
-			fmt.Print(strings.Repeat(" ", remaining))
-			fmt.Println("│")
-		}
-	}
-
-	fmt.Print("└")
-	fmt.Print(strings.Repeat("─", width-2))
-	fmt.Println("┘")
-
-	muted.Println("Press Ctrl+C to stop gracefully")
-
-	fmt.Print("\033[J")
+	// Use a more stable approach without cursor save/restore
+	fmt.Printf("\033[%d;1H\033[K%s\033[1G", pd.statusLine, progressLine)
 }
 
-func (pd *ProgressDisplay) renderProgressBar(percentage float64, width int) {
+func (pd *ProgressDisplay) buildProgressBar(percentage float64, width int) string {
 	filled := int(percentage / 100 * float64(width))
 	if filled > width {
 		filled = width
 	}
 
-	accent := color.New(color.FgCyan, color.Bold)
-	muted := color.New(color.FgHiBlack)
+	accent := color.New(color.FgCyan).SprintFunc()
+	muted := color.New(color.FgHiBlack).SprintFunc()
 
-	fmt.Print("█")
-
+	var bar strings.Builder
+	bar.WriteString("[")
+	
 	if filled > 0 {
-		accent.Print(strings.Repeat("█", filled))
+		bar.WriteString(accent(strings.Repeat("█", filled)))
 	}
-
+	
 	remaining := width - filled
 	if remaining > 0 {
-		muted.Print(strings.Repeat("░", remaining))
+		bar.WriteString(muted(strings.Repeat("░", remaining)))
 	}
-
-	fmt.Print("█")
+	
+	bar.WriteString("]")
+	return bar.String()
 }
 
 func (pd *ProgressDisplay) getTotalFilesProcessed() int {
@@ -366,14 +324,6 @@ func (pd *ProgressDisplay) getTotalRecordsProcessed() int64 {
 	return total
 }
 
-func (pd *ProgressDisplay) getTotalBatchesProcessed() int64 {
-	var total int64
-	for _, worker := range pd.workers {
-		total += worker.BatchesProcessed
-	}
-	return total
-}
-
 func formatNumber(n int64) string {
 	if n < 1000 {
 		return fmt.Sprintf("%d", n)
@@ -383,60 +333,6 @@ func formatNumber(n int64) string {
 		return fmt.Sprintf("%.1fM", float64(n)/1000000)
 	}
 	return fmt.Sprintf("%.1fB", float64(n)/1000000000)
-}
-
-func formatRate(rate float64) string {
-	if rate < 1000 {
-		return fmt.Sprintf("%.0f", rate)
-	} else if rate < 1000000 {
-		return fmt.Sprintf("%.1fK", rate/1000)
-	}
-	return fmt.Sprintf("%.1fM", rate/1000000)
-}
-
-func formatDuration(d time.Duration) string {
-	if d == 0 {
-		return "-"
-	}
-	ms := d.Milliseconds()
-	if ms < 1000 {
-		return fmt.Sprintf("%dms", ms)
-	} else if ms < 10000 {
-		return fmt.Sprintf("%dms", ms)
-	} else if ms < 60000 {
-		return fmt.Sprintf("%.1fs", float64(ms)/1000)
-	}
-	return fmt.Sprintf("%.1fm", float64(ms)/60000)
-}
-
-func (pd *ProgressDisplay) getAverageTimePerFile() time.Duration {
-	var totalTime time.Duration
-	var totalFiles int
-
-	for _, worker := range pd.workers {
-		if worker.FilesProcessed > 0 {
-			totalTime += worker.TotalFileTime
-			totalFiles += worker.FilesProcessed
-		}
-	}
-
-	if totalFiles == 0 {
-		return 0
-	}
-	return totalTime / time.Duration(totalFiles)
-}
-
-func getDisplayWidth(s string) int {
-	width := 0
-	runes := []rune(s)
-	for _, r := range runes {
-		if r > 0x1F600 && r < 0x1F6FF {
-			width += 2
-		} else {
-			width += 1
-		}
-	}
-	return width
 }
 
 func (pd *ProgressDisplay) UpdateFromPoolMetrics(metrics PoolMetrics, workerMetrics []WorkerMetrics) {

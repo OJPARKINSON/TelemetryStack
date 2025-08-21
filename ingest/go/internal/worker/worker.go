@@ -3,15 +3,15 @@ package worker
 import (
 	"context"
 	"fmt"
-	"log"
 	"path/filepath"
 	"time"
 
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/processing"
+	"go.uber.org/zap"
 )
 
 func (wp *WorkerPool) startWorker(workerID int) {
-	log.Printf("Worker %d starting", workerID)
+	wp.logger.Info("Worker starting", zap.Int("worker_id", workerID))
 
 	workerCtx, cancel := context.WithTimeout(wp.ctx, wp.config.WorkerTimeout)
 	defer cancel()
@@ -20,14 +20,14 @@ func (wp *WorkerPool) startWorker(workerID int) {
 		select {
 		case workItem, ok := <-wp.fileQueue:
 			if !ok {
-				log.Printf("Worker %d shutting down - queue closed", workerID)
+				wp.logger.Info("Worker shutting down - queue closed", zap.Int("worker_id", workerID))
 				return
 			}
 
 			wp.processWorkItem(workerCtx, workerID, workItem)
 
 		case <-workerCtx.Done():
-			log.Printf("Worker %d shutting down - context done: %v", workerID, workerCtx.Err())
+			wp.logger.Info("Worker shutting down - context done", zap.Int("worker_id", workerID), zap.Error(workerCtx.Err()))
 			return
 		}
 	}
@@ -37,13 +37,14 @@ func (wp *WorkerPool) processWorkItem(ctx context.Context, workerID int, item Wo
 	startTime := time.Now()
 
 	if item.FileInfo == nil {
-		log.Printf("Worker %d: FileInfo is nil for path: %s", workerID, item.FilePath)
+		wp.logger.Error("Worker FileInfo is nil", zap.Int("worker_id", workerID), zap.String("file_path", item.FilePath))
 		wp.errorsChan <- WorkError{
-			FilePath:  item.FilePath,
-			Error:     fmt.Errorf("FileInfo is nil"),
-			Retry:     false,
-			WorkerID:  workerID,
-			Timestamp: time.Now(),
+			FilePath:   item.FilePath,
+			Error:      fmt.Errorf("FileInfo is nil"),
+			Retry:      false,
+			WorkerID:   workerID,
+			RetryCount: item.RetryCount,
+			Timestamp:  time.Now(),
 		}
 		return
 	}
@@ -51,19 +52,20 @@ func (wp *WorkerPool) processWorkItem(ctx context.Context, workerID int, item Wo
 	filename := item.FileInfo.Name()
 	wp.UpdateWorkerStatus(workerID, filename, "PROCESSING")
 
-	log.Printf("Worker %d processing file: %s (retry %d)", workerID, item.FilePath, item.RetryCount)
+	wp.logger.Info("Worker processing file", zap.Int("worker_id", workerID), zap.String("file_path", item.FilePath), zap.Int("retry", item.RetryCount))
 
 	processor, err := processing.NewFileProcessor(wp.config, workerID, wp.rabbitPool)
 
 	if err != nil {
-		log.Printf("Worker %d ERROR creating file processor for %s: %v", workerID, filename, err)
+		wp.logger.Error("Worker error creating file processor", zap.Int("worker_id", workerID), zap.String("filename", filename), zap.Error(err))
 		wp.UpdateWorkerStatus(workerID, filename, "ERROR")
 		wp.errorsChan <- WorkError{
-			FilePath:  item.FilePath,
-			Error:     err,
-			Retry:     true,
-			WorkerID:  workerID,
-			Timestamp: time.Now(),
+			FilePath:   item.FilePath,
+			Error:      err,
+			Retry:      true,
+			WorkerID:   workerID,
+			RetryCount: item.RetryCount,
+			Timestamp:  time.Now(),
 		}
 		return
 	}
@@ -93,31 +95,41 @@ func (wp *WorkerPool) processWorkItem(ctx context.Context, workerID int, item Wo
 		result = res.result
 		processErr = res.err
 	case <-processCtx.Done():
-		processErr = fmt.Errorf("file processing timeout after %v", wp.config.FileProcessTimeout)
-		log.Printf("Worker %d: File processing timeout for %s", workerID, filename)
+		if processCtx.Err() == context.DeadlineExceeded {
+			processErr = fmt.Errorf("file processing timeout after %v", wp.config.FileProcessTimeout)
+			wp.logger.Warn("Worker file processing timeout", zap.Int("worker_id", workerID), zap.String("filename", filename))
+		} else {
+			wp.logger.Info("Worker graceful shutdown - attempting data flush", zap.Int("worker_id", workerID), zap.String("filename", filename))
+			if flushErr := processor.FlushPendingData(); flushErr != nil {
+				wp.logger.Error("Worker failed to flush pending data", zap.Int("worker_id", workerID), zap.String("filename", filename), zap.Error(flushErr))
+			}
+			processErr = fmt.Errorf("processing cancelled due to graceful shutdown")
+		}
 	}
 
 	if processErr != nil {
-		log.Printf("Worker %d ERROR processing file %s: %v", workerID, filename, processErr)
+		wp.logger.Error("Worker error processing file", zap.Int("worker_id", workerID), zap.String("filename", filename), zap.Error(processErr))
 		wp.UpdateWorkerStatus(workerID, filename, "ERROR")
 		wp.errorsChan <- WorkError{
-			FilePath:  item.FilePath,
-			Error:     processErr,
-			Retry:     shouldRetry(processErr, item.RetryCount),
-			WorkerID:  workerID,
-			Timestamp: time.Now(),
+			FilePath:   item.FilePath,
+			Error:      processErr,
+			Retry:      shouldRetry(processErr, item.RetryCount),
+			WorkerID:   workerID,
+			RetryCount: item.RetryCount,
+			Timestamp:  time.Now(),
 		}
 		return
 	}
 
 	wp.resultsChan <- WorkResult{
-		FilePath:       item.FilePath,
-		ProcessedCount: result.RecordCount,
-		BatchCount:     result.BatchCount,
-		Duration:       time.Since(startTime),
-		SessionID:      result.SessionID,
-		TrackName:      result.TrackName,
-		WorkerID:       workerID,
+		FilePath:         item.FilePath,
+		ProcessedCount:   result.RecordCount,
+		BatchCount:       result.BatchCount,
+		Duration:         time.Since(startTime),
+		SessionID:        result.SessionID,
+		TrackName:        result.TrackName,
+		WorkerID:         workerID,
+		MessagingMetrics: result.MessagingMetrics,
 	}
 }
 

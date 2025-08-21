@@ -3,6 +3,7 @@ package processing
 import (
 	"fmt"
 	"log"
+	"runtime"
 	"sync"
 	"time"
 
@@ -31,6 +32,12 @@ type loaderProcessor struct {
 	trackName      string
 	trackID        int
 	sessionInfoSet bool
+
+	// Memory pressure handling
+	lastMemCheck      time.Time
+	memCheckInterval  time.Duration
+	adaptiveBatchSize int
+	memoryPressure    bool
 }
 
 type sessionInfo struct {
@@ -40,11 +47,13 @@ type sessionInfo struct {
 }
 
 type processorMetrics struct {
-	totalProcessed    int
-	totalBatches      int
-	processingTime    time.Duration
-	maxBatchSize      int
-	processingStarted time.Time
+	totalProcessed       int
+	totalBatches         int
+	processingTime       time.Duration
+	maxBatchSize         int
+	processingStarted    time.Time
+	memoryPressureEvents int
+	adaptiveBatchSize    int
 }
 
 func NewLoaderProcessor(pubSub *messaging.PubSub, groupNumber int, config *config.Config, workerID int) *loaderProcessor {
@@ -67,9 +76,76 @@ func NewLoaderProcessor(pubSub *messaging.PubSub, groupNumber int, config *confi
 				return make(map[string]interface{}, 64)
 			},
 		},
+		
+		// Memory pressure handling initialization
+		lastMemCheck:      time.Now(),
+		memCheckInterval:  5 * time.Second,     // Check memory every 5 seconds
+		adaptiveBatchSize: 2000,                // Start with reasonable batch size
+		memoryPressure:    false,
 	}
 
 	return lp
+}
+
+// checkMemoryPressure monitors system memory and adjusts batch sizes accordingly
+func (l *loaderProcessor) checkMemoryPressure() {
+	now := time.Now()
+	if now.Sub(l.lastMemCheck) < l.memCheckInterval {
+		return
+	}
+	l.lastMemCheck = now
+
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	// Calculate memory pressure based on heap usage and GC pressure
+	heapMB := float64(memStats.HeapInuse) / 1024 / 1024
+	heapSysMB := float64(memStats.HeapSys) / 1024 / 1024
+	
+	// Pressure indicators:
+	// 1. High heap usage (>75% of system heap)
+	// 2. Recent GC activity (NumGC increased rapidly)
+	heapUsageRatio := heapMB / heapSysMB
+	gcPressure := memStats.NumGC > 0 && memStats.PauseNs[(memStats.NumGC+255)%256] > 5000000 // >5ms GC pause
+
+	previousPressure := l.memoryPressure
+	
+	if heapUsageRatio > 0.75 || gcPressure {
+		l.memoryPressure = true
+		// Reduce batch size under pressure
+		if l.adaptiveBatchSize > 500 {
+			l.adaptiveBatchSize = l.adaptiveBatchSize / 2
+			if !previousPressure {
+				l.metrics.memoryPressureEvents++
+				log.Printf("Worker %d: MEMORY PRESSURE detected (heap: %.1fMB, usage: %.1f%%, GC pause: %dus) - reducing batch size to %d",
+					l.workerID, heapMB, heapUsageRatio*100, memStats.PauseNs[(memStats.NumGC+255)%256]/1000, l.adaptiveBatchSize)
+			}
+		}
+		
+		// Emergency flush if we have data and memory pressure is severe
+		if heapUsageRatio > 0.90 && len(l.cache) > 100 {
+			log.Printf("Worker %d: SEVERE MEMORY PRESSURE (%.1f%%) - emergency flush of %d records", l.workerID, heapUsageRatio*100, len(l.cache))
+			if err := l.loadBatch(); err != nil {
+				log.Printf("Worker %d: Emergency flush failed: %v", l.workerID, err)
+			}
+		}
+	} else {
+		// Gradually increase batch size when memory pressure is low
+		if l.memoryPressure && heapUsageRatio < 0.5 {
+			l.memoryPressure = false
+			if l.adaptiveBatchSize < 2000 {
+				l.adaptiveBatchSize = min(l.adaptiveBatchSize * 2, 2000)
+				log.Printf("Worker %d: Memory pressure relieved - increasing batch size to %d", l.workerID, l.adaptiveBatchSize)
+			}
+		}
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (l *loaderProcessor) flushTimerCallback() {
@@ -167,10 +243,13 @@ func (l *loaderProcessor) Process(input ibt.Tick, hasNext bool, session *headers
 
 	l.mu.Lock()
 
-	// PERFORMANCE OPTIMIZATION: Dynamic batch size based on memory pressure
-	maxBatchSize := 2000
-	if l.currentBytes > l.thresholdBytes/2 {
-		maxBatchSize = 1000 // Reduce batch size when memory pressure is high
+	// Check and adjust for memory pressure
+	l.checkMemoryPressure()
+
+	// Use adaptive batch size based on memory pressure
+	maxBatchSize := l.adaptiveBatchSize
+	if l.memoryPressure {
+		maxBatchSize = min(maxBatchSize, 500) // Emergency reduction under severe pressure
 	}
 
 	shouldFlush := len(l.cache) >= maxBatchSize || l.currentBytes+estimatedSize > l.thresholdBytes
@@ -293,6 +372,18 @@ func (l *loaderProcessor) loadBatch() error {
 	return err
 }
 
+func (l *loaderProcessor) FlushPendingData() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if len(l.cache) > 0 {
+		log.Printf("Worker %d: Emergency flush of %d records (%d bytes) due to shutdown",
+			l.workerID, len(l.cache), l.currentBytes)
+		return l.loadBatch()
+	}
+	return nil
+}
+
 func (l *loaderProcessor) Close() error {
 	if l.flushTimer != nil {
 		l.flushTimer.Stop()
@@ -325,6 +416,8 @@ func (l *loaderProcessor) logMetrics() {
 	log.Printf("  Total points processed: %d", l.metrics.totalProcessed)
 	log.Printf("  Total batches sent: %d", l.metrics.totalBatches)
 	log.Printf("  Maximum batch size: %d", l.metrics.maxBatchSize)
+	log.Printf("  Final adaptive batch size: %d", l.adaptiveBatchSize)
+	log.Printf("  Memory pressure events: %d", l.metrics.memoryPressureEvents)
 	log.Printf("  Processing time: %d milliseconds", totalTime)
 	log.Printf("  Points per second: %d", pointsPerSecond)
 }
@@ -332,5 +425,9 @@ func (l *loaderProcessor) logMetrics() {
 func (l *loaderProcessor) GetMetrics() processorMetrics {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	
+	// Update current adaptive batch size in metrics
+	l.metrics.adaptiveBatchSize = l.adaptiveBatchSize
+	
 	return l.metrics
 }

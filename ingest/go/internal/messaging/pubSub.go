@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -118,28 +120,60 @@ type PubSub struct {
 	batchSizeBytes   int
 	batchSizeRecords int
 
+	// Data persistence for RabbitMQ failures
+	persistenceDir     string
+	failedBatchCount   int
+	persistedBatches   int
+	maxPersistentBytes int64
+
+	// Circuit breaker for RabbitMQ failures
+	circuitBreakerOpen     bool
+	consecutiveFailures    int
+	lastFailureTime        time.Time
+	circuitBreakerTimeout  time.Duration
+	maxConsecutiveFailures int
+
 	mu sync.Mutex
 }
 
 type PublishMetrics struct {
-	TotalBatches     int
-	TotalRecords     int
-	TotalBytes       int64
-	CurrentBatchSize int
-	LastFlush        time.Time
+	TotalBatches        int
+	TotalRecords        int
+	TotalBytes          int64
+	CurrentBatchSize    int
+	LastFlush           time.Time
+	FailedBatches       int
+	PersistedBatches    int
+	CircuitBreakerOpen  bool
+	ConsecutiveFailures int
 }
 
 func NewPubSub(sessionId string, sessionTime time.Time, cfg *config.Config, pool *ConnectionPool) *PubSub {
+	// Create persistence directory for failed batches
+	persistenceDir := filepath.Join("./failed_batches", sessionId)
+	if err := os.MkdirAll(persistenceDir, 0755); err != nil {
+		log.Printf("Failed to create persistence directory %s: %v", persistenceDir, err)
+		persistenceDir = "" // Disable persistence if directory creation fails
+	}
+
 	ps := &PubSub{
-		pool:             pool,
-		sessionID:        sessionId,
-		sessionTime:      sessionTime,
-		config:           cfg,
-		ctx:              context.Background(),
-		batchPool:        NewBatchPool(cfg.RabbitMQBatchSize),
-		batchSizeBytes:   cfg.BatchSizeBytes,
-		batchSizeRecords: cfg.BatchSizeRecords,
-		lastFlush:        time.Now(),
+		pool:               pool,
+		sessionID:          sessionId,
+		sessionTime:        sessionTime,
+		config:             cfg,
+		ctx:                context.Background(),
+		batchPool:          NewBatchPool(cfg.RabbitMQBatchSize),
+		batchSizeBytes:     cfg.BatchSizeBytes,
+		batchSizeRecords:   cfg.BatchSizeRecords,
+		lastFlush:          time.Now(),
+		persistenceDir:     persistenceDir,
+		maxPersistentBytes: 500 * 1024 * 1024, // 500MB max persistent storage per worker
+
+		// Circuit breaker configuration
+		circuitBreakerOpen:     false,
+		consecutiveFailures:    0,
+		circuitBreakerTimeout:  30 * time.Second, // 30 seconds before retrying RabbitMQ
+		maxConsecutiveFailures: 3,                // Open circuit after 3 consecutive failures
 	}
 
 	ps.recordBatch = make([]*Telemetry, 0, cfg.BatchSizeRecords)
@@ -206,6 +240,99 @@ func (ps *PubSub) Exec(data []map[string]interface{}) error {
 		}
 	}
 	return nil
+}
+
+// persistBatch saves a failed batch to disk for later retry
+func (ps *PubSub) persistBatch(batchData []byte, batchId string) error {
+	if ps.persistenceDir == "" {
+		return fmt.Errorf("persistence disabled - directory creation failed")
+	}
+
+	// Check if we've exceeded max persistent storage
+	if int64(len(batchData)) > ps.maxPersistentBytes {
+		return fmt.Errorf("batch too large for persistence: %d bytes", len(batchData))
+	}
+
+	filename := fmt.Sprintf("batch_%s_%d.pb", batchId, time.Now().UnixNano())
+	filepath := filepath.Join(ps.persistenceDir, filename)
+
+	if err := os.WriteFile(filepath, batchData, 0644); err != nil {
+		return fmt.Errorf("failed to persist batch to %s: %w", filepath, err)
+	}
+
+	ps.persistedBatches++
+	log.Printf("Worker %d: Persisted batch %s to disk (%d bytes)", ps.workerID, batchId, len(batchData))
+	return nil
+}
+
+// cleanupOldBatches removes old persisted batches to prevent disk overflow
+func (ps *PubSub) cleanupOldBatches() {
+	if ps.persistenceDir == "" {
+		return
+	}
+
+	// Remove batch files older than 24 hours
+	cutoff := time.Now().Add(-24 * time.Hour)
+
+	files, err := os.ReadDir(ps.persistenceDir)
+	if err != nil {
+		log.Printf("Worker %d: Failed to read persistence directory: %v", ps.workerID, err)
+		return
+	}
+
+	for _, file := range files {
+		if strings.HasSuffix(file.Name(), ".pb") {
+			filepath := filepath.Join(ps.persistenceDir, file.Name())
+			info, err := file.Info()
+			if err != nil {
+				continue
+			}
+
+			if info.ModTime().Before(cutoff) {
+				if err := os.Remove(filepath); err != nil {
+					log.Printf("Worker %d: Failed to cleanup old batch %s: %v", ps.workerID, file.Name(), err)
+				}
+			}
+		}
+	}
+}
+
+// Circuit breaker methods
+func (ps *PubSub) shouldSkipRabbitMQ() bool {
+	if !ps.circuitBreakerOpen {
+		return false
+	}
+
+	// Check if circuit breaker timeout has passed
+	if time.Since(ps.lastFailureTime) > ps.circuitBreakerTimeout {
+		log.Printf("Worker %d: Circuit breaker timeout reached, attempting to reconnect to RabbitMQ", ps.workerID)
+		ps.circuitBreakerOpen = false
+		ps.consecutiveFailures = 0
+		return false
+	}
+
+	return true
+}
+
+func (ps *PubSub) recordRabbitMQFailure() {
+	ps.consecutiveFailures++
+	ps.lastFailureTime = time.Now()
+
+	if ps.consecutiveFailures >= ps.maxConsecutiveFailures {
+		if !ps.circuitBreakerOpen {
+			log.Printf("Worker %d: CIRCUIT BREAKER OPEN - Too many RabbitMQ failures (%d), switching to persistence-only mode for %v",
+				ps.workerID, ps.consecutiveFailures, ps.circuitBreakerTimeout)
+		}
+		ps.circuitBreakerOpen = true
+	}
+}
+
+func (ps *PubSub) recordRabbitMQSuccess() {
+	if ps.circuitBreakerOpen || ps.consecutiveFailures > 0 {
+		log.Printf("Worker %d: RabbitMQ connection recovered, circuit breaker closed", ps.workerID)
+	}
+	ps.circuitBreakerOpen = false
+	ps.consecutiveFailures = 0
 }
 
 func (ps *PubSub) AddRecord(record map[string]interface{}) error {
@@ -336,6 +463,22 @@ func (ps *PubSub) flushBatchInternal() error {
 		return fmt.Errorf("failed to marshal protobuf batch: %w", err)
 	}
 
+	// Check circuit breaker - if open, skip RabbitMQ and go straight to persistence
+	if ps.shouldSkipRabbitMQ() {
+		log.Printf("Worker %d: Circuit breaker open, persisting batch %s directly", ps.workerID, batch.BatchId)
+		if persistErr := ps.persistBatch(data, batch.BatchId); persistErr != nil {
+			return fmt.Errorf("circuit breaker open AND failed to persist batch: %v", persistErr)
+		}
+
+		// Mark batch as handled
+		ps.recordBatch = ps.recordBatch[:0]
+		ps.totalBytes = 0
+		ps.totalBatches++
+		ps.failedBatchCount++
+		ps.lastFlush = time.Now()
+		return nil
+	}
+
 	maxRetries := 3
 	for retry := 0; retry < maxRetries; retry++ {
 		ch := ps.pool.GetChannel()
@@ -367,6 +510,9 @@ func (ps *PubSub) flushBatchInternal() error {
 		cancel()
 
 		if err == nil {
+			// Success! Record this and reset circuit breaker
+			ps.recordRabbitMQSuccess()
+
 			ps.recordBatch = ps.recordBatch[:0]
 			ps.totalBytes = 0
 			ps.totalBatches++
@@ -388,7 +534,32 @@ func (ps *PubSub) flushBatchInternal() error {
 		}
 	}
 
-	return fmt.Errorf("failed to publish batch after %d retries", maxRetries)
+	// If we reach here, RabbitMQ publish failed completely
+	// Record the failure for circuit breaker
+	ps.recordRabbitMQFailure()
+
+	// Persist the batch to disk for later recovery
+	if persistErr := ps.persistBatch(data, batch.BatchId); persistErr != nil {
+		log.Printf("Worker %d: CRITICAL - Failed to persist batch %s: %v", ps.workerID, batch.BatchId, persistErr)
+		return fmt.Errorf("failed to publish batch after %d retries AND failed to persist: %v", maxRetries, persistErr)
+	}
+
+	// Mark batch as handled (persisted) and continue processing
+	ps.recordBatch = ps.recordBatch[:0]
+	ps.totalBytes = 0
+	ps.totalBatches++
+	ps.failedBatchCount++
+	ps.lastFlush = time.Now()
+
+	log.Printf("Worker %d: Batch %s persisted to disk after RabbitMQ failure (consecutive failures: %d)",
+		ps.workerID, batch.BatchId, ps.consecutiveFailures)
+
+	// Periodically clean up old batches
+	if ps.failedBatchCount%10 == 0 {
+		go ps.cleanupOldBatches()
+	}
+
+	return nil // Don't return error since we've handled it via persistence
 }
 
 func (ps *PubSub) FlushBatch() error {
@@ -403,8 +574,11 @@ func (ps *PubSub) Close() error {
 		return err
 	}
 
-	log.Printf("Worker %d: Published %d batches with %d total records",
-		ps.workerID, ps.totalBatches, ps.totalRecords)
+	log.Printf("Worker %d: Published %d batches with %d total records", ps.workerID, ps.totalBatches, ps.totalRecords)
+	if ps.failedBatchCount > 0 {
+		log.Printf("Worker %d: PERSISTENCE - %d batches persisted to disk due to RabbitMQ failures", ps.workerID, ps.persistedBatches)
+		log.Printf("Worker %d: Check %s for persisted batches", ps.workerID, ps.persistenceDir)
+	}
 	return nil
 }
 
@@ -413,10 +587,14 @@ func (ps *PubSub) GetMetrics() PublishMetrics {
 	defer ps.mu.Unlock()
 
 	return PublishMetrics{
-		TotalBatches:     ps.totalBatches,
-		TotalRecords:     ps.totalRecords,
-		TotalBytes:       ps.totalBytes,
-		CurrentBatchSize: len(ps.recordBatch),
-		LastFlush:        ps.lastFlush,
+		TotalBatches:        ps.totalBatches,
+		TotalRecords:        ps.totalRecords,
+		TotalBytes:          ps.totalBytes,
+		CurrentBatchSize:    len(ps.recordBatch),
+		LastFlush:           ps.lastFlush,
+		FailedBatches:       ps.failedBatchCount,
+		PersistedBatches:    ps.persistedBatches,
+		CircuitBreakerOpen:  ps.circuitBreakerOpen,
+		ConsecutiveFailures: ps.consecutiveFailures,
 	}
 }
