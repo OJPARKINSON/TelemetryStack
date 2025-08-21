@@ -6,16 +6,16 @@ import ClientWrapper from "@/components/ClientWrapper";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function HomePage() {
+export default async function DashboardPage() {
 	let sessions: string | any[] = [];
 	let errorMessage = null;
 
 	try {
-		console.log("🏠 Home page: Fetching sessions at RUNTIME...");
+		console.log("🏠 Dashboard page: Fetching sessions at RUNTIME...");
 		sessions = await getSessions();
-		console.log(`🏠 Home page: Found ${sessions.length} sessions`);
+		console.log(`🏠 Dashboard page: Found ${sessions.length} sessions`);
 	} catch (error) {
-		console.error("🏠 Home page: Error loading sessions:", error);
+		console.error("🏠 Dashboard page: Error loading sessions:", error);
 		errorMessage =
 			error instanceof Error ? error.message : "Unknown error occurred";
 	}

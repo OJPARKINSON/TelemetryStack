@@ -46,11 +46,26 @@ const nextConfig = {
 				],
 			},
 			{
+				source: "/api/tiles/:path*",
+				headers: [
+					{ key: "Access-Control-Allow-Origin", value: "*" },
+					{ key: "Access-Control-Allow-Methods", value: "GET" },
+					{ key: "Cache-Control", value: "public, max-age=86400, immutable" },
+					{ key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
+					{ key: "Cross-Origin-Embedder-Policy", value: "unsafe-none" },
+					{
+						key: "Cache-Control",
+						value: "public, s-maxage=30, stale-while-revalidate=60",
+					},
+				],
+			},
+			{
 				source: "/:path*-tiles/:path*",
 				headers: [
 					{ key: "Access-Control-Allow-Origin", value: "*" },
 					{ key: "Access-Control-Allow-Methods", value: "GET" },
 					{ key: "Cache-Control", value: "public, max-age=86400, immutable" },
+					{ key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
 				],
 			},
 			{
@@ -91,30 +106,23 @@ const nextConfig = {
 						key: "Referrer-Policy",
 						value: "origin-when-cross-origin",
 					},
+					{
+						key: "Cross-Origin-Embedder-Policy",
+						value: "unsafe-none",
+					},
+					{
+						key: "Cross-Origin-Opener-Policy",
+						value: "same-origin-allow-popups",
+					},
 				],
 			},
 		];
 	},
 
-	// Optimized rewrites with caching
+	// Map tile rewrites are now handled by Traefik for better performance
 	async rewrites() {
-		return [
-			{
-				source: "/osm-tiles/:z/:x/:y.png",
-				destination: "https://tile.openstreetmap.org/:z/:x/:y.png",
-			},
-			{
-				source: "/carto-dark/:z/:x/:y.png",
-				destination:
-					"https://cartodb-basemaps-a.global.ssl.fastly.net/dark_all/:z/:x/:y.png",
-			},
-			{
-				source: "/carto-dark-nolabels/:z/:x/:y.png",
-				destination:
-					"https://cartodb-basemaps-a.global.ssl.fastly.net/dark_nolabels/:z/:x/:y.png",
-			},
-		];
-	},
+		return [];
+		},
 
 	// Redirect configuration for performance
 	async redirects() {

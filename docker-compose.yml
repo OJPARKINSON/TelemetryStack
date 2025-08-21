@@ -180,7 +180,9 @@ services:
       start_period: 30s
 
   telemetry-dashboard:
-    image: ghcr.io/ojparkinson/iracing-display:latest
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
     container_name: telemetry-dashboard
     restart: unless-stopped
     environment:
@@ -192,18 +194,17 @@ services:
       QUESTDB_USER: admin
       QUESTDB_PASSWORD: quest
       
-      # Application settings optimized for high concurrency
       NODE_ENV: production
-      NODE_OPTIONS: "--max-old-space-size=768 --max-semi-space-size=128"  # Optimize Node.js heap
-      NEXT_PUBLIC_APP_URL: https://${LOCAL_DOMAIN:-pi.local}/dashboard
-      NEXT_PUBLIC_BACKEND_URL: https://${LOCAL_DOMAIN:-pi.local}/api
+      NODE_OPTIONS: "--max-old-space-size=768 --max-semi-space-size=128"  
+      NEXT_PUBLIC_APP_URL: https://${TAILSCALE_DOMAIN:-pi.local}/dashboard
+      NEXT_PUBLIC_BACKEND_URL: https://${TAILSCALE_DOMAIN:-pi.local}/dashboard/api
     networks:
       - telemetry-network
     deploy:
       resources:
         limits:
-          cpus: '1.0'      # 1 core for web server and API
-          memory: 1g       # Large heap for high concurrency
+          cpus: '1.0'      
+          memory: 1g       
     labels:
       - "traefik.enable=true"
       # Dashboard main routes
@@ -248,23 +249,20 @@ services:
       GF_PROVISIONING_AUTO_ASSIGN_ORG: "true"
       GF_PROVISIONING_AUTO_ASSIGN_ORG_ROLE: Admin
       
-      # Performance optimization
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/files/system-monitoring.json
       GF_USERS_DEFAULT_THEME: dark
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
       
-      # Remove problematic database URL - use default SQLite
-      # GF_DATABASE_URL: postgresql://admin:quest@questdb:8812/qdb
     networks:
       - telemetry-network
     deploy:
       resources:
         limits:
-          cpus: '0.75'     # 3/4 core for dashboard rendering
-          memory: 1.5g     # Large memory for dashboard caching
+          cpus: '0.75'     
+          memory: 1.5g     
         reservations:
-          cpus: '0.25'     # Minimum resources
+          cpus: '0.25'    
           memory: 256m
     labels:
       - "traefik.enable=true"

@@ -21,13 +21,6 @@ interface OptimizedTrackMapProps {
 	selectedMetric?: string;
 }
 
-const MAP_THEMES = {
-	dark: {
-		name: "Dark",
-		url: "https://{a-d}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-	},
-};
-
 export default function OptimizedTrackMap({
 	dataWithCoordinates,
 	selectedPointIndex,
@@ -40,7 +33,6 @@ export default function OptimizedTrackMap({
 	const markerSourceRef = useRef<VectorSource | null>(null);
 	const trackRenderedRef = useRef(false);
 
-	const [mapTheme, setMapTheme] = useState<keyof typeof MAP_THEMES>("dark");
 	const [displayMetric, setDisplayMetric] = useState<string>(
 		selectedMetric || "Speed",
 	);
@@ -155,7 +147,7 @@ export default function OptimizedTrackMap({
 
 		const baseLayer = new TileLayer({
 			source: new XYZ({
-				url: MAP_THEMES[mapTheme].url,
+				url: "/dashboard/api/tiles/dark/{z}/{x}/{y}",
 			}),
 		});
 
@@ -207,7 +199,7 @@ export default function OptimizedTrackMap({
 			markerSourceRef.current = null;
 			trackRenderedRef.current = false;
 		};
-	}, [staticTrackData, mapTheme]); // Only re-init if track data completely changes
+	}, [staticTrackData]);
 
 	// ONE-TIME: Render the static racing line
 	useEffect(() => {

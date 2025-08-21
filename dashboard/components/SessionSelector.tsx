@@ -19,7 +19,7 @@ export default function SessionSelector({ sessions }: SessionSelectorProps) {
 
 	const handleSessionSelect = (sessionId: string) => {
 		if (sessionId) {
-			router.push(`/${sessionId}?lapId=1`);
+			router.push(`/dashboard/${sessionId}?lapId=1`);
 		}
 	};
 
