@@ -4,10 +4,12 @@ using TelemetryService.Domain.Models;
 
 namespace TelemetryService.Infrastructure.Persistence;
 
-public class QuestDbService
+public class QuestDbService : IDisposable
 {
     private ISender? _sender;
     private QuestDbSchemaManager? _schemaManager;
+    private readonly object _senderLock = new object();
+    private volatile bool _disposed = false;
 
     public QuestDbService()
     {
@@ -92,29 +94,57 @@ public class QuestDbService
 
     public void Dispose()
     {
-        _sender?.Dispose();
-        _schemaManager?.Dispose();
+        if (_disposed) return;
+        
+        lock (_senderLock)
+        {
+            if (_disposed) return;
+            
+            _sender?.Dispose();
+            _schemaManager?.Dispose();
+            _disposed = true;
+        }
+        
+        GC.SuppressFinalize(this);
     }
 
     public async Task WriteBatch(TelemetryBatch? telData)
     {
+        if (_disposed)
+        {
+            Console.WriteLine("ERROR: QuestDB service has been disposed");
+            return;
+        }
+
         if (telData == null)
         {
             Console.WriteLine("No telemetry data to write");
             return;
         }
 
-        if (_sender == null)
+        ISender? senderToUse;
+        lock (_senderLock)
         {
-            Console.WriteLine("ERROR: QuestDB sender is not initialized");
-            return;
+            if (_disposed)
+            {
+                Console.WriteLine("ERROR: QuestDB service has been disposed");
+                return;
+            }
+
+            if (_sender == null)
+            {
+                Console.WriteLine("ERROR: QuestDB sender is not initialized");
+                return;
+            }
+            
+            senderToUse = _sender;
         }
 
         try
         {
             foreach (var tel in telData.Records)
             {
-                _sender.Table("TelemetryTicks")
+                senderToUse.Table("TelemetryTicks")
                     .Symbol("session_id", tel.SessionId)
                     .Symbol("track_name", tel.TrackName)
                     .Symbol("track_id", tel.TrackId)
@@ -167,7 +197,7 @@ public class QuestDbService
                     .At(tel.TickTime.ToDateTime());
             }
             
-            await _sender.SendAsync();
+            await senderToUse.SendAsync();
             Console.WriteLine($"Successfully wrote {telData.Records.Count} telemetry points");
         }
         catch (OutOfMemoryException ex)
@@ -196,19 +226,25 @@ public class QuestDbService
                 Console.WriteLine($"   Inner Exception: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
             }
             
-            try
+            lock (_senderLock)
             {
-                _sender?.Dispose();
-                string? url = Environment.GetEnvironmentVariable("QUESTDB_URL");
-                if (url != null)
+                if (!_disposed)
                 {
-                    _sender = Sender.New($"http::addr={url.Replace("http://", "")};auto_flush_rows=2000;auto_flush_interval=500;");
-                    Console.WriteLine("🔄 QuestDB sender reset after error");
+                    try
+                    {
+                        _sender?.Dispose();
+                        string? url = Environment.GetEnvironmentVariable("QUESTDB_URL");
+                        if (url != null)
+                        {
+                            _sender = Sender.New($"http::addr={url.Replace("http://", "")};auto_flush_rows=2000;auto_flush_interval=500;");
+                            Console.WriteLine("🔄 QuestDB sender reset after error");
+                        }
+                    }
+                    catch (Exception resetEx)
+                    {
+                        Console.WriteLine($"⚠️  Failed to reset sender: {resetEx.Message}");
+                    }
                 }
-            }
-            catch (Exception resetEx)
-            {
-                Console.WriteLine($"⚠️  Failed to reset sender: {resetEx.Message}");
             }
         }
     }

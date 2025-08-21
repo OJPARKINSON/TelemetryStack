@@ -4,15 +4,19 @@ using QuestDB.Senders;
 
 namespace TelemetryService.Infrastructure.Persistence;
 
-public class QuestDbSchemaManager
+public class QuestDbSchemaManager : IDisposable
 {
     private readonly string _questDbUrl;
     private readonly HttpClient _httpClient;
+    private volatile bool _disposed = false;
 
     public QuestDbSchemaManager(string questDbUrl)
     {
         _questDbUrl = questDbUrl.Replace("http://", "").Replace("https://", "");
-        _httpClient = new HttpClient();
+        _httpClient = new HttpClient()
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
     }
 
     public async Task<bool> EnsureOptimizedSchemaExists()
@@ -385,6 +389,11 @@ public class QuestDbSchemaManager
 
     private async Task<JsonElement?> ExecuteQuery(string query)
     {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(QuestDbSchemaManager));
+        }
+
         try
         {
             var encodedQuery = Uri.EscapeDataString(query);
@@ -463,6 +472,11 @@ public class QuestDbSchemaManager
 
     public void Dispose()
     {
+        if (_disposed) return;
+        
         _httpClient?.Dispose();
+        _disposed = true;
+        
+        GC.SuppressFinalize(this);
     }
 }
