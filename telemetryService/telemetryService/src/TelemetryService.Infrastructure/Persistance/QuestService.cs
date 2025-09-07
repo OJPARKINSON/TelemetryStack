@@ -108,6 +108,15 @@ public class QuestDbService : IDisposable
         GC.SuppressFinalize(this);
     }
 
+    private static double GetValidDouble(double value)
+    {
+        if (double.IsNaN(value) || double.IsInfinity(value) || value == double.MinValue || value == double.MaxValue)
+        {
+            return 0.0;
+        }
+        return value;
+    }
+
     public async Task WriteBatch(TelemetryBatch? telData)
     {
         if (_disposed)
@@ -145,55 +154,53 @@ public class QuestDbService : IDisposable
             foreach (var tel in telData.Records)
             {
                 senderToUse.Table("TelemetryTicks")
-                    .Symbol("session_id", tel.SessionId)
-                    .Symbol("track_name", tel.TrackName)
-                    .Symbol("track_id", tel.TrackId)
-                    
+                    .Symbol("session_id", tel.SessionId ?? "unknown")
+                    .Symbol("track_name", tel.TrackName ?? "unknown")
+                    .Symbol("track_id", tel.TrackId ?? "unknown")
                     .Symbol("lap_id", tel.LapId ?? "unknown")
-                    .Symbol("session_num", tel.SessionNum)
+                    .Symbol("session_num", tel.SessionNum ?? "0")
                     .Symbol("session_type", tel.SessionType ?? "Unknown")
                     .Symbol("session_name", tel.SessionName ?? "Unknown")
                     
-                    .Column("car_id", tel.CarId)
-                    
+                    .Column("car_id", tel.CarId ?? "unknown")
                     .Column("gear", tel.Gear)
-                    .Column("player_car_position", (long)Math.Floor(tel.PlayerCarPosition))
+                    .Column("player_car_position", (long)Math.Max(0, Math.Floor(tel.PlayerCarPosition)))
                     
-                    .Column("speed", tel.Speed)
-                    .Column("lap_dist_pct", tel.LapDistPct)
-                    .Column("session_time", tel.SessionTime)
-                    .Column("lat", tel.Lat)
-                    .Column("lon", tel.Lon)
-                    .Column("lap_current_lap_time", tel.LapCurrentLapTime)
-                    .Column("lapLastLapTime", tel.LapLastLapTime)
-                    .Column("lapDeltaToBestLap", tel.LapDeltaToBestLap)
+                    .Column("speed", GetValidDouble(tel.Speed))
+                    .Column("lap_dist_pct", GetValidDouble(tel.LapDistPct))
+                    .Column("session_time", GetValidDouble(tel.SessionTime))
+                    .Column("lat", GetValidDouble(tel.Lat))
+                    .Column("lon", GetValidDouble(tel.Lon))
+                    .Column("lap_current_lap_time", GetValidDouble(tel.LapCurrentLapTime))
+                    .Column("lapLastLapTime", GetValidDouble(tel.LapLastLapTime))
+                    .Column("lapDeltaToBestLap", GetValidDouble(tel.LapDeltaToBestLap))
                     
-                    .Column("throttle", (float)tel.Throttle)
-                    .Column("brake", (float)tel.Brake)
-                    .Column("steering_wheel_angle", (float)tel.SteeringWheelAngle)
-                    .Column("rpm", (float)tel.Rpm)
-                    .Column("velocity_x", (float)tel.VelocityX)
-                    .Column("velocity_y", (float)tel.VelocityY)
-                    .Column("velocity_z", (float)tel.VelocityZ)
-                    .Column("fuel_level", (float)tel.FuelLevel)
-                    .Column("alt", (float)tel.Alt)
-                    .Column("lat_accel", (float)tel.LatAccel)
-                    .Column("long_accel", (float)tel.LongAccel)
-                    .Column("vert_accel", (float)tel.VertAccel)
-                    .Column("pitch", (float)tel.Pitch)
-                    .Column("roll", (float)tel.Roll)
-                    .Column("yaw", (float)tel.Yaw)
-                    .Column("yaw_north", (float)tel.YawNorth)
-                    .Column("voltage", (float)tel.Voltage)
-                    .Column("waterTemp", (float)tel.WaterTemp)
-                    .Column("lFpressure", (float)tel.LFpressure)
-                    .Column("rFpressure", (float)tel.RFpressure)
-                    .Column("lRpressure", (float)tel.LRpressure)
-                    .Column("rRpressure", (float)tel.RRpressure)
-                    .Column("lFtempM", (float)tel.LFtempM)
-                    .Column("rFtempM", (float)tel.RFtempM)
-                    .Column("lRtempM", (float)tel.LRtempM)
-                    .Column("rRtempM", (float)tel.RRtempM)
+                    .Column("throttle", (float)GetValidDouble(tel.Throttle))
+                    .Column("brake", (float)GetValidDouble(tel.Brake))
+                    .Column("steering_wheel_angle", (float)GetValidDouble(tel.SteeringWheelAngle))
+                    .Column("rpm", (float)GetValidDouble(tel.Rpm))
+                    .Column("velocity_x", (float)GetValidDouble(tel.VelocityX))
+                    .Column("velocity_y", (float)GetValidDouble(tel.VelocityY))
+                    .Column("velocity_z", (float)GetValidDouble(tel.VelocityZ))
+                    .Column("fuel_level", (float)GetValidDouble(tel.FuelLevel))
+                    .Column("alt", (float)GetValidDouble(tel.Alt))
+                    .Column("lat_accel", (float)GetValidDouble(tel.LatAccel))
+                    .Column("long_accel", (float)GetValidDouble(tel.LongAccel))
+                    .Column("vert_accel", (float)GetValidDouble(tel.VertAccel))
+                    .Column("pitch", (float)GetValidDouble(tel.Pitch))
+                    .Column("roll", (float)GetValidDouble(tel.Roll))
+                    .Column("yaw", (float)GetValidDouble(tel.Yaw))
+                    .Column("yaw_north", (float)GetValidDouble(tel.YawNorth))
+                    .Column("voltage", (float)GetValidDouble(tel.Voltage))
+                    .Column("waterTemp", (float)GetValidDouble(tel.WaterTemp))
+                    .Column("lFpressure", (float)GetValidDouble(tel.LFpressure))
+                    .Column("rFpressure", (float)GetValidDouble(tel.RFpressure))
+                    .Column("lRpressure", (float)GetValidDouble(tel.LRpressure))
+                    .Column("rRpressure", (float)GetValidDouble(tel.RRpressure))
+                    .Column("lFtempM", (float)GetValidDouble(tel.LFtempM))
+                    .Column("rFtempM", (float)GetValidDouble(tel.RFtempM))
+                    .Column("lRtempM", (float)GetValidDouble(tel.LRtempM))
+                    .Column("rRtempM", (float)GetValidDouble(tel.RRtempM))
                     .At(tel.TickTime.ToDateTime());
             }
             
