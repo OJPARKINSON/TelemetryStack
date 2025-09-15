@@ -1,3 +1,5 @@
+using System.Net.Http;
+using System.Net.Sockets;
 using QuestDB;
 using QuestDB.Senders;
 using TelemetryService.Domain.Models;
@@ -117,6 +119,42 @@ public class QuestDbService : IDisposable
         return value;
     }
 
+    private static string SanitizeString(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "unknown";
+        }
+        
+        // Remove or replace characters that can break line protocol
+        return value
+            .Replace(",", "_")     // Field separator
+            .Replace(" ", "_")     // Space separator 
+            .Replace("=", "_")     // Key-value separator
+            .Replace("\n", "_")    // Line separator
+            .Replace("\r", "_")    // Carriage return
+            .Replace("\"", "_")    // Quotes
+            .Replace("'", "_")     // Single quotes
+            .Replace("\\", "_")    // Backslash
+            .Trim();
+    }
+
+    private static bool IsConnectionError(Exception ex)
+    {
+        // Check if this is a connection-related error that warrants sender reset
+        var message = ex.Message?.ToLower() ?? "";
+        var innerMessage = ex.InnerException?.Message?.ToLower() ?? "";
+        
+        return ex is ObjectDisposedException ||
+               ex is HttpRequestException ||
+               ex is SocketException ||
+               message.Contains("connection") ||
+               message.Contains("timeout") ||
+               message.Contains("network") ||
+               innerMessage.Contains("httpclient") ||
+               innerMessage.Contains("disposed");
+    }
+
     public async Task WriteBatch(TelemetryBatch? telData)
     {
         if (_disposed)
@@ -153,16 +191,33 @@ public class QuestDbService : IDisposable
         {
             foreach (var tel in telData.Records)
             {
+                // Validate required fields to prevent empty table names and invalid data
+                var sessionId = SanitizeString(tel.SessionId);
+                var trackName = SanitizeString(tel.TrackName);
+                var trackId = SanitizeString(tel.TrackId);
+                var lapId = SanitizeString(tel.LapId);
+                var sessionNum = SanitizeString(tel.SessionNum);
+                var sessionType = SanitizeString(tel.SessionType);
+                var sessionName = SanitizeString(tel.SessionName);
+                var carId = SanitizeString(tel.CarId);
+
+                // Skip records with critical missing data
+                if (sessionId == "unknown" && trackName == "unknown")
+                {
+                    Console.WriteLine("⚠️  Skipping telemetry record with missing session_id and track_name");
+                    continue;
+                }
+
                 senderToUse.Table("TelemetryTicks")
-                    .Symbol("session_id", tel.SessionId ?? "unknown")
-                    .Symbol("track_name", tel.TrackName ?? "unknown")
-                    .Symbol("track_id", tel.TrackId ?? "unknown")
-                    .Symbol("lap_id", tel.LapId ?? "unknown")
-                    .Symbol("session_num", tel.SessionNum ?? "0")
-                    .Symbol("session_type", tel.SessionType ?? "Unknown")
-                    .Symbol("session_name", tel.SessionName ?? "Unknown")
+                    .Symbol("session_id", sessionId)
+                    .Symbol("track_name", trackName)
+                    .Symbol("track_id", trackId)
+                    .Symbol("lap_id", lapId)
+                    .Symbol("session_num", sessionNum)
+                    .Symbol("session_type", sessionType)
+                    .Symbol("session_name", sessionName)
                     
-                    .Column("car_id", tel.CarId ?? "unknown")
+                    .Column("car_id", carId)
                     .Column("gear", tel.Gear)
                     .Column("player_car_position", (long)Math.Max(0, Math.Floor(tel.PlayerCarPosition)))
                     
@@ -233,25 +288,41 @@ public class QuestDbService : IDisposable
                 Console.WriteLine($"   Inner Exception: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
             }
             
-            lock (_senderLock)
+            // Only reset sender for specific errors that indicate connection issues
+            if (IsConnectionError(ex))
             {
-                if (!_disposed)
+                lock (_senderLock)
                 {
-                    try
+                    if (!_disposed)
                     {
-                        _sender?.Dispose();
-                        string? url = Environment.GetEnvironmentVariable("QUESTDB_URL");
-                        if (url != null)
+                        try
                         {
-                            _sender = Sender.New($"http::addr={url.Replace("http://", "")};auto_flush_rows=2000;auto_flush_interval=500;");
-                            Console.WriteLine("🔄 QuestDB sender reset after error");
+                            Console.WriteLine("🔄 Attempting to reset QuestDB sender due to connection error...");
+                            _sender?.Dispose();
+                            _sender = null;
+                            
+                            string? url = Environment.GetEnvironmentVariable("QUESTDB_URL");
+                            if (url != null)
+                            {
+                                _sender = Sender.New($"http::addr={url.Replace("http://", "")};auto_flush_rows=2000;auto_flush_interval=500;");
+                                Console.WriteLine("✅ QuestDB sender reset successful");
+                            }
+                            else
+                            {
+                                Console.WriteLine("❌ Cannot reset sender: QUESTDB_URL not found");
+                            }
+                        }
+                        catch (Exception resetEx)
+                        {
+                            Console.WriteLine($"❌ Failed to reset sender: {resetEx.Message}");
+                            _sender = null;
                         }
                     }
-                    catch (Exception resetEx)
-                    {
-                        Console.WriteLine($"⚠️  Failed to reset sender: {resetEx.Message}");
-                    }
                 }
+            }
+            else
+            {
+                Console.WriteLine("⚠️  Data format error - sender reset not attempted");
             }
         }
     }
