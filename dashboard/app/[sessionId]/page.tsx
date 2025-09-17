@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { getLaps, getTelemetryData } from "@/lib/questDb";
-import TelemetryPage from "../../components/TelemetryPage";
 import ClientWrapper from "../../components/ClientWrapper";
+import TelemetryPage from "../../components/TelemetryPage";
 
 // Force dynamic rendering - prevent build-time execution
 export const dynamic = "force-dynamic";
@@ -64,7 +64,6 @@ export default async function SessionPage({ params, searchParams }: PageProps) {
 function TelemetryLoadingSkeleton() {
 	return (
 		<div className="min-h-screen bg-zinc-950 flex">
-			{/* Sidebar Skeleton */}
 			<div className="w-64 bg-zinc-900/50 border-r border-zinc-800/50 flex flex-col">
 				<div className="px-6 py-6">
 					<div className="animate-pulse">
@@ -79,7 +78,6 @@ function TelemetryLoadingSkeleton() {
 				</div>
 			</div>
 
-			{/* Main Content Skeleton */}
 			<div className="flex-1 flex flex-col">
 				<div className="bg-zinc-950/50 border-b border-zinc-800/50 px-6 py-4">
 					<div className="animate-pulse h-4 w-48 bg-zinc-700 rounded"></div>

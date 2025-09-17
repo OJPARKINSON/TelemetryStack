@@ -11,8 +11,8 @@ import XYZ from "ol/source/XYZ";
 import { Circle, Fill, Stroke, Style } from "ol/style";
 import View from "ol/View";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { TelemetryDataPoint } from "@/lib/types";
 import { usePerformanceMonitor } from "@/hooks/usePerformanceMonitor";
+import type { TelemetryDataPoint } from "@/lib/types";
 
 interface OptimizedTrackMapProps {
 	dataWithCoordinates: TelemetryDataPoint[];
@@ -41,7 +41,10 @@ export default function OptimizedTrackMap({
 	const colorCacheRef = useRef<Map<string, string>>(new Map());
 
 	// Performance monitoring (enable during development)
-	const perfMonitor = usePerformanceMonitor("OptimizedTrackMap", process.env.NODE_ENV === 'development');
+	const perfMonitor = usePerformanceMonitor(
+		"OptimizedTrackMap",
+		process.env.NODE_ENV === "development",
+	);
 
 	// Color mapping function for different metrics with caching
 	const getColorForMetric = useCallback(
@@ -58,9 +61,12 @@ export default function OptimizedTrackMap({
 
 			switch (metric) {
 				case "Speed":
-					if (normalized < 0.3) color = "#ef4444"; // Red for low speed
-					else if (normalized < 0.6) color = "#f97316"; // Orange for medium
-					else if (normalized < 0.8) color = "#eab308"; // Yellow for medium-high
+					if (normalized < 0.3)
+						color = "#ef4444"; // Red for low speed
+					else if (normalized < 0.6)
+						color = "#f97316"; // Orange for medium
+					else if (normalized < 0.8)
+						color = "#eab308"; // Yellow for medium-high
 					else color = "#22c55e"; // Green for high speed
 					break;
 				case "Throttle":
@@ -80,7 +86,8 @@ export default function OptimizedTrackMap({
 						"#ec4899",
 						"#f59e0b",
 					];
-					color = gearColors[Math.min(Math.floor(normalized * 8), 7)] || "#888888";
+					color =
+						gearColors[Math.min(Math.floor(normalized * 8), 7)] || "#888888";
 					break;
 				}
 				case "RPM":
@@ -97,7 +104,7 @@ export default function OptimizedTrackMap({
 
 			// Cache the result
 			colorCacheRef.current.set(cacheKey, color);
-			
+
 			// Limit cache size to prevent memory leaks
 			if (colorCacheRef.current.size > 10000) {
 				const firstKey = colorCacheRef.current.keys().next().value;
@@ -147,7 +154,7 @@ export default function OptimizedTrackMap({
 
 		const baseLayer = new TileLayer({
 			source: new XYZ({
-				url: "/dashboard/api/tiles/dark/{z}/{x}/{y}",
+				url: "/api/tiles/dark/{z}/{x}/{y}",
 			}),
 		});
 
@@ -300,7 +307,7 @@ export default function OptimizedTrackMap({
 
 		// PERFORMANCE FIX: Throttle marker updates to 60fps max
 		const now = performance.now();
-		if (now - lastMarkerUpdateRef.current < 16) { // 60fps = 16.67ms
+		if (now - lastMarkerUpdateRef.current < 16) {
 			return;
 		}
 		lastMarkerUpdateRef.current = now;
@@ -362,7 +369,11 @@ export default function OptimizedTrackMap({
 
 					// Reuse existing style object if possible
 					const existingStyle = feature.getStyle();
-					if (existingStyle && typeof existingStyle !== 'function' && Array.isArray(existingStyle) === false) {
+					if (
+						existingStyle &&
+						typeof existingStyle !== "function" &&
+						Array.isArray(existingStyle) === false
+					) {
 						const stroke = (existingStyle as Style).getStroke();
 						if (stroke) {
 							stroke.setColor(color);
@@ -377,7 +388,7 @@ export default function OptimizedTrackMap({
 								color: color,
 								width: 3,
 							}),
-						})
+						}),
 					);
 				});
 
@@ -429,177 +440,147 @@ export default function OptimizedTrackMap({
 
 	return (
 		<>
-			<div className=" bg-zinc-800/90 border border-zinc-600 p-3 rounded-lg text-sm z-10">
-				<div className="text-white font-medium mb-2">
-					{displayMetric === "Speed" && "Speed (km/h)"}
-					{displayMetric === "Throttle" && "Throttle (%)"}
-					{displayMetric === "Brake" && "Brake (%)"}
-					{displayMetric === "Gear" && "Gear"}
-					{displayMetric === "RPM" && "RPM"}
-					{displayMetric === "SteeringWheelAngle" && "Steering (deg)"}
-				</div>
-				<div className="space-y-1">
-					{displayMetric === "Speed" && (
-						<>
-							<div className="flex items-center space-x-2">
-								<div
-									className="w-3 h-3 rounded"
-									style={{ backgroundColor: "#ef4444" }}
-								></div>
-								<span className="text-zinc-300">Low Speed</span>
-							</div>
-							<div className="flex items-center space-x-2">
-								<div
-									className="w-3 h-3 rounded"
-									style={{ backgroundColor: "#eab308" }}
-								></div>
-								<span className="text-zinc-300">Medium Speed</span>
-							</div>
-							<div className="flex items-center space-x-2">
-								<div
-									className="w-3 h-3 rounded"
-									style={{ backgroundColor: "#22c55e" }}
-								></div>
-								<span className="text-zinc-300">High Speed</span>
-							</div>
-						</>
-					)}
-					{displayMetric === "Throttle" && (
-						<>
-							<div className="flex items-center space-x-2">
-								<div
-									className="w-3 h-3 rounded"
-									style={{ backgroundColor: "rgb(0, 150, 0)" }}
-								></div>
-								<span className="text-zinc-300">0% Throttle</span>
-							</div>
-							<div className="flex items-center space-x-2">
-								<div
-									className="w-3 h-3 rounded"
-									style={{ backgroundColor: "rgb(0, 255, 0)" }}
-								></div>
-								<span className="text-zinc-300">100% Throttle</span>
-							</div>
-						</>
-					)}
-					{displayMetric === "Brake" && (
-						<>
-							<div className="flex items-center space-x-2">
-								<div
-									className="w-3 h-3 rounded"
-									style={{ backgroundColor: "rgb(150, 0, 0)" }}
-								></div>
-								<span className="text-zinc-300">0% Brake</span>
-							</div>
-							<div className="flex items-center space-x-2">
-								<div
-									className="w-3 h-3 rounded"
-									style={{ backgroundColor: "rgb(255, 0, 0)" }}
-								></div>
-								<span className="text-zinc-300">100% Brake</span>
-							</div>
-						</>
-					)}
-					{displayMetric === "Gear" && (
-						<>
-							<div className="flex items-center space-x-2">
-								<div
-									className="w-3 h-3 rounded"
-									style={{ backgroundColor: "#ef4444" }}
-								></div>
-								<span className="text-zinc-300">Low Gear</span>
-							</div>
-							<div className="flex items-center space-x-2">
-								<div
-									className="w-3 h-3 rounded"
-									style={{ backgroundColor: "#22c55e" }}
-								></div>
-								<span className="text-zinc-300">High Gear</span>
-							</div>
-						</>
-					)}
-					{displayMetric === "RPM" && (
-						<>
-							<div className="flex items-center space-x-2">
-								<div
-									className="w-3 h-3 rounded"
-									style={{ backgroundColor: "#06b6d4" }}
-								></div>
-								<span className="text-zinc-300">Low RPM</span>
-							</div>
-							<div className="flex items-center space-x-2">
-								<div
-									className="w-3 h-3 rounded"
-									style={{ backgroundColor: "#ec4899" }}
-								></div>
-								<span className="text-zinc-300">High RPM</span>
-							</div>
-						</>
-					)}
-					{displayMetric === "SteeringWheelAngle" && (
-						<>
-							<div className="flex items-center space-x-2">
-								<div
-									className="w-3 h-3 rounded"
-									style={{ backgroundColor: "#888888" }}
-								></div>
-								<span className="text-zinc-300">Straight</span>
-							</div>
-							<div className="flex items-center space-x-2">
-								<div
-									className="w-3 h-3 rounded"
-									style={{ backgroundColor: "#a855f7" }}
-								></div>
-								<span className="text-zinc-300">Full Lock</span>
-							</div>
-						</>
-					)}
-				</div>
-			</div>
-
-			{/* Controls */}
 			<div className="flex flex-col space-y-2 z-10">
-				{/* Zoom controls */}
-				<div className="flex space-x-2">
-					<button
-						onClick={() => {
-							if (mapInstanceRef.current) {
-								const view = mapInstanceRef.current.getView();
-								view.setZoom((view.getZoom() || 15) + 1);
-							}
-						}}
-						type="button"
-						className="bg-zinc-800/90 border border-zinc-600 text-white px-3 py-1 rounded text-sm font-medium hover:bg-zinc-700/90"
+				<div className="flex justify-between">
+					<select
+						value={displayMetric}
+						onChange={(e) => setDisplayMetric(e.target.value)}
+						className="bg-zinc-800/90 border border-zinc-600 text-white px-3 py-1 rounded text-sm font-medium hover:bg-zinc-700/90 focus:outline-none focus:ring-2 focus:ring-blue-500 h-fit"
 					>
-						+
-					</button>
-					<button
-						type="button"
-						onClick={() => {
-							if (mapInstanceRef.current) {
-								const view = mapInstanceRef.current.getView();
-								view.setZoom((view.getZoom() || 15) - 1);
-							}
-						}}
-						className="bg-zinc-800/90 border border-zinc-600 text-white px-3 py-1 rounded text-sm font-medium hover:bg-zinc-700/90"
-					>
-						-
-					</button>
-				</div>
+						<option value="Speed">Speed</option>
+						<option value="Throttle">Throttle</option>
+						<option value="Brake">Brake</option>
+						<option value="Gear">Gear</option>
+						<option value="RPM">RPM</option>
+						<option value="SteeringWheelAngle">Steering</option>
+					</select>
 
-				{/* Metric selector */}
-				<select
-					value={displayMetric}
-					onChange={(e) => setDisplayMetric(e.target.value)}
-					className="bg-zinc-800/90 border border-zinc-600 text-white px-3 py-1 rounded text-sm font-medium hover:bg-zinc-700/90 focus:outline-none focus:ring-2 focus:ring-blue-500"
-				>
-					<option value="Speed">Speed</option>
-					<option value="Throttle">Throttle</option>
-					<option value="Brake">Brake</option>
-					<option value="Gear">Gear</option>
-					<option value="RPM">RPM</option>
-					<option value="SteeringWheelAngle">Steering</option>
-				</select>
+					<div className=" bg-zinc-800/90 border border-zinc-600 p-3 rounded-lg text-sm z-10">
+						<div className="text-white font-medium mb-2">
+							{displayMetric === "Speed" && "Speed (km/h)"}
+							{displayMetric === "Throttle" && "Throttle (%)"}
+							{displayMetric === "Brake" && "Brake (%)"}
+							{displayMetric === "Gear" && "Gear"}
+							{displayMetric === "RPM" && "RPM"}
+							{displayMetric === "SteeringWheelAngle" && "Steering (deg)"}
+						</div>
+						{displayMetric === "Speed" && (
+							<>
+								<div className="flex items-center space-x-2">
+									<div
+										className="w-3 h-3 rounded"
+										style={{ backgroundColor: "#ef4444" }}
+									></div>
+									<span className="text-zinc-300">Low Speed</span>
+								</div>
+								<div className="flex items-center space-x-2">
+									<div
+										className="w-3 h-3 rounded"
+										style={{ backgroundColor: "#eab308" }}
+									></div>
+									<span className="text-zinc-300">Medium Speed</span>
+								</div>
+								<div className="flex items-center space-x-2">
+									<div
+										className="w-3 h-3 rounded"
+										style={{ backgroundColor: "#22c55e" }}
+									></div>
+									<span className="text-zinc-300">High Speed</span>
+								</div>
+							</>
+						)}
+						{displayMetric === "Throttle" && (
+							<>
+								<div className="flex items-center space-x-2">
+									<div
+										className="w-3 h-3 rounded"
+										style={{ backgroundColor: "rgb(0, 150, 0)" }}
+									></div>
+									<span className="text-zinc-300">0% Throttle</span>
+								</div>
+								<div className="flex items-center space-x-2">
+									<div
+										className="w-3 h-3 rounded"
+										style={{ backgroundColor: "rgb(0, 255, 0)" }}
+									></div>
+									<span className="text-zinc-300">100% Throttle</span>
+								</div>
+							</>
+						)}
+						{displayMetric === "Brake" && (
+							<>
+								<div className="flex items-center space-x-2">
+									<div
+										className="w-3 h-3 rounded"
+										style={{ backgroundColor: "rgb(150, 0, 0)" }}
+									></div>
+									<span className="text-zinc-300">0% Brake</span>
+								</div>
+								<div className="flex items-center space-x-2">
+									<div
+										className="w-3 h-3 rounded"
+										style={{ backgroundColor: "rgb(255, 0, 0)" }}
+									></div>
+									<span className="text-zinc-300">100% Brake</span>
+								</div>
+							</>
+						)}
+						{displayMetric === "Gear" && (
+							<>
+								<div className="flex items-center space-x-2">
+									<div
+										className="w-3 h-3 rounded"
+										style={{ backgroundColor: "#ef4444" }}
+									></div>
+									<span className="text-zinc-300">Low Gear</span>
+								</div>
+								<div className="flex items-center space-x-2">
+									<div
+										className="w-3 h-3 rounded"
+										style={{ backgroundColor: "#22c55e" }}
+									></div>
+									<span className="text-zinc-300">High Gear</span>
+								</div>
+							</>
+						)}
+						{displayMetric === "RPM" && (
+							<>
+								<div className="flex items-center space-x-2">
+									<div
+										className="w-3 h-3 rounded"
+										style={{ backgroundColor: "#06b6d4" }}
+									></div>
+									<span className="text-zinc-300">Low RPM</span>
+								</div>
+								<div className="flex items-center space-x-2">
+									<div
+										className="w-3 h-3 rounded"
+										style={{ backgroundColor: "#ec4899" }}
+									></div>
+									<span className="text-zinc-300">High RPM</span>
+								</div>
+							</>
+						)}
+						{displayMetric === "SteeringWheelAngle" && (
+							<>
+								<div className="flex items-center space-x-2">
+									<div
+										className="w-3 h-3 rounded"
+										style={{ backgroundColor: "#888888" }}
+									></div>
+									<span className="text-zinc-300">Straight</span>
+								</div>
+								<div className="flex items-center space-x-2">
+									<div
+										className="w-3 h-3 rounded"
+										style={{ backgroundColor: "#a855f7" }}
+									></div>
+									<span className="text-zinc-300">Full Lock</span>
+								</div>
+							</>
+						)}
+					</div>
+				</div>
 			</div>
 
 			<div

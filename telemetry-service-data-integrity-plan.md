@@ -421,7 +421,7 @@ private async Task RecoverQuestDbConnection()
                 string? url = Environment.GetEnvironmentVariable("QUESTDB_URL");
                 if (url != null)
                 {
-                    _sender = Sender.New($"http::addr={url.Replace("http://", "")};auto_flush_rows=5000;auto_flush_interval=500;");
+                    _sender = Sender.New($"tcp::addr={url};auto_flush_rows=5000;auto_flush_interval=250;");
                     Console.WriteLine("✅ QuestDB connection recovery successful");
                 }
                 else

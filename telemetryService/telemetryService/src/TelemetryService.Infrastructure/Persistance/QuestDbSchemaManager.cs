@@ -15,7 +15,7 @@ public class QuestDbSchemaManager : IDisposable
         _questDbUrl = questDbUrl.Replace("http://", "").Replace("https://", "");
         _httpClient = new HttpClient()
         {
-            Timeout = TimeSpan.FromSeconds(30)
+            Timeout = TimeSpan.FromSeconds(60)
         };
     }
 
@@ -24,6 +24,9 @@ public class QuestDbSchemaManager : IDisposable
         try
         {
             Console.WriteLine("🔧 Checking QuestDB schema optimization...");
+            
+            // Wait for QuestDB to be ready
+            await WaitForQuestDbReady();
             
             // Clean up any orphaned tables first
             await CleanupOrphanedTables();
@@ -542,6 +545,29 @@ public class QuestDbSchemaManager : IDisposable
         {
             Console.WriteLine($"⚠️  Could not cleanup orphaned tables: {ex.Message}");
         }
+    }
+
+    private async Task WaitForQuestDbReady()
+    {
+        for (int i = 0; i < 10; i++)
+        {
+            try
+            {
+                var healthCheck = await ExecuteQuery("SELECT 1 as health_check");
+                if (healthCheck != null)
+                {
+                    Console.WriteLine("✅ QuestDB connection verified");
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⏳ Waiting for QuestDB to be ready (attempt {i + 1}/10): {ex.Message}");
+                await Task.Delay(2000);
+            }
+        }
+        
+        throw new Exception("QuestDB is not responding after 10 attempts");
     }
 
     private static bool IsOrphanedTable(string tableName)

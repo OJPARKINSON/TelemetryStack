@@ -36,7 +36,7 @@ services:
     networks:
       - telemetry-network
     environment:
-      QUESTDB_URL: tcp://questdb:9009
+      QUESTDB_URL: questdb:9009
       DOTNET_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:5000
       DOTNET_GCRetainVM: 1
@@ -59,7 +59,7 @@ services:
       QUESTDB_USER: admin
       QUESTDB_PASSWORD: quest
       QUESTDB_DATABASE: qdb
-      NODE_ENV: production
+      NODE_ENV: development
       NEXT_PUBLIC_APP_URL: http://localhost:3000
     networks:
       - telemetry-network
@@ -71,6 +71,7 @@ services:
     restart: unless-stopped
     ports:
       - "9000:9000"
+      - "9009:9009"
       - "8812:8812"
     volumes:
       - questdb-data:/root/.questdb

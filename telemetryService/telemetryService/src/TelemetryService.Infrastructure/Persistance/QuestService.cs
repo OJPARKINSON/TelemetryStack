@@ -1,4 +1,3 @@
-using System.Net.Http;
 using System.Net.Sockets;
 using QuestDB;
 using QuestDB.Senders;
@@ -22,9 +21,23 @@ public class QuestDbService : IDisposable
             return;
         }
 
-        _schemaManager = new QuestDbSchemaManager(url);
-
-        _sender = Sender.New($"tcp::addr={url.Replace("tcp://", "").Replace("http://", "")};auto_flush_rows=5000;auto_flush_interval=250;");
+        // Parse the URL to get hostname and port for different QuestDB protocols
+        string hostAndPort = url;
+        if (url.StartsWith("tcp://"))
+        {
+            hostAndPort = url.Substring(6); // Remove "tcp://" prefix
+        }
+        
+        // Extract hostname for HTTP connection (schema manager uses port 9000)
+        string hostname = hostAndPort.Split(':')[0];
+        string httpUrl = $"{hostname}:9000";
+        
+        Console.WriteLine($"🔗 Initializing QuestDB connections:");
+        Console.WriteLine($"   TCP Ingress: tcp::addr={hostAndPort}");
+        Console.WriteLine($"   HTTP Schema: http://{httpUrl}");
+        
+        _schemaManager = new QuestDbSchemaManager(httpUrl);
+        _sender = Sender.New($"tcp::addr={hostAndPort};auto_flush_rows=10000;auto_flush_interval=1000;");
         
         _ = Task.Run(async () => 
         {
@@ -151,8 +164,13 @@ public class QuestDbService : IDisposable
                message.Contains("connection") ||
                message.Contains("timeout") ||
                message.Contains("network") ||
+               message.Contains("broken pipe") ||
+               message.Contains("socketerror") ||
+               message.Contains("could not write data to server") ||
                innerMessage.Contains("httpclient") ||
-               innerMessage.Contains("disposed");
+               innerMessage.Contains("disposed") ||
+               innerMessage.Contains("broken pipe") ||
+               innerMessage.Contains("transport connection");
     }
 
     public async Task WriteBatch(TelemetryBatch? telData)
@@ -189,6 +207,10 @@ public class QuestDbService : IDisposable
 
         try
         {
+            Console.WriteLine($"🔄 Starting batch write to QuestDB: {telData.Records.Count} records");
+            var startTime = DateTime.UtcNow;
+            var processedCount = 0;
+            
             foreach (var tel in telData.Records)
             {
                 // Validate required fields to prevent empty table names and invalid data
@@ -207,8 +229,18 @@ public class QuestDbService : IDisposable
                     Console.WriteLine("⚠️  Skipping telemetry record with missing session_id and track_name");
                     continue;
                 }
+                
+                processedCount++;
+                if (processedCount % 1000 == 0)
+                {
+                    Console.WriteLine($"   📊 Processed {processedCount}/{telData.Records.Count} records...");
+                }
+                
                 const string TABLE_NAME = "TelemetryTicks";
-                senderToUse.Table(TABLE_NAME)
+                
+                try
+                {
+                    senderToUse.Table(TABLE_NAME)
                     .Symbol("session_id", sessionId)
                     .Symbol("track_name", trackName)
                     .Symbol("track_id", trackId)
@@ -257,10 +289,27 @@ public class QuestDbService : IDisposable
                     .Column("lRtempM", (float)GetValidDouble(tel.LRtempM))
                     .Column("rRtempM", (float)GetValidDouble(tel.RRtempM))
                     .At(tel.TickTime.ToDateTime());
+                }
+                catch (Exception rowEx)
+                {
+                    Console.WriteLine($"⚠️  Error adding record {processedCount} to batch: {rowEx.GetType().Name}: {rowEx.Message}");
+                    
+                    // If this is a connection error during auto-flush, re-throw to trigger sender reset
+                    if (IsConnectionError(rowEx))
+                    {
+                        Console.WriteLine($"   🔄 Connection error during row processing, will trigger sender reset");
+                        throw;
+                    }
+                    
+                    // For non-connection errors, skip this record and continue
+                    continue;
+                }
             }
             
+            Console.WriteLine($"📤 Sending batch to QuestDB via TCP... ({processedCount} records processed)");
             await senderToUse.SendAsync();
-            Console.WriteLine($"Successfully wrote {telData.Records.Count} telemetry points");
+            var duration = DateTime.UtcNow - startTime;
+            Console.WriteLine($"✅ Successfully wrote {processedCount}/{telData.Records.Count} telemetry points in {duration.TotalMilliseconds:F1}ms");
         }
         catch (OutOfMemoryException ex)
         {
@@ -278,10 +327,13 @@ public class QuestDbService : IDisposable
         }
         catch (Exception ex)
         {
+            var processedSoFar = processedCount > 0 ? processedCount : 0;
             Console.WriteLine($"❌ ERROR writing to QuestDB: {ex.GetType().Name}");
             Console.WriteLine($"   Message: {ex.Message}");
             Console.WriteLine($"   Stack Trace: {ex.StackTrace}");
             Console.WriteLine($"   Batch Size: {telData.Records.Count} records");
+            Console.WriteLine($"   Records Processed: {processedSoFar} before error");
+            Console.WriteLine($"   Connection State: {(senderToUse != null ? "Sender Available" : "Sender Null")}");
             
             if (ex.InnerException != null)
             {
@@ -289,7 +341,10 @@ public class QuestDbService : IDisposable
             }
             
             // Only reset sender for specific errors that indicate connection issues
-            if (IsConnectionError(ex))
+            var isConnError = IsConnectionError(ex);
+            Console.WriteLine($"   Classified as connection error: {isConnError}");
+            
+            if (isConnError)
             {
                 lock (_senderLock)
                 {
@@ -298,13 +353,25 @@ public class QuestDbService : IDisposable
                         try
                         {
                             Console.WriteLine("🔄 Attempting to reset QuestDB sender due to connection error...");
+                            Console.WriteLine($"   Previous sender state: {(_sender != null ? "Active" : "Null")}");
+                            
                             _sender?.Dispose();
                             _sender = null;
                             
                             string? url = Environment.GetEnvironmentVariable("QUESTDB_URL");
+                            Console.WriteLine($"   QUESTDB_URL: {url}");
+                            
                             if (url != null)
                             {
-                                _sender = Sender.New($"tcp::addr={url.Replace("tcp://", "").Replace("http://", "")};auto_flush_rows=2000;auto_flush_interval=500;");
+                                // Parse the URL to extract hostname and port for QuestDB TCP client
+                                string hostAndPort = url;
+                                if (url.StartsWith("tcp://"))
+                                {
+                                    hostAndPort = url.Substring(6); // Remove "tcp://" prefix
+                                }
+                                
+                                Console.WriteLine($"   Connecting to: tcp::addr={hostAndPort}");
+                                _sender = Sender.New($"tcp::addr={hostAndPort};auto_flush_rows=10000;auto_flush_interval=1000;");
                                 Console.WriteLine("✅ QuestDB sender reset successful");
                             }
                             else

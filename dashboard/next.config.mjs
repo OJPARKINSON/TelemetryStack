@@ -4,6 +4,8 @@ const nextConfig = {
 	serverExternalPackages: ["pg"],
 	reactStrictMode: true,
 
+	basePath: process.env.NODE_ENV === "production" ? "/dashboard" : "",
+
 	compiler: {
 		removeConsole:
 			process.env.NODE_ENV === "production"
@@ -122,7 +124,7 @@ const nextConfig = {
 	// Map tile rewrites are now handled by Traefik for better performance
 	async rewrites() {
 		return [];
-		},
+	},
 
 	// Redirect configuration for performance
 	async redirects() {
