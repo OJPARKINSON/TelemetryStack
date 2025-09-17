@@ -24,7 +24,7 @@ public class QuestDbService : IDisposable
 
         _schemaManager = new QuestDbSchemaManager(url);
 
-        _sender = Sender.New($"http::addr={url.Replace("http://", "")};auto_flush_rows=2000;auto_flush_interval=500;");
+        _sender = Sender.New($"tcp::addr={url.Replace("tcp://", "").Replace("http://", "")};auto_flush_rows=5000;auto_flush_interval=250;");
         
         _ = Task.Run(async () => 
         {
@@ -207,8 +207,8 @@ public class QuestDbService : IDisposable
                     Console.WriteLine("⚠️  Skipping telemetry record with missing session_id and track_name");
                     continue;
                 }
-
-                senderToUse.Table("TelemetryTicks")
+                const string TABLE_NAME = "TelemetryTicks";
+                senderToUse.Table(TABLE_NAME)
                     .Symbol("session_id", sessionId)
                     .Symbol("track_name", trackName)
                     .Symbol("track_id", trackId)
@@ -304,7 +304,7 @@ public class QuestDbService : IDisposable
                             string? url = Environment.GetEnvironmentVariable("QUESTDB_URL");
                             if (url != null)
                             {
-                                _sender = Sender.New($"http::addr={url.Replace("http://", "")};auto_flush_rows=2000;auto_flush_interval=500;");
+                                _sender = Sender.New($"tcp::addr={url.Replace("tcp://", "").Replace("http://", "")};auto_flush_rows=2000;auto_flush_interval=500;");
                                 Console.WriteLine("✅ QuestDB sender reset successful");
                             }
                             else

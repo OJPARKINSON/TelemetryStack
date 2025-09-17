@@ -44,35 +44,28 @@ type Config struct {
 
 func LoadConfig() *Config {
 	return &Config{
-		// High-Performance Defaults (Optimized for AMD Ryzen 7 7600X)
-		// 16 threads, 32MB L3 cache, DDR5 memory
-		WorkerCount:   getEnvAsInt("WORKER_COUNT", 20),      // Utilize 16 threads + overhead
-		FileQueueSize: getEnvAsInt("FILE_QUEUE_SIZE", 1000), // Large queue to prevent blocking
+		WorkerCount:   getEnvAsInt("WORKER_COUNT", 20),
+		FileQueueSize: getEnvAsInt("FILE_QUEUE_SIZE", 1000),
 		WorkerTimeout: getEnvAsDuration("WORKER_TIMEOUT", 30*time.Minute),
 
-		// Aggressive Batch Processing (3-6 GB/hour target)
-		BatchSizeBytes: getEnvAsInt("BATCH_SIZE_BYTES", 67108864),              // 32MB batches (leverage L3 cache)
-		BatchTimeout:   getEnvAsDuration("BATCH_TIMEOUT", 10*time.Millisecond), // Very aggressive flushing
+		BatchSizeBytes: getEnvAsInt("BATCH_SIZE_BYTES", 67108864),
+		BatchTimeout:   getEnvAsDuration("BATCH_TIMEOUT", 10*time.Millisecond),
 		MaxRetries:     getEnvAsInt("MAX_RETRIES", 3),
 		RetryDelay:     getEnvAsDuration("RETRY_DELAY", 250*time.Millisecond),
 
-		// Network Connection (7600X → Pi5 over 0.3ms link)
-		RabbitMQURL: getEnv("RABBITMQ_URL", "amqp://admin:changeme@100.66.157.27:5672/"),
+		RabbitMQURL: getEnv("RABBITMQ_URL", "amqp://admin:changeme@localhost:5672"),
 
-		// File Processing Optimization
 		FileAgeThreshold:   getEnvAsDuration("FILE_AGE_THRESHOLD", 30*time.Second),
 		FileProcessTimeout: getEnvAsDuration("FILE_PROCESS_TIMEOUT", 10*time.Minute),
 
-		// Go Runtime Optimization (7600X specific)
-		GoMaxProcs: getEnvAsInt("GOMAXPROCS", 16), // Use all 16 threads
-		GOGC:       getEnvAsInt("GOGC", 800),      // Infrequent GC with abundant memory
+		GoMaxProcs: getEnvAsInt("GOMAXPROCS", 16),
+		GOGC:       getEnvAsInt("GOGC", 800),
 
 		// Development & Monitoring
-		EnablePprof:  getEnvAsBool("ENABLE_PPROF", false), // Disabled in production
+		EnablePprof:  getEnvAsBool("ENABLE_PPROF", false),
 		PprofPort:    getEnv("PPROF_PORT", "6060"),
 		MemoryTuning: getEnvAsBool("MEMORY_TUNING", true),
 
-		// RabbitMQ Client Optimization (High-Throughput → Pi5)
 		RabbitMQPoolSize:      getEnvAsInt("RABBITMQ_POOL_SIZE", 20),                          // Match worker count
 		RabbitMQPrefetchCount: getEnvAsInt("RABBITMQ_PREFETCH_COUNT", 100000),                 // Large prefetch buffer
 		RabbitMQBatchSize:     getEnvAsInt("RABBITMQ_BATCH_SIZE", 16000),                      // Large message batches
@@ -84,7 +77,7 @@ func LoadConfig() *Config {
 		RabbitMQFrameSize:     getEnvAsInt("RABBITMQ_FRAME_SIZE", 16777216),                   // 4MB frames for large batches
 
 		// Record Processing
-		BatchSizeRecords: getEnvAsInt("BATCH_SIZE_RECORDS", 64000), // Large record batches
+		BatchSizeRecords: getEnvAsInt("BATCH_SIZE_RECORDS", 64000),
 	}
 }
 

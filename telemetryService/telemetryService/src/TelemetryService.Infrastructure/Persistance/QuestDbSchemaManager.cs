@@ -25,6 +25,9 @@ public class QuestDbSchemaManager : IDisposable
         {
             Console.WriteLine("🔧 Checking QuestDB schema optimization...");
             
+            // Clean up any orphaned tables first
+            await CleanupOrphanedTables();
+            
             var tableInfo = await GetTableInfo("TelemetryTicks");
             
             if (tableInfo == null)
@@ -478,5 +481,93 @@ public class QuestDbSchemaManager : IDisposable
         _disposed = true;
         
         GC.SuppressFinalize(this);
+    }
+
+    private async Task CleanupOrphanedTables()
+    {
+        try
+        {
+            Console.WriteLine("🧹 Checking for orphaned tables...");
+            
+            // Get list of all tables
+            var tablesQuery = "SHOW TABLES";
+            var response = await ExecuteQuery(tablesQuery);
+            
+            if (response?.TryGetProperty("dataset", out var dataset) == true)
+            {
+                var tablesToDelete = new List<string>();
+                
+                foreach (var row in dataset.EnumerateArray())
+                {
+                    var rowArray = row.EnumerateArray().ToArray();
+                    if (rowArray.Length > 0)
+                    {
+                        var tableName = rowArray[0].GetString();
+                        
+                        // Check if this is an orphaned table (numeric names that look like session IDs)
+                        if (!string.IsNullOrEmpty(tableName) && 
+                            tableName != "TelemetryTicks" && 
+                            IsOrphanedTable(tableName))
+                        {
+                            tablesToDelete.Add(tableName);
+                        }
+                    }
+                }
+                
+                // Delete orphaned tables
+                foreach (var tableName in tablesToDelete)
+                {
+                    try
+                    {
+                        Console.WriteLine($"   🗑️  Dropping orphaned table: {tableName}");
+                        await ExecuteQuery($"DROP TABLE {tableName}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"   ⚠️  Could not drop table {tableName}: {ex.Message}");
+                    }
+                }
+                
+                if (tablesToDelete.Count > 0)
+                {
+                    Console.WriteLine($"✅ Cleaned up {tablesToDelete.Count} orphaned tables");
+                }
+                else
+                {
+                    Console.WriteLine("✅ No orphaned tables found");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️  Could not cleanup orphaned tables: {ex.Message}");
+        }
+    }
+
+    private static bool IsOrphanedTable(string tableName)
+    {
+        // Check if table name looks like a session ID (numeric) or backup table
+        if (string.IsNullOrEmpty(tableName))
+            return false;
+            
+        // Remove known good table names
+        if (tableName == "TelemetryTicks")
+            return false;
+            
+        // Check for numeric-only names (likely session IDs)
+        if (long.TryParse(tableName, out _))
+        {
+            Console.WriteLine($"   Found numeric table name (likely session ID): {tableName}");
+            return true;
+        }
+        
+        // Check for backup tables from failed migrations
+        if (tableName.StartsWith("TelemetryTicks_backup_"))
+        {
+            Console.WriteLine($"   Found backup table: {tableName}");
+            return true;
+        }
+        
+        return false;
     }
 }
