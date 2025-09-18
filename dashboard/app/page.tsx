@@ -25,17 +25,17 @@ export default async function DashboardPage() {
 			<div className="min-h-screen bg-zinc-950 flex">
 				<div className="w-64 bg-zinc-900/50 border-r border-zinc-800/50 flex flex-col">
 					<div className="px-6 py-6">
-						<div className="flex items-center space-x-3">
-							<div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-								<div className="w-4 h-4 bg-zinc-900 rounded"></div>
-							</div>
-							<div>
-								<Link href="/">
+						<Link href="/" className="cursor-pointer">
+							<div className="flex items-center space-x-3">
+								<div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
+									<div className="w-4 h-4 bg-zinc-900 rounded"></div>
+								</div>
+								<div>
 									<h1 className="text-sm font-semibold text-white">iRacing</h1>
 									<p className="text-xs text-zinc-400">Telemetry</p>
-								</Link>
+								</div>
 							</div>
-						</div>
+						</Link>
 					</div>
 
 					<nav className="flex-1 px-4 space-y-1">

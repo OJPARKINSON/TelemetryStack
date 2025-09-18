@@ -1,4 +1,4 @@
-import { useCallback, useState, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { TelemetryDataPoint } from "@/lib/types";
 
 /**
@@ -7,10 +7,10 @@ import type { TelemetryDataPoint } from "@/lib/types";
 export function useTrackPosition(telemetryData: TelemetryDataPoint[]) {
 	const [selectedIndex, setSelectedIndex] = useState<number>(0);
 	const [selectedLapPct, setSelectedLapPct] = useState<number>(0);
-	
+
 	// Cache for expensive lookups
 	const lookupCacheRef = useRef<Map<number, TelemetryDataPoint>>(new Map());
-	
+
 	// Memoize sorted data for faster lookups
 	const sortedData = useMemo(() => {
 		if (!telemetryData?.length) return [];
@@ -82,11 +82,11 @@ export function useTrackPosition(telemetryData: TelemetryDataPoint[]) {
 
 		// Cache the result
 		lookupCacheRef.current.set(cacheKey, bestPoint);
-		
+
 		// Limit cache size to prevent memory leaks
 		if (lookupCacheRef.current.size > 1000) {
 			const firstKey = lookupCacheRef.current.keys().next().value;
-			lookupCacheRef.current.delete(firstKey);
+			lookupCacheRef.current.delete(firstKey!);
 		}
 
 		return bestPoint;

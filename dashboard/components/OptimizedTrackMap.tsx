@@ -455,8 +455,8 @@ export default function OptimizedTrackMap({
 						<option value="SteeringWheelAngle">Steering</option>
 					</select>
 
-					<div className=" bg-zinc-800/90 border border-zinc-600 p-3 rounded-lg text-sm z-10">
-						<div className="text-white font-medium mb-2">
+					<div className=" bg-zinc-800/90 border border-zinc-600 p-2 rounded-lg text-sm z-10 mb-2">
+						<div className="text-white font-medium mb-1">
 							{displayMetric === "Speed" && "Speed (km/h)"}
 							{displayMetric === "Throttle" && "Throttle (%)"}
 							{displayMetric === "Brake" && "Brake (%)"}

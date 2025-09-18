@@ -1,10 +1,18 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useState, useCallback, useRef, useEffect, useDeferredValue } from "react";
-import { InfoBox, TelemetryChart } from "@/components/InfoBox";
-import TrackView from "@/components/TrackView";
+import {
+	useCallback,
+	useDeferredValue,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
+import { InfoBox } from "@/components/InfoBox";
 import ProfessionalTelemetryCharts from "@/components/ProfessionalTelemetryCharts";
+import TrackView from "@/components/TrackView";
 import { useTrackPosition } from "@/hooks/useTrackPosition";
 import type { TelemetryRes } from "@/lib/Fetch";
 import type { TelemetryDataPoint } from "@/lib/types";
@@ -69,45 +77,51 @@ export default function TelemetryPage({
 	}, [dataWithGPSCoordinates, sessionId]);
 
 	// Memoize track point click handler
-	const handleTrackPointClick = useCallback((index: number) => {
-		handlePointSelection(index);
-		setIsScrubbing(true);
-		setTimeout(() => setIsScrubbing(false), 500);
-	}, [handlePointSelection]);
+	const handleTrackPointClick = useCallback(
+		(index: number) => {
+			handlePointSelection(index);
+			setIsScrubbing(true);
+			setTimeout(() => setIsScrubbing(false), 500);
+		},
+		[handlePointSelection],
+	);
 
 	// Debounced hover handling for smoother interactions
 	const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-	
+
 	const handleChartHover = useCallback((index: number) => {
 		// Clear any pending hover timeout
 		if (hoverTimeoutRef.current) {
 			clearTimeout(hoverTimeoutRef.current);
 		}
-		
+
 		// More aggressive debouncing for heavy datasets
 		hoverTimeoutRef.current = setTimeout(() => {
 			setHoverIndex(index);
 		}, 16); // 16ms debounce (~60fps) for better performance with 39K points
 	}, []);
 
-	const handleChartClick = useCallback((index: number) => {
-		// Clear any pending hover timeouts on click
-		if (hoverTimeoutRef.current) {
-			clearTimeout(hoverTimeoutRef.current);
-		}
-		
-		handlePointSelection(index);
-		setIsScrubbing(true);
-		setTimeout(() => setIsScrubbing(false), 300);
-		setHoverIndex(-1); // Clear hover state after selection
-	}, [handlePointSelection]);
+	const handleChartClick = useCallback(
+		(index: number) => {
+			// Clear any pending hover timeouts on click
+			if (hoverTimeoutRef.current) {
+				clearTimeout(hoverTimeoutRef.current);
+			}
+
+			handlePointSelection(index);
+			setIsScrubbing(true);
+			setTimeout(() => setIsScrubbing(false), 300);
+			setHoverIndex(-1); // Clear hover state after selection
+		},
+		[handlePointSelection],
+	);
 
 	const handleChartMouseLeave = useCallback(() => {
 		// Clear any pending hover timeouts
 		if (hoverTimeoutRef.current) {
 			clearTimeout(hoverTimeoutRef.current);
 		}
-		
+
 		// Debounce mouse leave to prevent flickering
 		hoverTimeoutRef.current = setTimeout(() => {
 			setHoverIndex(-1);
@@ -125,7 +139,7 @@ export default function TelemetryPage({
 
 	// Defer hover index updates to prevent blocking the main thread
 	const deferredHoverIndex = useDeferredValue(hoverIndex);
-	
+
 	// Get display index (hover takes precedence over selection for preview)
 	const displayIndex = useMemo(() => {
 		return deferredHoverIndex >= 0 ? deferredHoverIndex : selectedIndex;
@@ -195,15 +209,17 @@ export default function TelemetryPage({
 			<div className="w-64 bg-zinc-900/50 border-r border-zinc-800/50 flex flex-col">
 				{/* Logo/Brand */}
 				<div className="px-6 py-6">
-					<div className="flex items-center space-x-3">
-						<div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-							<div className="w-4 h-4 bg-zinc-900 rounded"></div>
+					<Link href="/" className=" cursor-pointer">
+						<div className="flex items-center space-x-3">
+							<div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
+								<div className="w-4 h-4 bg-zinc-900 rounded"></div>
+							</div>
+							<div>
+								<h1 className="text-sm font-semibold text-white">iRacing</h1>
+								<p className="text-xs text-zinc-400">Telemetry</p>
+							</div>
 						</div>
-						<div>
-							<h1 className="text-sm font-semibold text-white">iRacing</h1>
-							<p className="text-xs text-zinc-400">Telemetry</p>
-						</div>
-					</div>
+					</Link>
 				</div>
 
 				{/* Navigation */}
@@ -224,12 +240,10 @@ export default function TelemetryPage({
 						Performance
 					</div>
 				</nav>
-
 			</div>
 
 			{/* Main Content */}
 			<div className="flex-1 flex flex-col">
-
 				{/* Main Content */}
 				<main className="flex-1 p-6 space-y-6">
 					{/* Key Stats Section */}
@@ -238,16 +252,23 @@ export default function TelemetryPage({
 							<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 								<div className="text-center">
 									<div className="text-xs text-zinc-500 mb-1">Track</div>
-									<div className="text-lg font-semibold text-white">{trackInfo?.trackName || "Unknown"}</div>
+									<div className="text-lg font-semibold text-white">
+										{trackInfo?.trackName || "Unknown"}
+									</div>
 								</div>
 								<div className="text-center">
 									<div className="text-xs text-zinc-500 mb-1">GPS Points</div>
-									<div className="text-lg font-semibold text-green-400">{dataWithGPSCoordinates.length.toLocaleString()}</div>
+									<div className="text-lg font-semibold text-green-400">
+										{dataWithGPSCoordinates.length.toLocaleString()}
+									</div>
 								</div>
 								<div className="text-center">
 									<div className="text-xs text-zinc-500 mb-1">Max Speed</div>
 									<div className="text-lg font-semibold text-yellow-400">
-										{Math.max(...dataWithGPSCoordinates.map(p => p.Speed || 0)).toFixed(0)} km/h
+										{Math.max(
+											...dataWithGPSCoordinates.map((p) => p.Speed || 0),
+										).toFixed(0)}{" "}
+										km/h
 									</div>
 								</div>
 								<div className="text-center">
@@ -256,10 +277,14 @@ export default function TelemetryPage({
 									</div>
 									{displayIndex >= 0 && dataWithGPSCoordinates[displayIndex] ? (
 										<div className="text-lg font-semibold text-blue-400">
-											{dataWithGPSCoordinates[displayIndex].Speed?.toFixed(0) || "0"} km/h
+											{dataWithGPSCoordinates[displayIndex].Speed?.toFixed(0) ||
+												"0"}{" "}
+											km/h
 										</div>
 									) : (
-										<div className="text-lg font-semibold text-zinc-500">--</div>
+										<div className="text-lg font-semibold text-zinc-500">
+											--
+										</div>
 									)}
 								</div>
 							</div>
@@ -270,7 +295,6 @@ export default function TelemetryPage({
 					<div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
 						{/* Track Map */}
 						<div className="col-span-1 lg:col-span-3 bg-zinc-900/50 border border-zinc-800/50 rounded-lg p-6">
-
 							{dataWithGPSCoordinates.length > 0 ? (
 								<TrackView
 									dataWithCoordinates={dataWithGPSCoordinates}
@@ -286,7 +310,8 @@ export default function TelemetryPage({
 										</div>
 										<p className="text-zinc-400 mb-2">No GPS data available</p>
 										<p className="text-zinc-500 text-sm">
-											This session may not contain GPS coordinates or they may be invalid.
+											This session may not contain GPS coordinates or they may
+											be invalid.
 										</p>
 									</div>
 								</div>
@@ -309,7 +334,9 @@ export default function TelemetryPage({
 										<div className="w-16 h-16 mx-auto bg-zinc-700/50 rounded-lg flex items-center justify-center mb-4">
 											<div className="w-8 h-8 border-2 border-zinc-600 rounded border-dashed"></div>
 										</div>
-										<p className="text-zinc-400 mb-2">No telemetry data available</p>
+										<p className="text-zinc-400 mb-2">
+											No telemetry data available
+										</p>
 										<p className="text-zinc-500 text-sm">
 											Loading telemetry charts...
 										</p>
@@ -336,7 +363,6 @@ export default function TelemetryPage({
 	);
 }
 
-
 function GPSAnalysisPanel({ data }: { data: any[] }) {
 	const totalDistance = data.reduce(
 		(sum, point) => sum + (point.distanceFromPrev || 0),
@@ -351,7 +377,9 @@ function GPSAnalysisPanel({ data }: { data: any[] }) {
 
 	return (
 		<div className="bg-zinc-900/50 border border-zinc-800/50 rounded-lg p-6">
-			<h2 className="text-lg font-semibold text-white mb-6">GPS Track Analysis</h2>
+			<h2 className="text-lg font-semibold text-white mb-6">
+				GPS Track Analysis
+			</h2>
 			<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 				<div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-4">
 					<div className="text-sm text-zinc-400 mb-2">Total Distance</div>
@@ -361,7 +389,9 @@ function GPSAnalysisPanel({ data }: { data: any[] }) {
 				</div>
 				<div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-4">
 					<div className="text-sm text-zinc-400 mb-2">Average Speed</div>
-					<div className="text-2xl font-bold text-green-400">{avgSpeed.toFixed(1)} km/h</div>
+					<div className="text-2xl font-bold text-green-400">
+						{avgSpeed.toFixed(1)} km/h
+					</div>
 				</div>
 				<div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-4">
 					<div className="text-sm text-zinc-400 mb-2">Speed Range</div>
@@ -372,7 +402,9 @@ function GPSAnalysisPanel({ data }: { data: any[] }) {
 				</div>
 				<div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-4">
 					<div className="text-sm text-zinc-400 mb-2">Corner Points</div>
-					<div className="text-2xl font-bold text-purple-400">{corners.length.toLocaleString()}</div>
+					<div className="text-2xl font-bold text-purple-400">
+						{corners.length.toLocaleString()}
+					</div>
 					<div className="text-xs text-zinc-500">
 						{((corners.length / data.length) * 100).toFixed(1)}% of lap
 					</div>

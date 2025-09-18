@@ -327,13 +327,12 @@ public class QuestDbService : IDisposable
         }
         catch (Exception ex)
         {
-            var processedSoFar = processedCount > 0 ? processedCount : 0;
             Console.WriteLine($"❌ ERROR writing to QuestDB: {ex.GetType().Name}");
             Console.WriteLine($"   Message: {ex.Message}");
-            Console.WriteLine($"   Stack Trace: {ex.StackTrace}");
+            Console.WriteLine($"   Message: {telData}");
             Console.WriteLine($"   Batch Size: {telData.Records.Count} records");
-            Console.WriteLine($"   Records Processed: {processedSoFar} before error");
             Console.WriteLine($"   Connection State: {(senderToUse != null ? "Sender Available" : "Sender Null")}");
+            Console.WriteLine($"   Stack Trace: {ex.StackTrace}");
             
             if (ex.InnerException != null)
             {

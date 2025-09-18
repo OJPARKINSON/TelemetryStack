@@ -1,7 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import Link from "next/link";
 
 interface Session {
 	session_id: string;
@@ -14,15 +13,6 @@ interface SessionSelectorProps {
 }
 
 export default function SessionSelector({ sessions }: SessionSelectorProps) {
-	const router = useRouter();
-	const [selectedSession, setSelectedSession] = useState<string>("");
-
-	const handleSessionSelect = (sessionId: string) => {
-		if (sessionId) {
-			router.push(`/${sessionId}?lapId=1`);
-		}
-	};
-
 	const formatDate = (date: Date) => {
 		return new Intl.DateTimeFormat("en-US", {
 			year: "numeric",
@@ -62,10 +52,9 @@ export default function SessionSelector({ sessions }: SessionSelectorProps) {
 			{/* Sessions Grid */}
 			<div className="grid grid-cols-1 gap-4">
 				{sessions.map((session) => (
-					<button
-						type="button"
+					<Link
 						key={session.session_id}
-						onClick={() => handleSessionSelect(session.session_id)}
+						href={`/${session.session_id}?lap=1`}
 						className="bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-700/50 rounded-lg p-6 text-left transition-all duration-200 group"
 					>
 						<div className="flex items-center justify-between">
@@ -119,7 +108,7 @@ export default function SessionSelector({ sessions }: SessionSelectorProps) {
 								</div>
 							</div>
 						</div>
-					</button>
+					</Link>
 				))}
 			</div>
 
