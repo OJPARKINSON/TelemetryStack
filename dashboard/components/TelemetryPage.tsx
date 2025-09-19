@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
 	useCallback,
 	useDeferredValue,
@@ -10,12 +10,12 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { InfoBox } from "@/components/InfoBox";
-import ProfessionalTelemetryCharts from "@/components/ProfessionalTelemetryCharts";
-import TrackView from "@/components/TrackView";
-import { useTrackPosition } from "@/hooks/useTrackPosition";
-import type { TelemetryRes } from "@/lib/Fetch";
-import type { TelemetryDataPoint } from "@/lib/types";
+import { InfoBox } from "../components/InfoBox";
+import ProfessionalTelemetryCharts from "../components/ProfessionalTelemetryCharts";
+import TrackView from "../components/TrackView";
+import { useTrackPosition } from "../hooks/useTrackPosition";
+import type { TelemetryRes } from "../lib/Fetch";
+import type { TelemetryDataPoint } from "../lib/types";
 
 interface TelemetryPageProps {
 	initialTelemetryData: TelemetryRes;
@@ -23,19 +23,6 @@ interface TelemetryPageProps {
 	sessionId: string;
 	currentLapId: number;
 }
-
-const availableMetrics: string[] = [
-	"LapDistPct",
-	"Speed",
-	"Throttle",
-	"Brake",
-	"Gear",
-	"RPM",
-	"SteeringWheelAngle",
-	"LapCurrentLapTime",
-	"PlayerCarPosition",
-	"FuelLevel",
-];
 
 export default function TelemetryPage({
 	initialTelemetryData,
@@ -45,6 +32,7 @@ export default function TelemetryPage({
 }: TelemetryPageProps) {
 	const router = useRouter();
 	const pathname = usePathname();
+	const searchParams = useSearchParams();
 
 	const [selectedMetric, setSelectedMetric] = useState<string>("Speed");
 	const [isScrubbing, setIsScrubbing] = useState<boolean>(false);
@@ -55,22 +43,22 @@ export default function TelemetryPage({
 		return initialTelemetryData?.dataWithGPSCoordinates || [];
 	}, [initialTelemetryData?.dataWithGPSCoordinates]);
 
-	const trackBounds = initialTelemetryData?.trackBounds || null;
 	const processError = initialTelemetryData?.processError || null;
 
-	const {
-		selectedIndex,
-		selectedLapPct,
-		handlePointSelection,
-		getTrackDisplayPoint,
-	} = useTrackPosition(dataWithGPSCoordinates as TelemetryDataPoint[]);
+	const { selectedIndex, handlePointSelection } = useTrackPosition(
+		dataWithGPSCoordinates as TelemetryDataPoint[],
+	);
 
 	// Derive track information from data
 	const trackInfo = useMemo(() => {
 		if (dataWithGPSCoordinates.length === 0) return null;
 
-		const firstPoint = dataWithGPSCoordinates[0];
+		const firstPoint = dataWithGPSCoordinates[0] as TelemetryDataPoint;
+		const lastPoint = dataWithGPSCoordinates[
+			dataWithGPSCoordinates.length - 1
+		] as TelemetryDataPoint;
 		return {
+			lapTime: lastPoint?.LapCurrentLapTime,
 			trackName: firstPoint?.TrackName || "Unknown Track",
 			sessionNum: firstPoint?.SessionNum || sessionId,
 		};
@@ -153,7 +141,7 @@ export default function TelemetryPage({
 	const handleLapChange = (newLapId: string) => {
 		const params = new URLSearchParams();
 		params.set("lapId", newLapId);
-		router.push(pathname + "?" + params.toString());
+		router.push(`${pathname}?${params.toString()}`);
 	};
 
 	if (processError) {
@@ -222,8 +210,21 @@ export default function TelemetryPage({
 					</Link>
 				</div>
 
-				{/* Navigation */}
 				<nav className="flex-1 px-4 space-y-1">
+					<div className="text-white px-3 py-2 rounded-md text-sm font-medium cursor-pointer flex justify-between items-center">
+						Lap:
+						<select
+							className="bg-zinc-800/90 border border-zinc-600 text-white px-3 py-1 rounded text-sm font-medium hover:bg-zinc-700/90 focus:outline-none focus:ring-2 focus:ring-blue-500 h-fit"
+							onChange={(e) => handleLapChange(e.currentTarget.value)}
+							value={(searchParams.get("lapId") || "")?.toString()}
+						>
+							{availableLaps.map(({ lap_id }) => (
+								<option key={lap_id.toString()} value={lap_id.toString()}>
+									{lap_id.toString()}
+								</option>
+							))}
+						</select>
+					</div>
 					<div className="px-2 py-2 text-xs font-medium text-zinc-500 uppercase tracking-wider">
 						Analysis
 					</div>
@@ -242,11 +243,8 @@ export default function TelemetryPage({
 				</nav>
 			</div>
 
-			{/* Main Content */}
 			<div className="flex-1 flex flex-col">
-				{/* Main Content */}
 				<main className="flex-1 p-6 space-y-6">
-					{/* Key Stats Section */}
 					{dataWithGPSCoordinates.length > 0 && (
 						<div className="bg-zinc-900/50 border border-zinc-800/50 rounded-lg p-4">
 							<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -272,28 +270,18 @@ export default function TelemetryPage({
 									</div>
 								</div>
 								<div className="text-center">
-									<div className="text-xs text-zinc-500 mb-1">
-										{deferredHoverIndex >= 0 ? "Preview" : "Selected"}
+									<div className="text-xs text-zinc-500 mb-1">Lap time</div>
+									<div className="text-lg font-semibold text-blue-400">
+										{trackInfo?.lapTime
+											? formatTime(trackInfo?.lapTime)
+											: "0.00"}
 									</div>
-									{displayIndex >= 0 && dataWithGPSCoordinates[displayIndex] ? (
-										<div className="text-lg font-semibold text-blue-400">
-											{dataWithGPSCoordinates[displayIndex].Speed?.toFixed(0) ||
-												"0"}{" "}
-											km/h
-										</div>
-									) : (
-										<div className="text-lg font-semibold text-zinc-500">
-											--
-										</div>
-									)}
 								</div>
 							</div>
 						</div>
 					)}
 
-					{/* Main Content Grid - Track Map + Professional Telemetry Charts */}
 					<div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-						{/* Track Map */}
 						<div className="col-span-1 lg:col-span-3 bg-zinc-900/50 border border-zinc-800/50 rounded-lg p-6">
 							{dataWithGPSCoordinates.length > 0 ? (
 								<TrackView
@@ -318,7 +306,6 @@ export default function TelemetryPage({
 							)}
 						</div>
 
-						{/* Professional Telemetry Charts */}
 						<div className="col-span-1 lg:col-span-2 bg-zinc-900/50 border border-zinc-800/50 rounded-lg p-4">
 							{memoizedTelemetryData.length > 0 ? (
 								<ProfessionalTelemetryCharts
@@ -346,7 +333,6 @@ export default function TelemetryPage({
 						</div>
 					</div>
 
-					{/* Info Boxes */}
 					{dataWithGPSCoordinates.length > 0 && (
 						<InfoBox
 							telemetryData={dataWithGPSCoordinates as TelemetryDataPoint[]}
@@ -412,4 +398,27 @@ function GPSAnalysisPanel({ data }: { data: any[] }) {
 			</div>
 		</div>
 	);
+}
+
+function formatTime(totalSeconds: number | undefined) {
+	if (!totalSeconds) return "--";
+	const minutes = Math.floor(totalSeconds / 60);
+	const remainingSeconds = totalSeconds % 60;
+
+	// Extract milliseconds from the remaining seconds
+	const seconds = Math.floor(remainingSeconds);
+	const milliseconds = Math.round((remainingSeconds % 1) * 1000); // Round to nearest millisecond
+
+	// Helper to pad single digits with a leading zero
+	const padTo2Digits = (num: number) => {
+		return num.toString().padStart(2, "0");
+	};
+
+	// Format the output string
+	const paddedMinutes = padTo2Digits(minutes);
+	const paddedSeconds = padTo2Digits(seconds);
+	// Only show milliseconds if they exist
+	const paddedMilliseconds = milliseconds > 0 ? `.${milliseconds}` : "";
+
+	return `${paddedMinutes}:${paddedSeconds}${paddedMilliseconds}`;
 }

@@ -1,6 +1,6 @@
 using TelemetryService.Infrastructure.Messaging;
 
-namespace TelemetryService.API.BackgroundServices; // Fixed: API not Api
+namespace TelemetryService.API.BackgroundServices;
 
 public class TelemetryBackgroundService : BackgroundService
 {

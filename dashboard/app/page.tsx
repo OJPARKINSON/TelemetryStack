@@ -1,7 +1,7 @@
 import Link from "next/link";
-import ClientWrapper from "@/components/ClientWrapper";
-import SessionSelector from "@/components/SessionSelector";
-import { getSessions } from "@/lib/questDb";
+import ClientWrapper from "../components/ClientWrapper";
+import SessionSelector from "../components/SessionSelector";
+import { getSessions } from "../lib/questDb";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

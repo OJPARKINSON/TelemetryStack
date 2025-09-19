@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { getLaps, getTelemetryData } from "@/lib/questDb";
+import { getLaps, getTelemetryData } from "../../lib/questDb";
 import ClientWrapper from "../../components/ClientWrapper";
 import TelemetryPage from "../../components/TelemetryPage";
 

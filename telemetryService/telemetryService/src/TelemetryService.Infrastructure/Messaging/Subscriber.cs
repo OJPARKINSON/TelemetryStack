@@ -11,11 +11,10 @@ public class Subscriber
 {
     private const int MaxRetryAttempts = 10;
     private const int RetryDelayMs = 5000;
-    private const int MaxConcurrentProcessing = 50;
-    private const double MemoryThresholdPercent = 0.80;
+    private const int MaxConcurrentProcessing = 25;
     private const int BasePollIntervalMs = 10; // Base polling interval when messages available
     private const int EmptyQueueDelayMs = 100; // Delay when no messages available
-    private const int BatchSize = 10; // Number of messages to pull in each batch
+    private const int BatchSize = 30; // Number of messages to pull in each batch
     
     private readonly QuestDbService _questDbService;
     private readonly SemaphoreSlim _processingSemaphore = new(MaxConcurrentProcessing, MaxConcurrentProcessing);
@@ -64,23 +63,8 @@ public class Subscriber
         Console.WriteLine("Successfully connected to RabbitMQ!");
 
         using var channel = await connection.CreateChannelAsync();
-        // Increase prefetch for better performance with pull-based consumption
+
         await channel.BasicQosAsync(0, 1000, false);
-        Console.WriteLine("Channel created successfully");
-
-        await channel.ExchangeDeclareAsync(
-            "telemetry_topic",
-            ExchangeType.Topic,
-            true,
-            false);
-        Console.WriteLine("Exchange declared successfully");
-
-        await channel.QueueDeclareAsync(
-            "telemetry_queue",
-            true,
-            false,
-            false);
-        Console.WriteLine("Queue declared successfully");
 
         await channel.QueueBindAsync(
             "telemetry_queue",

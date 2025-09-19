@@ -9,7 +9,7 @@ import {
 	XAxis,
 	YAxis,
 } from "recharts";
-import type { TelemetryDataPoint } from "@/lib/types";
+import type { TelemetryDataPoint } from "../lib/types";
 
 interface InfoBoxProps {
 	telemetryData: any[];

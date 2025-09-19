@@ -11,8 +11,7 @@ import XYZ from "ol/source/XYZ";
 import { Circle, Fill, Stroke, Style } from "ol/style";
 import View from "ol/View";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePerformanceMonitor } from "@/hooks/usePerformanceMonitor";
-import type { TelemetryDataPoint } from "@/lib/types";
+import type { TelemetryDataPoint } from "../lib/types";
 
 interface OptimizedTrackMapProps {
 	dataWithCoordinates: TelemetryDataPoint[];
@@ -37,16 +36,8 @@ export default function OptimizedTrackMap({
 		selectedMetric || "Speed",
 	);
 
-	// PERFORMANCE FIX: Color cache to avoid recalculating same colors
 	const colorCacheRef = useRef<Map<string, string>>(new Map());
 
-	// Performance monitoring (enable during development)
-	const perfMonitor = usePerformanceMonitor(
-		"OptimizedTrackMap",
-		process.env.NODE_ENV === "development",
-	);
-
-	// Color mapping function for different metrics with caching
 	const getColorForMetric = useCallback(
 		(value: number, metric: string, minVal: number, maxVal: number): string => {
 			if (!value || minVal === maxVal) return "#888888";
@@ -168,7 +159,7 @@ export default function OptimizedTrackMap({
 			source: markerSource,
 			style: new Style({
 				image: new Circle({
-					radius: 10, // 20% smaller (was 12, now 10)
+					radius: 5, // 20% smaller (was 12, now 10)
 					fill: new Fill({
 						color: "#ffff00",
 					}),

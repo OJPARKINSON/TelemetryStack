@@ -1,6 +1,6 @@
 "use client";
 
-import type { TelemetryDataPoint } from "@/lib/types";
+import type { TelemetryDataPoint } from "../lib/types";
 import OptimizedTrackMap from "./OptimizedTrackMap";
 
 interface TrackViewProps {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getQuestDBHealth, getQuestDBStats, getSessions } from "@/lib/questDb";
+import { getQuestDBHealth, getQuestDBStats, getSessions } from "../../../lib/questDb";
 
 export async function GET() {
 	const startTime = Date.now();

@@ -53,6 +53,7 @@ export default function GPSTrackMap({
 			source: new XYZ({
 				url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
 				attributions: "© OpenStreetMap contributors",
+				cacheSize: 100,
 			}),
 		});
 

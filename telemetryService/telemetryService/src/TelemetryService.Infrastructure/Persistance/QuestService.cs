@@ -11,6 +11,8 @@ public class QuestDbService : IDisposable
     private QuestDbSchemaManager? _schemaManager;
     private readonly object _senderLock = new object();
     private volatile bool _disposed = false;
+    
+    private string _tableName = "TelemetryTicks";
 
     public QuestDbService()
     {
@@ -27,19 +29,19 @@ public class QuestDbService : IDisposable
         {
             hostAndPort = url.Substring(6); // Remove "tcp://" prefix
         }
-        
+
         // Extract hostname for HTTP connection (schema manager uses port 9000)
         string hostname = hostAndPort.Split(':')[0];
         string httpUrl = $"{hostname}:9000";
-        
+
         Console.WriteLine($"🔗 Initializing QuestDB connections:");
         Console.WriteLine($"   TCP Ingress: tcp::addr={hostAndPort}");
         Console.WriteLine($"   HTTP Schema: http://{httpUrl}");
-        
+
         _schemaManager = new QuestDbSchemaManager(httpUrl);
         _sender = Sender.New($"tcp::addr={hostAndPort};auto_flush_rows=10000;auto_flush_interval=1000;");
-        
-        _ = Task.Run(async () => 
+
+        _ = Task.Run(async () =>
         {
             await Task.Delay(3000);
             await InitializeSchema();
@@ -236,11 +238,10 @@ public class QuestDbService : IDisposable
                     Console.WriteLine($"   📊 Processed {processedCount}/{telData.Records.Count} records...");
                 }
                 
-                const string TABLE_NAME = "TelemetryTicks";
-                
+                 
                 try
                 {
-                    senderToUse.Table(TABLE_NAME)
+                    senderToUse.Table(_tableName)
                     .Symbol("session_id", sessionId)
                     .Symbol("track_name", trackName)
                     .Symbol("track_id", trackId)

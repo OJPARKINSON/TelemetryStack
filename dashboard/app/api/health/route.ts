@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getQuestDBHealth } from "@/lib/questDb";
+import { getQuestDBHealth } from "../../../lib/questDb";
 
 export async function GET() {
 	try {
