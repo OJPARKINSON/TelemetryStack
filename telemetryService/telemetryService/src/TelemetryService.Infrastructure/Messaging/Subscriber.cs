@@ -11,21 +11,19 @@ public class Subscriber
 {
     private const int MaxRetryAttempts = 10;
     private const int RetryDelayMs = 5000;
-    private const int MaxConcurrentProcessing = 25;
+    private const int MaxConcurrentProcessing = 10; // Reduced to ease QuestDB connection pressure
     private const int BasePollIntervalMs = 10; // Base polling interval when messages available
     private const int EmptyQueueDelayMs = 100; // Delay when no messages available
     private const int BatchSize = 30; // Number of messages to pull in each batch
     
-    private readonly QuestDbService _questDbService;
     private readonly SemaphoreSlim _processingSemaphore = new(MaxConcurrentProcessing, MaxConcurrentProcessing);
     private volatile bool _pauseProcessing = false;
     private volatile bool _stopRequested = false;
     private Timer? _memoryMonitorTimer;
     private double _lastLoggedMemoryUsage = 0;
 
-    public Subscriber(QuestDbService questDbService)
+    public Subscriber()
     {
-        _questDbService = questDbService;
     }
 
     public async Task SubscribeAsync()
@@ -165,9 +163,9 @@ public class Subscriber
             var body = result.Body.ToArray();
             var message = TelemetryBatch.Parser.ParseFrom(body);
             
-            // Write to QuestDB synchronously but don't wait for completion
-            // This provides natural backpressure without overwhelming QuestDB
-            await _questDbService.WriteBatch(message);
+            // Create fresh QuestDbService per batch for thread safety
+            using var questDbService = new QuestDbService();
+            await questDbService.WriteBatch(message);
             
             // Acknowledge message after successful QuestDB write
             await channel.BasicAckAsync(result.DeliveryTag, false);

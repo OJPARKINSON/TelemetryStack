@@ -151,6 +151,8 @@ services:
       - telemetry-network
     environment:
       QUESTDB_URL: questdb:9009;username=admin;password=quest
+      QUESTDB_TCP_HOST: questdb
+      QUESTDB_TCP_PORT: 9009
       
       # QuestDB Performance Tuning
       QUESTDB_BATCH_SIZE: 1000

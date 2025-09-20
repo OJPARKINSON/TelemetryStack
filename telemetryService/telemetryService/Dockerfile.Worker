@@ -45,7 +45,7 @@ ENV DOTNET_RUNNING_IN_CONTAINER=true \
 
 # QuestDB Configuration Defaults (can be overridden by docker-compose)
 ENV QUESTDB_TCP_HOST=questdb \
-    QUESTDB_TCP_PORT=9000 \
+    QUESTDB_TCP_PORT=9009 \
     QUESTDB_TCP_USERNAME=admin \
     QUESTDB_TCP_PASSWORD=quest \
     QUESTDB_BATCH_SIZE=250 \

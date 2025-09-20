@@ -86,7 +86,7 @@ internal class Program
         return Host.CreateDefaultBuilder(args)
             .ConfigureServices((_, services) =>
             {
-                services.AddSingleton<QuestDbService>();
+                // Remove QuestDbService from DI - will be created per-batch
                 services.AddSingleton<Subscriber>();
             });
     }
