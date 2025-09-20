@@ -1,96 +1,309 @@
 services:
-  rabbitMQ:
-    container_name: rabbitMQ
+  traefik:
+    image: traefik:v3.5
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "8443:443"  
+      - "8080:8080"
+    networks:
+      - telemetry-network
+      - default
+    volumes:
+      # - /run/user/oliver.parkinson/podman/podman.sock:/var/run/docker.sock
+      - ./traefik:/etc/traefik:ro
+      - traefik-logs:/var/log/traefik
+    environment:
+      - TRAEFIK_DASHBOARD_AUTH=${TRAEFIK_DASHBOARD_AUTH}
+      - LOCAL_DOMAIN=${LOCAL_DOMAIN:-localhost}
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "traefik.enable=true"
+      # Dashboard accessible via both domains with enhanced security
+      - "traefik.http.routers.dashboard-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && (PathPrefix(`/api`) || PathPrefix(`/net-dash`))"
+      - "traefik.http.routers.dashboard-local.entrypoints=websecure"
+      - "traefik.http.routers.dashboard-local.service=api@internal"
+      - "traefik.http.routers.dashboard-local.tls=true"
+      - "traefik.http.routers.dashboard-local.middlewares=dashboard-auth,secure-dashboard@file"
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
+
+  rabbitmq:
     image: rabbitmq:4.0-management
+    container_name: rabbitmq
+    restart: unless-stopped
     ports:
       - "5672:5672"
-      - "15672:15672"
+      - "15672:15672" # Management UI
+      - "15692:15692" # Prometheus metrics
     volumes:
       - ./config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
       - ./config/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
       - ./config/definitions.json:/etc/rabbitmq/definitions.json:ro
       - rabbitmq-data:/var/lib/rabbitmq
-    healthcheck:
-      test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-    networks:
-      - telemetry-network
-    restart: always
     environment:
+      # Create default admin user automatically
       RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_PASS: changeme
+      # Enable management load definitions
       RABBITMQ_MANAGEMENT_LOAD_DEFINITIONS: /etc/rabbitmq/definitions.json
-
-  telemetry_service:
-    build: ./telemetryService/telemetryService
-    container_name: telemetry_service
-    restart: on-failure
-    depends_on:
-      rabbitMQ:
-        condition: service_healthy
-    ports:
-      - "5000:5000"
     networks:
       - telemetry-network
-    environment:
-      QUESTDB_URL: questdb:9009
-      DOTNET_ENVIRONMENT: Development
-      ASPNETCORE_URLS: http://+:5000
-      DOTNET_GCRetainVM: 1
-      DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 1
-    shm_size: 256m
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     labels:
-      com.centurylinklabs.watchtower.enable: "true"
-
-  telemetry-dashboard:
-    build:
-      context: dashboard/
-      dockerfile: Dockerfile
-    container_name: telemetry-dashboard
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      QUESTDB_HOST: questdb
-      QUESTDB_PORT: 8812
-      QUESTDB_USER: admin
-      QUESTDB_PASSWORD: quest
-      QUESTDB_DATABASE: qdb
-      NODE_ENV: development
-      NEXT_PUBLIC_APP_URL: http://localhost:3000
-    networks:
-      - telemetry-network
-    shm_size: 256m
+      - "traefik.enable=true"
+      - "traefik.http.routers.rabbitmq-local.rule=Host(`${LOCAL_DOMAIN}`) && PathPrefix(`/rabbitmq`)"
+      - "traefik.http.routers.rabbitmq-local.entrypoints=websecure"
+      - "traefik.http.routers.rabbitmq-local.tls=true"
+      - "traefik.http.routers.rabbitmq-local.middlewares=rabbitmq-stripprefix,secure-management@file"
+      - "traefik.http.middlewares.rabbitmq-stripprefix.stripprefix.prefixes=/rabbitmq"
+      - "traefik.http.services.rabbitmq.loadbalancer.server.port=5672"
+      - "traefik.http.services.rabbitmq.loadbalancer.server.port=15672"
 
   questdb:
     image: questdb/questdb:latest
     container_name: questdb
     restart: unless-stopped
     ports:
-      - "9000:9000"
-      - "9009:9009"
-      - "8812:8812"
+      - "9000:9000" 
+      - "8812:8812" 
+      - "9009:9009" 
+      - "9003:9003" 
     volumes:
-      - questdb-data:/root/.questdb
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    healthcheck:
-      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/8812' || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+      - questdb-data:/var/lib/questdb
+    environment:
+      JAVA_OPTS: "-Xmx2g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=100"
+      QDB_HTTP_ENABLED: "true"
+      QDB_PG_ENABLED: "true"
+      QDB_LINE_TCP_ENABLED: "true"
     networks:
       - telemetry-network
+    labels:
+      - "traefik.enable=true"
+      # QuestDB API routes (no web UI, direct API access)
+      - "traefik.http.routers.questdb-local.rule=Host(`${LOCAL_DOMAIN}`) && PathPrefix(`/questdb`)"
+      - "traefik.http.routers.questdb-local.entrypoints=websecure"
+      - "traefik.http.routers.questdb-local.tls=true"
+      - "traefik.http.routers.questdb-local.middlewares=questdb-stripprefix"
+      - "traefik.http.middlewares.questdb-stripprefix.stripprefix.prefixes=/questdb"
+      - "traefik.http.services.questdb.loadbalancer.server.port=9000"
+
+  telemetry-service:
+    build:
+      context: ./telemetryService/telemetryService
+      dockerfile: Dockerfile.Worker
+    container_name: telemetry-service
+    restart: unless-stopped
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      # questdb:
+      #   condition: service_healthy
+    networks:
+      - telemetry-network
+    environment:
+      QUESTDB_URL: questdb:9009;username=admin;password=quest
+
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: changeme
+      RABBITMQ_URL: amqp://admin:changeme@rabbitmq:5672/
+      
+      # Application settings
+      DOTNET_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:5000
+    deploy:
+      resources:
+        limits:
+          cpus: '1.25'      # 1 core for telemetry processing
+          memory: 8g       # Much more memory for high-volume telemetry processing
+        reservations:
+          cpus: '0.25'     # Minimum guaranteed resources
+          memory: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  telemetry-dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: telemetry-dashboard
+    restart: unless-stopped
+    environment:
+      # QuestDB connection for READING data (uses PostgreSQL wire protocol)
+      QUESTDB_URL: postgresql://admin:quest@questdb:8812/qdb
+      QUESTDB_HOST: questdb
+      QUESTDB_PORT: 8812
+      QUESTDB_DATABASE: qdb
+      QUESTDB_USER: admin
+      QUESTDB_PASSWORD: quest
+      
+      NODE_ENV: production
+      NODE_OPTIONS: "--max-old-space-size=768 --max-semi-space-size=128"  
+      NEXT_PUBLIC_APP_URL: https://localhost:3000/dashboard
+      NEXT_PUBLIC_BACKEND_URL: https://localhost:3000/dashboard/api
+    networks:
+      - telemetry-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'      
+          memory: 1g       
+    labels:
+      - "traefik.enable=true"
+      # Dashboard main routes
+      - "traefik.http.routers.telemetry-dashboard-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.telemetry-dashboard-local.entrypoints=websecure"
+      - "traefik.http.routers.telemetry-dashboard-local.tls=true"
+      - "traefik.http.routers.telemetry-dashboard-local.middlewares=dashboard-stripprefix,default-security@file"
+      # Static assets routes (higher priority)
+      - "traefik.http.routers.dashboard-static-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && PathPrefix(`/_next/static`)"
+      - "traefik.http.routers.dashboard-static-local.entrypoints=websecure"
+      - "traefik.http.routers.dashboard-static-local.tls=true"
+      - "traefik.http.routers.dashboard-static-local.priority=200"
+      # Middlewares and services
+      - "traefik.http.middlewares.dashboard-stripprefix.stripprefix.prefixes=/dashboard"
+      - "traefik.http.services.telemetry-dashboard.loadbalancer.server.port=3000"
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  grafana:
+    image: grafana/grafana:10.4.8
+    container_name: grafana
+    restart: unless-stopped
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana:/etc/grafana/provisioning:ro
+    environment:
+      # Grafana settings optimized for high performance
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin123}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: https://${LOCAL_DOMAIN:-pi.local}/grafana
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_INSTALL_PLUGINS: grafana-clock-panel
+      GF_PROVISIONING_AUTO_ASSIGN_ORG: "true"
+      GF_PROVISIONING_AUTO_ASSIGN_ORG_ROLE: Admin
+      
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/files/system-monitoring.json
+      GF_USERS_DEFAULT_THEME: dark
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      
+    networks:
+      - telemetry-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'     
+          memory: 1.5g     
+        reservations:
+          cpus: '0.25'    
+          memory: 256m
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && PathPrefix(`/grafana`)"
+      - "traefik.http.routers.grafana-local.entrypoints=websecure"
+      - "traefik.http.routers.grafana-local.tls=true"
+      - "traefik.http.routers.grafana-local.middlewares=secure-management@file"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+
+  prometheus:
+    image: prom/prometheus:v2.47.2
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'  # Extended retention with 16GB RAM
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.external-url=https://${LOCAL_DOMAIN:-pi.local}/prometheus'
+      - '--web.route-prefix=/'
+      - '--storage.tsdb.retention.size=4GB'   # Use more disk space for metrics
+    networks:
+      - telemetry-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'     # More CPU for metrics processing
+          memory: 2g       # Double memory for larger datasets
+        reservations:
+          cpus: '0.25'
+          memory: 512m
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && PathPrefix(`/prometheus`)"
+      - "traefik.http.routers.prometheus-local.entrypoints=websecure"
+      - "traefik.http.routers.prometheus-local.tls=true"
+      - "traefik.http.routers.prometheus-local.middlewares=prometheus-stripprefix,secure-management@file"
+      - "traefik.http.middlewares.prometheus-stripprefix.stripprefix.prefixes=/prometheus"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+
+  # Simplified monitoring stack
+  node-exporter:
+    image: prom/node-exporter:v1.6.1
+    container_name: node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - telemetry-network
+    deploy:
+      resources:
+        limits:
+          cpus: 0.2
+          memory: 128m
+
+  # Optional: Watchtower for auto-updates (can be disabled)
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 3600 --cleanup --label-enable
+    environment:
+      TZ: Europe/London
+    deploy:
+      resources:
+        limits:
+          cpus: 0.1
+          memory: 256m
 
 volumes:
   rabbitmq-data:
+    driver: local
   questdb-data:
-
+    driver: local
+  grafana-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  traefik-logs:
+    driver: local
 
 networks:
   telemetry-network:
-    external: true
+    driver: bridge

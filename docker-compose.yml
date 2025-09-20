@@ -6,7 +6,7 @@ services:
       - no-new-privileges:true
     ports:
       - "80:80"
-      - "8443:443"  
+      - "443:443"  
       - "8080:8080"
     networks:
       - telemetry-network
@@ -15,10 +15,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik:/etc/traefik:ro
       - traefik-logs:/var/log/traefik
+      - traefik-acme:/var/lib/traefik
       - /var/run/tailscale:/var/run/tailscale:ro
     environment:
       - TRAEFIK_DASHBOARD_AUTH=${TRAEFIK_DASHBOARD_AUTH}
-      - LOCAL_DOMAIN=${LOCAL_DOMAIN:-192.168.1.202}
+      - LOCAL_DOMAIN=${LOCAL_DOMAIN:-localhost}
       - TAILSCALE_DOMAIN=${TAILSCALE_DOMAIN:-raspberrypi.tail95aa0e.ts.net}
     deploy:
       resources:
@@ -36,10 +37,9 @@ services:
     labels:
       - "traefik.enable=true"
       # Dashboard accessible via both domains with enhanced security
-      - "traefik.http.routers.dashboard-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && (PathPrefix(`/api`) || PathPrefix(`/net-dash`))"
-      - "traefik.http.routers.dashboard-local.entrypoints=websecure"
+      - "traefik.http.routers.dashboard-local.rule=(Host(`${LOCAL_DOMAIN:-localhost}`) || Host(`localhost`)) && (PathPrefix(`/api`) || PathPrefix(`/net-dash`))"
+      - "traefik.http.routers.dashboard-local.entrypoints=web,websecure"
       - "traefik.http.routers.dashboard-local.service=api@internal"
-      - "traefik.http.routers.dashboard-local.tls=true"
       - "traefik.http.routers.dashboard-local.middlewares=dashboard-auth,secure-dashboard@file"
       - "traefik.http.routers.dashboard-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/net-dash`))"
       - "traefik.http.routers.dashboard-tailscale.entrypoints=websecure"
@@ -86,9 +86,8 @@ services:
       start_period: 30s
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.rabbitmq-local.rule=Host(`${LOCAL_DOMAIN}`) && PathPrefix(`/rabbitmq`)"
-      - "traefik.http.routers.rabbitmq-local.entrypoints=websecure"
-      - "traefik.http.routers.rabbitmq-local.tls=true"
+      - "traefik.http.routers.rabbitmq-local.rule=(Host(`${LOCAL_DOMAIN}`) || Host(`localhost`)) && PathPrefix(`/rabbitmq`)"
+      - "traefik.http.routers.rabbitmq-local.entrypoints=web,websecure"
       - "traefik.http.routers.rabbitmq-local.middlewares=rabbitmq-stripprefix,secure-management@file"
       - "traefik.http.routers.rabbitmq-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/rabbitmq`)"
       - "traefik.http.routers.rabbitmq-tailscale.entrypoints=websecure"
@@ -128,9 +127,8 @@ services:
     labels:
       - "traefik.enable=true"
       # QuestDB API routes (no web UI, direct API access)
-      - "traefik.http.routers.questdb-local.rule=Host(`${LOCAL_DOMAIN}`) && PathPrefix(`/questdb`)"
-      - "traefik.http.routers.questdb-local.entrypoints=websecure"
-      - "traefik.http.routers.questdb-local.tls=true"
+      - "traefik.http.routers.questdb-local.rule=(Host(`${LOCAL_DOMAIN}`) || Host(`localhost`)) && PathPrefix(`/questdb`)"
+      - "traefik.http.routers.questdb-local.entrypoints=web,websecure"
       - "traefik.http.routers.questdb-local.middlewares=questdb-stripprefix"
       - "traefik.http.routers.questdb-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/questdb`)"
       - "traefik.http.routers.questdb-tailscale.entrypoints=websecure"
@@ -196,8 +194,8 @@ services:
       
       NODE_ENV: production
       NODE_OPTIONS: "--max-old-space-size=768 --max-semi-space-size=128"  
-      NEXT_PUBLIC_APP_URL: https://${TAILSCALE_DOMAIN:-pi.local}/dashboard
-      NEXT_PUBLIC_BACKEND_URL: https://${TAILSCALE_DOMAIN:-pi.local}/dashboard/api
+      NEXT_PUBLIC_APP_URL: http://${LOCAL_DOMAIN:-localhost}/dashboard
+      NEXT_PUBLIC_BACKEND_URL: http://${LOCAL_DOMAIN:-localhost}/dashboard/api
     networks:
       - telemetry-network
     deploy:
@@ -205,12 +203,17 @@ services:
         limits:
           cpus: '1.0'      
           memory: 1g       
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://0.0.0.0:3000 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     labels:
       - "traefik.enable=true"
       # Dashboard main routes
-      - "traefik.http.routers.telemetry-dashboard-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && PathPrefix(`/dashboard`)"
-      - "traefik.http.routers.telemetry-dashboard-local.entrypoints=websecure"
-      - "traefik.http.routers.telemetry-dashboard-local.tls=true"
+      - "traefik.http.routers.telemetry-dashboard-local.rule=(Host(`${LOCAL_DOMAIN:-localhost}`) || Host(`localhost`)) && PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.telemetry-dashboard-local.entrypoints=web,websecure"
       - "traefik.http.routers.telemetry-dashboard-local.middlewares=dashboard-stripprefix,default-security@file"
       - "traefik.http.routers.telemetry-dashboard-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/dashboard`)"
       - "traefik.http.routers.telemetry-dashboard-tailscale.entrypoints=websecure"
@@ -218,9 +221,8 @@ services:
       - "traefik.http.routers.telemetry-dashboard-tailscale.tls.certresolver=tailscale"
       - "traefik.http.routers.telemetry-dashboard-tailscale.middlewares=dashboard-stripprefix,default-security@file"
       # Static assets routes (higher priority)
-      - "traefik.http.routers.dashboard-static-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && PathPrefix(`/_next/static`)"
-      - "traefik.http.routers.dashboard-static-local.entrypoints=websecure"
-      - "traefik.http.routers.dashboard-static-local.tls=true"
+      - "traefik.http.routers.dashboard-static-local.rule=(Host(`${LOCAL_DOMAIN:-localhost}`) || Host(`localhost`)) && PathPrefix(`/_next/static`)"
+      - "traefik.http.routers.dashboard-static-local.entrypoints=web,websecure"
       - "traefik.http.routers.dashboard-static-local.priority=200"
       - "traefik.http.routers.dashboard-static-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/_next/static`)"
       - "traefik.http.routers.dashboard-static-tailscale.entrypoints=websecure"
@@ -243,7 +245,7 @@ services:
       # Grafana settings optimized for high performance
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin123}
       GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_SERVER_ROOT_URL: https://${LOCAL_DOMAIN:-pi.local}/grafana
+      GF_SERVER_ROOT_URL: http://${LOCAL_DOMAIN:-localhost}/grafana
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
       GF_INSTALL_PLUGINS: grafana-clock-panel
       GF_PROVISIONING_AUTO_ASSIGN_ORG: "true"
@@ -266,9 +268,8 @@ services:
           memory: 256m
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.grafana-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && PathPrefix(`/grafana`)"
-      - "traefik.http.routers.grafana-local.entrypoints=websecure"
-      - "traefik.http.routers.grafana-local.tls=true"
+      - "traefik.http.routers.grafana-local.rule=(Host(`${LOCAL_DOMAIN:-localhost}`) || Host(`localhost`)) && PathPrefix(`/grafana`)"
+      - "traefik.http.routers.grafana-local.entrypoints=web,websecure"
       - "traefik.http.routers.grafana-local.middlewares=secure-management@file"
       - "traefik.http.routers.grafana-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/grafana`)"
       - "traefik.http.routers.grafana-tailscale.entrypoints=websecure"
@@ -291,7 +292,7 @@ services:
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--web.enable-lifecycle'
-      - '--web.external-url=https://${LOCAL_DOMAIN:-pi.local}/prometheus'
+      - '--web.external-url=http://${LOCAL_DOMAIN:-localhost}/prometheus'
       - '--web.route-prefix=/'
       - '--storage.tsdb.retention.size=4GB'   # Use more disk space for metrics
     networks:
@@ -306,9 +307,8 @@ services:
           memory: 512m
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.prometheus-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && PathPrefix(`/prometheus`)"
-      - "traefik.http.routers.prometheus-local.entrypoints=websecure"
-      - "traefik.http.routers.prometheus-local.tls=true"
+      - "traefik.http.routers.prometheus-local.rule=(Host(`${LOCAL_DOMAIN:-localhost}`) || Host(`localhost`)) && PathPrefix(`/prometheus`)"
+      - "traefik.http.routers.prometheus-local.entrypoints=web,websecure"
       - "traefik.http.routers.prometheus-local.middlewares=prometheus-stripprefix,secure-management@file"
       - "traefik.http.routers.prometheus-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/prometheus`)"
       - "traefik.http.routers.prometheus-tailscale.entrypoints=websecure"
@@ -366,6 +366,8 @@ volumes:
   prometheus-data:
     driver: local
   traefik-logs:
+    driver: local
+  traefik-acme:
     driver: local
 
 networks:
