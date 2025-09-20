@@ -159,8 +159,8 @@ services:
       QUESTDB_TCP_PASSWORD: quest
       
       # QuestDB Performance Tuning
-      QUESTDB_BATCH_SIZE: 250
-      QUESTDB_AUTO_FLUSH_ROWS: 500
+      QUESTDB_BATCH_SIZE: 1000
+      QUESTDB_AUTO_FLUSH_ROWS: 2000
       QUESTDB_AUTO_FLUSH_INTERVAL: 2000
       QUESTDB_CONNECTION_TIMEOUT: 30000
       QUESTDB_RETRY_ATTEMPTS: 3
@@ -171,7 +171,7 @@ services:
       RABBITMQ_USER: guest
       RABBITMQ_PASS: changeme
       RABBITMQ_URL: amqp://guest:changeme@rabbitmq:5672/
-      RABBITMQ_BATCH_SIZE: 250
+      RABBITMQ_BATCH_SIZE: 1000
       RABBITMQ_PREFETCH_COUNT: 500
       
       # Application settings

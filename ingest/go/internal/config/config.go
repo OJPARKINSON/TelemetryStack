@@ -53,13 +53,13 @@ func LoadConfig() *Config {
 		MaxRetries:     getEnvAsInt("MAX_RETRIES", 3),
 		RetryDelay:     getEnvAsDuration("RETRY_DELAY", 250*time.Millisecond),
 
-		RabbitMQURL: getEnv("RABBITMQ_URL", "amqp://admin:changeme@localhost:5672"),
+		RabbitMQURL: getEnv("RABBITMQ_URL", "amqp://admin:changeme@192.168.1.202:5672"),
 
 		FileAgeThreshold:   getEnvAsDuration("FILE_AGE_THRESHOLD", 30*time.Second),
 		FileProcessTimeout: getEnvAsDuration("FILE_PROCESS_TIMEOUT", 10*time.Minute),
 
 		GoMaxProcs: getEnvAsInt("GOMAXPROCS", 16),
-		GOGC:       getEnvAsInt("GOGC", 800),
+		GOGC:       getEnvAsInt("GOGC", 400),
 
 		// Development & Monitoring
 		EnablePprof:  getEnvAsBool("ENABLE_PPROF", false),

@@ -380,12 +380,14 @@ public class QuestDbService : IDisposable
                     // If this is a connection error during auto-flush, re-throw to trigger sender reset
                     if (IsConnectionError(rowEx))
                     {
-                        Console.WriteLine($"   🔄 Connection error during row processing, will trigger sender reset");
+                        Console.WriteLine($"🔄 Connection error during row processing, will trigger sender reset: ", rowEx);
                         throw;
                     }
+
+                    Console.Write("⚠️ on-connection errors, skip this record and continue: ", rowEx);
                     
                     // For non-connection errors, skip this record and continue
-                    continue;
+                continue;
                 }
         }
         
