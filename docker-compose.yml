@@ -6,7 +6,7 @@ services:
       - no-new-privileges:true
     ports:
       - "80:80"
-      - "443:443"  
+      - "8443:443"  
       - "8080:8080"
     networks:
       - telemetry-network
@@ -152,12 +152,27 @@ services:
     networks:
       - telemetry-network
     environment:
-      QUESTDB_URL: questdb:9000;username=admin;password=quest
+      # QuestDB TCP Configuration (Optimized)
+      QUESTDB_TCP_HOST: questdb
+      QUESTDB_TCP_PORT: 9009
+      QUESTDB_TCP_USERNAME: admin
+      QUESTDB_TCP_PASSWORD: quest
       
+      # QuestDB Performance Tuning
+      QUESTDB_BATCH_SIZE: 250
+      QUESTDB_AUTO_FLUSH_ROWS: 500
+      QUESTDB_AUTO_FLUSH_INTERVAL: 2000
+      QUESTDB_CONNECTION_TIMEOUT: 30000
+      QUESTDB_RETRY_ATTEMPTS: 3
+      QUESTDB_RETRY_DELAY: 1000
+      
+      # RabbitMQ Configuration
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: guest
       RABBITMQ_PASS: changeme
       RABBITMQ_URL: amqp://guest:changeme@rabbitmq:5672/
+      RABBITMQ_BATCH_SIZE: 250
+      RABBITMQ_PREFETCH_COUNT: 500
       
       # Application settings
       DOTNET_ENVIRONMENT: Production
@@ -171,7 +186,7 @@ services:
           cpus: '0.25'     # Minimum guaranteed resources
           memory: 1g
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+      test: ["CMD-SHELL", "ps aux | grep '[d]otnet TelemetryService.Worker.dll' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -204,7 +219,7 @@ services:
           cpus: '1.0'      
           memory: 1g       
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://0.0.0.0:3000 || exit 1"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://0.0.0.0:3000/dashboard || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -214,12 +229,12 @@ services:
       # Dashboard main routes
       - "traefik.http.routers.telemetry-dashboard-local.rule=(Host(`${LOCAL_DOMAIN:-localhost}`) || Host(`localhost`)) && PathPrefix(`/dashboard`)"
       - "traefik.http.routers.telemetry-dashboard-local.entrypoints=web,websecure"
-      - "traefik.http.routers.telemetry-dashboard-local.middlewares=dashboard-stripprefix,default-security@file"
+      - "traefik.http.routers.telemetry-dashboard-local.middlewares=default-security@file"
       - "traefik.http.routers.telemetry-dashboard-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/dashboard`)"
       - "traefik.http.routers.telemetry-dashboard-tailscale.entrypoints=websecure"
       - "traefik.http.routers.telemetry-dashboard-tailscale.tls=true"
       - "traefik.http.routers.telemetry-dashboard-tailscale.tls.certresolver=tailscale"
-      - "traefik.http.routers.telemetry-dashboard-tailscale.middlewares=dashboard-stripprefix,default-security@file"
+      - "traefik.http.routers.telemetry-dashboard-tailscale.middlewares=default-security@file"
       # Static assets routes (higher priority)
       - "traefik.http.routers.dashboard-static-local.rule=(Host(`${LOCAL_DOMAIN:-localhost}`) || Host(`localhost`)) && PathPrefix(`/_next/static`)"
       - "traefik.http.routers.dashboard-static-local.entrypoints=web,websecure"

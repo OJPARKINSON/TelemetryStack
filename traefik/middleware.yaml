@@ -17,10 +17,10 @@ http:
           Cross-Origin-Resource-Policy: "same-origin"
         sslProxyHeaders:
           X-Forwarded-Proto: "https"
-        stsSeconds: 63072000
-        stsIncludeSubdomains: true
-        stsPreload: true
-        forceSTSHeader: true
+        stsSeconds: 0
+        stsIncludeSubdomains: false
+        stsPreload: false
+        forceSTSHeader: false
         contentTypeNosniff: true
         browserXssFilter: true
         referrerPolicy: "same-origin"

@@ -24,6 +24,9 @@ RUN dotnet publish src/TelemetryService.Worker/TelemetryService.Worker.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime
 WORKDIR /app
 
+# Install curl for health checks
+RUN apk add --no-cache curl
+
 # Create non-root user
 RUN addgroup -g 1001 -S dotnet && \
     adduser -S dotnet -u 1001 -G dotnet
@@ -39,5 +42,24 @@ ENV DOTNET_RUNNING_IN_CONTAINER=true \
     DOTNET_GCRetainVM=0 \
     DOTNET_GCConserveMemory=1 \
     DOTNET_GCHeapHardLimit=5368709120
+
+# QuestDB Configuration Defaults (can be overridden by docker-compose)
+ENV QUESTDB_TCP_HOST=questdb \
+    QUESTDB_TCP_PORT=9000 \
+    QUESTDB_TCP_USERNAME=admin \
+    QUESTDB_TCP_PASSWORD=quest \
+    QUESTDB_BATCH_SIZE=250 \
+    QUESTDB_AUTO_FLUSH_ROWS=500 \
+    QUESTDB_AUTO_FLUSH_INTERVAL=2000 \
+    QUESTDB_CONNECTION_TIMEOUT=30000 \
+    QUESTDB_RETRY_ATTEMPTS=3 \
+    QUESTDB_RETRY_DELAY=1000
+
+# RabbitMQ Configuration Defaults
+ENV RABBITMQ_HOST=rabbitmq \
+    RABBITMQ_USER=guest \
+    RABBITMQ_PASS=changeme \
+    RABBITMQ_BATCH_SIZE=250 \
+    RABBITMQ_PREFETCH_COUNT=500
 
 ENTRYPOINT ["dotnet", "TelemetryService.Worker.dll"]

@@ -13,39 +13,65 @@ public class QuestDbService : IDisposable
     private volatile bool _disposed = false;
     
     private string _tableName = "TelemetryTicks";
+    
+    // Configuration with defaults
+    private readonly string _tcpHost;
+    private readonly int _tcpPort;
+    private readonly string _username;
+    private readonly string _password;
+    private readonly int _batchSize;
+    private readonly int _autoFlushRows;
+    private readonly int _autoFlushInterval;
+    private readonly int _connectionTimeout;
+    private readonly int _retryAttempts;
+    private readonly int _retryDelay;
 
     public QuestDbService()
     {
-        string? url = Environment.GetEnvironmentVariable("QUESTDB_URL");
+        // Load configuration from environment variables with defaults
+        _tcpHost = Environment.GetEnvironmentVariable("QUESTDB_TCP_HOST") ?? "questdb";
+        _tcpPort = int.TryParse(Environment.GetEnvironmentVariable("QUESTDB_TCP_PORT"), out var port) ? port : 9000;
+        _username = Environment.GetEnvironmentVariable("QUESTDB_TCP_USERNAME") ?? "admin";
+        _password = Environment.GetEnvironmentVariable("QUESTDB_TCP_PASSWORD") ?? "quest";
+        _batchSize = int.TryParse(Environment.GetEnvironmentVariable("QUESTDB_BATCH_SIZE"), out var batch) ? batch : 250;
+        _autoFlushRows = int.TryParse(Environment.GetEnvironmentVariable("QUESTDB_AUTO_FLUSH_ROWS"), out var flushRows) ? flushRows : 500;
+        _autoFlushInterval = int.TryParse(Environment.GetEnvironmentVariable("QUESTDB_AUTO_FLUSH_INTERVAL"), out var flushInterval) ? flushInterval : 2000;
+        _connectionTimeout = int.TryParse(Environment.GetEnvironmentVariable("QUESTDB_CONNECTION_TIMEOUT"), out var timeout) ? timeout : 30000;
+        _retryAttempts = int.TryParse(Environment.GetEnvironmentVariable("QUESTDB_RETRY_ATTEMPTS"), out var retries) ? retries : 3;
+        _retryDelay = int.TryParse(Environment.GetEnvironmentVariable("QUESTDB_RETRY_DELAY"), out var delay) ? delay : 1000;
 
-        if (url == null)
+        string tcpConnectionString = $"{_tcpHost}:{_tcpPort}";
+        string httpUrl = $"{_tcpHost}:9000";
+
+        Console.WriteLine($"🔗 Initializing QuestDB connections with optimized settings:");
+        Console.WriteLine($"   TCP Host: {_tcpHost}:{_tcpPort}");
+        Console.WriteLine($"   Batch Size: {_batchSize} records");
+        Console.WriteLine($"   Auto Flush: {_autoFlushRows} rows / {_autoFlushInterval}ms");
+        Console.WriteLine($"   Connection Timeout: {_connectionTimeout}ms");
+        Console.WriteLine($"   Retry Policy: {_retryAttempts} attempts with {_retryDelay}ms delay");
+
+        try
         {
-            return;
+            _schemaManager = new QuestDbSchemaManager(httpUrl);
+            _sender = CreateSender(tcpConnectionString);
+
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(3000);
+                await InitializeSchema();
+            });
         }
-
-        // Parse the URL to get hostname and port for different QuestDB protocols
-        string hostAndPort = url;
-        if (url.StartsWith("tcp://"))
+        catch (Exception ex)
         {
-            hostAndPort = url.Substring(6); // Remove "tcp://" prefix
+            Console.WriteLine($"❌ Failed to initialize QuestDB service: {ex.Message}");
         }
+    }
 
-        // Extract hostname for HTTP connection (schema manager uses port 9000)
-        string hostname = hostAndPort.Split(':')[0];
-        string httpUrl = $"{hostname}:9000";
-
-        Console.WriteLine($"🔗 Initializing QuestDB connections:");
-        Console.WriteLine($"   TCP Ingress: tcp::addr={hostAndPort}");
-        Console.WriteLine($"   HTTP Schema: http://{httpUrl}");
-
-        _schemaManager = new QuestDbSchemaManager(httpUrl);
-        _sender = Sender.New($"tcp::addr={hostAndPort};auto_flush_rows=10000;auto_flush_interval=1000;");
-
-        _ = Task.Run(async () =>
-        {
-            await Task.Delay(3000);
-            await InitializeSchema();
-        });
+    private ISender CreateSender(string hostAndPort)
+    {
+        string connectionString = $"tcp::addr={hostAndPort};auto_flush_rows={_autoFlushRows};auto_flush_interval={_autoFlushInterval};";
+        Console.WriteLine($"   Creating sender with: {connectionString}");
+        return Sender.New(connectionString);
     }
 
     private async Task InitializeSchema()
@@ -207,13 +233,69 @@ public class QuestDbService : IDisposable
             senderToUse = _sender;
         }
 
+        // Implement batch chunking if the batch is too large
+        if (telData.Records.Count > _batchSize)
+        {
+            Console.WriteLine($"🔄 Large batch detected ({telData.Records.Count} records). Chunking into batches of {_batchSize}...");
+            
+            var chunks = telData.Records
+                .Select((record, index) => new { record, index })
+                .GroupBy(x => x.index / _batchSize)
+                .Select(g => g.Select(x => x.record).ToList())
+                .ToList();
+
+            var totalProcessed = 0;
+            var startTime = DateTime.UtcNow;
+
+            for (int i = 0; i < chunks.Count; i++)
+            {
+                var chunk = chunks[i];
+                var chunkBatch = new TelemetryBatch();
+                chunkBatch.Records.AddRange(chunk);
+                
+                Console.WriteLine($"📦 Processing chunk {i + 1}/{chunks.Count} ({chunk.Count} records)");
+                
+                try
+                {
+                    await WriteBatchChunk(senderToUse, chunkBatch);
+                    totalProcessed += chunk.Count;
+                    
+                    // Small delay between chunks to prevent overwhelming the connection
+                    if (i < chunks.Count - 1)
+                    {
+                        await Task.Delay(50);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"⚠️  Failed to write chunk {i + 1}: {ex.Message}");
+                    // Continue with next chunk - don't fail the entire batch
+                }
+            }
+            
+            var duration = DateTime.UtcNow - startTime;
+            Console.WriteLine($"✅ Chunked batch processing complete: {totalProcessed}/{telData.Records.Count} records in {duration.TotalMilliseconds:F1}ms");
+            return;
+        }
+
+        // Process normal-sized batches directly
         try
         {
             Console.WriteLine($"🔄 Starting batch write to QuestDB: {telData.Records.Count} records");
-            var startTime = DateTime.UtcNow;
-            var processedCount = 0;
-            
-            foreach (var tel in telData.Records)
+            await WriteBatchChunk(senderToUse, telData);
+        }
+        catch (Exception ex)
+        {
+            await HandleWriteError(ex, telData);
+        }
+    }
+
+    private async Task WriteBatchChunk(ISender senderToUse, TelemetryBatch telData)
+    {
+        var startTime = DateTime.UtcNow;
+        var processedCount = 0;
+        
+        foreach (var tel in telData.Records)
             {
                 // Validate required fields to prevent empty table names and invalid data
                 var sessionId = SanitizeString(tel.SessionId);
@@ -242,54 +324,54 @@ public class QuestDbService : IDisposable
                 try
                 {
                     senderToUse.Table(_tableName)
-                    .Symbol("session_id", sessionId)
-                    .Symbol("track_name", trackName)
-                    .Symbol("track_id", trackId)
-                    .Symbol("lap_id", lapId)
-                    .Symbol("session_num", sessionNum)
-                    .Symbol("session_type", sessionType)
-                    .Symbol("session_name", sessionName)
-                    
-                    .Column("car_id", carId)
-                    .Column("gear", tel.Gear)
-                    .Column("player_car_position", (long)Math.Max(0, Math.Floor(tel.PlayerCarPosition)))
-                    
-                    .Column("speed", GetValidDouble(tel.Speed))
-                    .Column("lap_dist_pct", GetValidDouble(tel.LapDistPct))
-                    .Column("session_time", GetValidDouble(tel.SessionTime))
-                    .Column("lat", GetValidDouble(tel.Lat))
-                    .Column("lon", GetValidDouble(tel.Lon))
-                    .Column("lap_current_lap_time", GetValidDouble(tel.LapCurrentLapTime))
-                    .Column("lapLastLapTime", GetValidDouble(tel.LapLastLapTime))
-                    .Column("lapDeltaToBestLap", GetValidDouble(tel.LapDeltaToBestLap))
-                    
-                    .Column("throttle", (float)GetValidDouble(tel.Throttle))
-                    .Column("brake", (float)GetValidDouble(tel.Brake))
-                    .Column("steering_wheel_angle", (float)GetValidDouble(tel.SteeringWheelAngle))
-                    .Column("rpm", (float)GetValidDouble(tel.Rpm))
-                    .Column("velocity_x", (float)GetValidDouble(tel.VelocityX))
-                    .Column("velocity_y", (float)GetValidDouble(tel.VelocityY))
-                    .Column("velocity_z", (float)GetValidDouble(tel.VelocityZ))
-                    .Column("fuel_level", (float)GetValidDouble(tel.FuelLevel))
-                    .Column("alt", (float)GetValidDouble(tel.Alt))
-                    .Column("lat_accel", (float)GetValidDouble(tel.LatAccel))
-                    .Column("long_accel", (float)GetValidDouble(tel.LongAccel))
-                    .Column("vert_accel", (float)GetValidDouble(tel.VertAccel))
-                    .Column("pitch", (float)GetValidDouble(tel.Pitch))
-                    .Column("roll", (float)GetValidDouble(tel.Roll))
-                    .Column("yaw", (float)GetValidDouble(tel.Yaw))
-                    .Column("yaw_north", (float)GetValidDouble(tel.YawNorth))
-                    .Column("voltage", (float)GetValidDouble(tel.Voltage))
-                    .Column("waterTemp", (float)GetValidDouble(tel.WaterTemp))
-                    .Column("lFpressure", (float)GetValidDouble(tel.LFpressure))
-                    .Column("rFpressure", (float)GetValidDouble(tel.RFpressure))
-                    .Column("lRpressure", (float)GetValidDouble(tel.LRpressure))
-                    .Column("rRpressure", (float)GetValidDouble(tel.RRpressure))
-                    .Column("lFtempM", (float)GetValidDouble(tel.LFtempM))
-                    .Column("rFtempM", (float)GetValidDouble(tel.RFtempM))
-                    .Column("lRtempM", (float)GetValidDouble(tel.LRtempM))
-                    .Column("rRtempM", (float)GetValidDouble(tel.RRtempM))
-                    .At(tel.TickTime.ToDateTime());
+                        .Symbol("session_id", sessionId)
+                        .Symbol("track_name", trackName)
+                        .Symbol("track_id", trackId)
+                        .Symbol("lap_id", lapId)
+                        .Symbol("session_num", sessionNum)
+                        .Symbol("session_type", sessionType)
+                        .Symbol("session_name", sessionName)
+                        
+                        .Column("car_id", carId)
+                        .Column("gear", tel.Gear)
+                        .Column("player_car_position", (long)Math.Max(0, Math.Floor(tel.PlayerCarPosition)))
+                        
+                        .Column("speed", GetValidDouble(tel.Speed))
+                        .Column("lap_dist_pct", GetValidDouble(tel.LapDistPct))
+                        .Column("session_time", GetValidDouble(tel.SessionTime))
+                        .Column("lat", GetValidDouble(tel.Lat))
+                        .Column("lon", GetValidDouble(tel.Lon))
+                        .Column("lap_current_lap_time", GetValidDouble(tel.LapCurrentLapTime))
+                        .Column("lapLastLapTime", GetValidDouble(tel.LapLastLapTime))
+                        .Column("lapDeltaToBestLap", GetValidDouble(tel.LapDeltaToBestLap))
+                        
+                        .Column("throttle", (float)GetValidDouble(tel.Throttle))
+                        .Column("brake", (float)GetValidDouble(tel.Brake))
+                        .Column("steering_wheel_angle", (float)GetValidDouble(tel.SteeringWheelAngle))
+                        .Column("rpm", (float)GetValidDouble(tel.Rpm))
+                        .Column("velocity_x", (float)GetValidDouble(tel.VelocityX))
+                        .Column("velocity_y", (float)GetValidDouble(tel.VelocityY))
+                        .Column("velocity_z", (float)GetValidDouble(tel.VelocityZ))
+                        .Column("fuel_level", (float)GetValidDouble(tel.FuelLevel))
+                        .Column("alt", (float)GetValidDouble(tel.Alt))
+                        .Column("lat_accel", (float)GetValidDouble(tel.LatAccel))
+                        .Column("long_accel", (float)GetValidDouble(tel.LongAccel))
+                        .Column("vert_accel", (float)GetValidDouble(tel.VertAccel))
+                        .Column("pitch", (float)GetValidDouble(tel.Pitch))
+                        .Column("roll", (float)GetValidDouble(tel.Roll))
+                        .Column("yaw", (float)GetValidDouble(tel.Yaw))
+                        .Column("yaw_north", (float)GetValidDouble(tel.YawNorth))
+                        .Column("voltage", (float)GetValidDouble(tel.Voltage))
+                        .Column("waterTemp", (float)GetValidDouble(tel.WaterTemp))
+                        .Column("lFpressure", (float)GetValidDouble(tel.LFpressure))
+                        .Column("rFpressure", (float)GetValidDouble(tel.RFpressure))
+                        .Column("lRpressure", (float)GetValidDouble(tel.LRpressure))
+                        .Column("rRpressure", (float)GetValidDouble(tel.RRpressure))
+                        .Column("lFtempM", (float)GetValidDouble(tel.LFtempM))
+                        .Column("rFtempM", (float)GetValidDouble(tel.RFtempM))
+                        .Column("lRtempM", (float)GetValidDouble(tel.LRtempM))
+                        .Column("rRtempM", (float)GetValidDouble(tel.RRtempM))
+                        .At(tel.TickTime.ToDateTime());
                 }
                 catch (Exception rowEx)
                 {
@@ -305,14 +387,17 @@ public class QuestDbService : IDisposable
                     // For non-connection errors, skip this record and continue
                     continue;
                 }
-            }
-            
-            Console.WriteLine($"📤 Sending batch to QuestDB via TCP... ({processedCount} records processed)");
-            await senderToUse.SendAsync();
-            var duration = DateTime.UtcNow - startTime;
-            Console.WriteLine($"✅ Successfully wrote {processedCount}/{telData.Records.Count} telemetry points in {duration.TotalMilliseconds:F1}ms");
         }
-        catch (OutOfMemoryException ex)
+        
+        Console.WriteLine($"📤 Sending batch to QuestDB via TCP... ({processedCount} records processed)");
+        await senderToUse.SendAsync();
+        var duration = DateTime.UtcNow - startTime;
+        Console.WriteLine($"✅ Successfully wrote {processedCount}/{telData.Records.Count} telemetry points in {duration.TotalMilliseconds:F1}ms");
+    }
+
+    private async Task HandleWriteError(Exception ex, TelemetryBatch telData)
+    {
+        if (ex is OutOfMemoryException)
         {
             Console.WriteLine($"❌ CRITICAL: OutOfMemoryException in QuestDB write operation");
             Console.WriteLine($"   Message: {ex.Message}");
@@ -325,71 +410,58 @@ public class QuestDbService : IDisposable
             var gcMemoryMB = GC.GetTotalMemory(false) / (1024 * 1024);
             Console.WriteLine($"   Current Memory Usage: {memoryUsageGB:F2}GB (Working Set)");
             Console.WriteLine($"   GC Memory: {gcMemoryMB:F2}MB");
+            return;
         }
-        catch (Exception ex)
+        
+        Console.WriteLine($"❌ ERROR writing to QuestDB: {ex.GetType().Name}");
+        Console.WriteLine($"   Message: {ex.Message}");
+        Console.WriteLine($"   Batch Size: {telData.Records.Count} records");
+        Console.WriteLine($"   Stack Trace: {ex.StackTrace}");
+        
+        if (ex.InnerException != null)
         {
-            Console.WriteLine($"❌ ERROR writing to QuestDB: {ex.GetType().Name}");
-            Console.WriteLine($"   Message: {ex.Message}");
-            Console.WriteLine($"   Message: {telData}");
-            Console.WriteLine($"   Batch Size: {telData.Records.Count} records");
-            Console.WriteLine($"   Connection State: {(senderToUse != null ? "Sender Available" : "Sender Null")}");
-            Console.WriteLine($"   Stack Trace: {ex.StackTrace}");
-            
-            if (ex.InnerException != null)
+            Console.WriteLine($"   Inner Exception: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
+        }
+        
+        // Only reset sender for specific errors that indicate connection issues
+        var isConnError = IsConnectionError(ex);
+        Console.WriteLine($"   Classified as connection error: {isConnError}");
+        
+        if (isConnError)
+        {
+            ResetSender();
+        }
+        else
+        {
+            Console.WriteLine("⚠️  Data format error - sender reset not attempted");
+        }
+    }
+
+    private void ResetSender()
+    {
+        lock (_senderLock)
+        {
+            if (!_disposed)
             {
-                Console.WriteLine($"   Inner Exception: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
-            }
-            
-            // Only reset sender for specific errors that indicate connection issues
-            var isConnError = IsConnectionError(ex);
-            Console.WriteLine($"   Classified as connection error: {isConnError}");
-            
-            if (isConnError)
-            {
-                lock (_senderLock)
+                try
                 {
-                    if (!_disposed)
-                    {
-                        try
-                        {
-                            Console.WriteLine("🔄 Attempting to reset QuestDB sender due to connection error...");
-                            Console.WriteLine($"   Previous sender state: {(_sender != null ? "Active" : "Null")}");
-                            
-                            _sender?.Dispose();
-                            _sender = null;
-                            
-                            string? url = Environment.GetEnvironmentVariable("QUESTDB_URL");
-                            Console.WriteLine($"   QUESTDB_URL: {url}");
-                            
-                            if (url != null)
-                            {
-                                // Parse the URL to extract hostname and port for QuestDB TCP client
-                                string hostAndPort = url;
-                                if (url.StartsWith("tcp://"))
-                                {
-                                    hostAndPort = url.Substring(6); // Remove "tcp://" prefix
-                                }
-                                
-                                Console.WriteLine($"   Connecting to: tcp::addr={hostAndPort}");
-                                _sender = Sender.New($"tcp::addr={hostAndPort};auto_flush_rows=10000;auto_flush_interval=1000;");
-                                Console.WriteLine("✅ QuestDB sender reset successful");
-                            }
-                            else
-                            {
-                                Console.WriteLine("❌ Cannot reset sender: QUESTDB_URL not found");
-                            }
-                        }
-                        catch (Exception resetEx)
-                        {
-                            Console.WriteLine($"❌ Failed to reset sender: {resetEx.Message}");
-                            _sender = null;
-                        }
-                    }
+                    Console.WriteLine("🔄 Attempting to reset QuestDB sender due to connection error...");
+                    Console.WriteLine($"   Previous sender state: {(_sender != null ? "Active" : "Null")}");
+                    
+                    _sender?.Dispose();
+                    _sender = null;
+                    
+                    string tcpConnectionString = $"{_tcpHost}:{_tcpPort}";
+                    Console.WriteLine($"   Connecting to: {tcpConnectionString}");
+                    
+                    _sender = CreateSender(tcpConnectionString);
+                    Console.WriteLine("✅ QuestDB sender reset successful");
                 }
-            }
-            else
-            {
-                Console.WriteLine("⚠️  Data format error - sender reset not attempted");
+                catch (Exception resetEx)
+                {
+                    Console.WriteLine($"❌ Failed to reset sender: {resetEx.Message}");
+                    _sender = null;
+                }
             }
         }
     }

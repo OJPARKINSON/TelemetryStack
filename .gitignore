@@ -22,6 +22,7 @@ dynamic/tls.yml
 # Go workspace file
 go.work
 go.work.sum
+tailscale/
 
 # Environment and sensitive files
 .env
