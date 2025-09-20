@@ -147,16 +147,12 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-      # questdb:
-      #   condition: service_healthy
+      questdb:
+        condition: service_healthy
     networks:
       - telemetry-network
     environment:
-      # QuestDB TCP Configuration (Optimized)
-      QUESTDB_TCP_HOST: questdb
-      QUESTDB_TCP_PORT: 9009
-      QUESTDB_TCP_USERNAME: admin
-      QUESTDB_TCP_PASSWORD: quest
+      QUESTDB_URL: questdb:9009;username=admin;password=quest
       
       # QuestDB Performance Tuning
       QUESTDB_BATCH_SIZE: 1000
