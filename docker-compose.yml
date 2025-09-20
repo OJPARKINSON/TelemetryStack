@@ -147,8 +147,6 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-      questdb:
-        condition: service_healthy
     networks:
       - telemetry-network
     environment:
