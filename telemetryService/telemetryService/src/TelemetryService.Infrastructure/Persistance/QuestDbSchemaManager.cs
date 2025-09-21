@@ -252,7 +252,7 @@ public class QuestDbSchemaManager : IDisposable
                 lRtempM FLOAT,
                 rRtempM FLOAT,
                 timestamp TIMESTAMP
-            ) TIMESTAMP(timestamp) PARTITION BY HOUR 
+            ) TIMESTAMP(timestamp) PARTITION BY HOUR WAL
             WITH maxUncommittedRows=1000000, dedup_upsert_keys=(session_id, car_id, timestamp);
         ";
 
