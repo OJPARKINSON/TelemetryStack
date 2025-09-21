@@ -84,6 +84,7 @@ services:
       QDB_HTTP_ENABLED: "true"
       QDB_PG_ENABLED: "true"
       QDB_LINE_TCP_ENABLED: "true"
+      QDB_CAIRO_WAL_ENABLED_DEFAULT: "true"
     networks:
       - telemetry-network
     labels:
@@ -139,8 +140,9 @@ services:
       dockerfile: Dockerfile
     container_name: telemetry-dashboard
     restart: unless-stopped
+    ports:
+      - "3000:3000" 
     environment:
-      # QuestDB connection for READING data (uses PostgreSQL wire protocol)
       QUESTDB_URL: postgresql://admin:quest@questdb:8812/qdb
       QUESTDB_HOST: questdb
       QUESTDB_PORT: 8812

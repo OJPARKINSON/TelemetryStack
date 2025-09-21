@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, memo } from "react";
 import {
 	CartesianGrid,
 	Line,
@@ -14,12 +14,14 @@ import type { TelemetryDataPoint } from "../lib/types";
 interface InfoBoxProps {
 	telemetryData: any[];
 	lapId: string;
+	selectedMetric?: string;
+	setSelectedMetric?: (metric: string) => void;
 }
 
-export const InfoBox = ({ telemetryData, lapId }: InfoBoxProps) => {
+export const InfoBox = memo(function InfoBox({ telemetryData, lapId }: InfoBoxProps) {
 	return (
 		<div className="bg-zinc-900/50 border border-zinc-800/50 rounded-lg p-6">
-			<h2 className="text-lg font-semibold text-white mb-6">Telemetry Details</h2>
+			<div className="flex justify-between items-center mb-6"></div>
 			<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 				<div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-4">
 					<div className="text-sm text-zinc-400 mb-2">Lap</div>
@@ -49,7 +51,7 @@ export const InfoBox = ({ telemetryData, lapId }: InfoBoxProps) => {
 			</div>
 		</div>
 	);
-};
+});
 
 export const TelemetryChart = ({
 	selectedMetric,
@@ -95,23 +97,6 @@ export const TelemetryChart = ({
 		<div>
 			<div className="flex justify-between items-center mb-4">
 				<h2 className="text-lg font-semibold text-white">Telemetry Data</h2>
-				<div>
-					<label htmlFor="selectMetric" className="text-sm text-zinc-400 mr-2">
-						Select Metric:
-					</label>
-					<select
-						name="selectMetric"
-						value={selectedMetric}
-						onChange={(e) => setSelectedMetric(e.target.value)}
-						className="bg-zinc-800/50 border border-zinc-700/50 text-white px-3 py-1 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-					>
-						{availableMetrics.map((metric) => (
-							<option key={metric} value={metric}>
-								{metric}
-							</option>
-						))}
-					</select>
-				</div>
 			</div>
 
 			<div className="h-64">

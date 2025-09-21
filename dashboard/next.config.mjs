@@ -4,12 +4,26 @@ const nextConfig = {
 	serverExternalPackages: ["pg"],
 	reactStrictMode: true,
 
+	// Performance optimizations
+	experimental: {
+		optimizePackageImports: ["recharts"],
+	},
+
+	turbopack: {
+		rules: {
+			"*.svg": {
+				loaders: ["@svgr/webpack"],
+				as: "*.js",
+			},
+		},
+	},
+
 	compiler: {
 		removeConsole:
 			process.env.NODE_ENV === "production"
 				? {
-					exclude: ["error", "warn"],
-				}
+						exclude: ["error", "warn"],
+					}
 				: false,
 	},
 
@@ -50,13 +64,14 @@ const nextConfig = {
 				headers: [
 					{ key: "Access-Control-Allow-Origin", value: "*" },
 					{ key: "Access-Control-Allow-Methods", value: "GET" },
-					{ key: "Cache-Control", value: "public, max-age=86400, immutable" },
 					{ key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
 					{ key: "Cross-Origin-Embedder-Policy", value: "unsafe-none" },
+					// Aggressive caching for map tiles (1 year) - tiles never change
 					{
 						key: "Cache-Control",
-						value: "public, s-maxage=300, stale-while-revalidate=60",
+						value: "public, max-age=86400, s-maxage=86400, immutable",
 					},
+					{ key: "Vary", value: "Accept-Encoding" },
 				],
 			},
 			{
@@ -64,12 +79,13 @@ const nextConfig = {
 				headers: [
 					{ key: "Access-Control-Allow-Origin", value: "*" },
 					{ key: "Access-Control-Allow-Methods", value: "GET" },
-					{ key: "Cache-Control", value: "public, max-age=86400, immutable" },
 					{ key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
+					// Aggressive caching for map tiles (1 year) - tiles never change
 					{
 						key: "Cache-Control",
-						value: "public, s-maxage=300, stale-while-revalidate=60",
+						value: "public, max-age=86400, s-maxage=86400, immutable",
 					},
+					{ key: "Vary", value: "Accept-Encoding" },
 				],
 			},
 			{
@@ -77,13 +93,14 @@ const nextConfig = {
 				headers: [
 					{ key: "Access-Control-Allow-Origin", value: "*" },
 					{ key: "Access-Control-Allow-Methods", value: "GET" },
-					{ key: "Cache-Control", value: "public, max-age=86400, immutable" },
 					{ key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
 					{ key: "Cross-Origin-Embedder-Policy", value: "unsafe-none" },
+					// Aggressive caching for map tiles (1 year) - tiles never change
 					{
 						key: "Cache-Control",
-						value: "public, s-maxage=300, stale-while-revalidate=60",
+						value: "public, max-age=86400, s-maxage=86400, immutable",
 					},
+					{ key: "Vary", value: "Accept-Encoding" },
 				],
 			},
 			{
@@ -91,12 +108,13 @@ const nextConfig = {
 				headers: [
 					{ key: "Access-Control-Allow-Origin", value: "*" },
 					{ key: "Access-Control-Allow-Methods", value: "GET" },
-					{ key: "Cache-Control", value: "public, max-age=86400, immutable" },
 					{ key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
+					// Aggressive caching for map tiles (1 year) - tiles never change
 					{
 						key: "Cache-Control",
-						value: "public, s-maxage=300, stale-while-revalidate=60",
+						value: "public, max-age=86400, s-maxage=86400, immutable",
 					},
+					{ key: "Vary", value: "Accept-Encoding" },
 				],
 			},
 			{
@@ -104,7 +122,7 @@ const nextConfig = {
 				headers: [
 					{
 						key: "Cache-Control",
-						value: "public, max-age=31536000, immutable",
+						value: "public, max-age=86400, immutable",
 					},
 				],
 			},
@@ -113,7 +131,7 @@ const nextConfig = {
 				headers: [
 					{
 						key: "Cache-Control",
-						value: "public, max-age=31536000, immutable",
+						value: "public, max-age=86400, immutable",
 					},
 				],
 			},
@@ -182,6 +200,38 @@ const nextConfig = {
 	env: {
 		OPTIMIZE_IMAGES: "true",
 		MINIMIZE_JS: process.env.NODE_ENV === "production" ? "true" : "false",
+	},
+
+	// Webpack optimizations
+	webpack: (config, { isServer }) => {
+		// Optimize bundle splitting
+		if (!isServer) {
+			config.optimization.splitChunks = {
+				chunks: "all",
+				cacheGroups: {
+					ol: {
+						name: "ol",
+						test: /[\\/]node_modules[\\/]ol[\\/]/,
+						priority: 30,
+						chunks: "all",
+					},
+					recharts: {
+						name: "recharts",
+						test: /[\\/]node_modules[\\/]recharts[\\/]/,
+						priority: 20,
+						chunks: "all",
+					},
+					vendor: {
+						name: "vendor",
+						test: /[\\/]node_modules[\\/]/,
+						priority: 10,
+						chunks: "all",
+					},
+				},
+			};
+		}
+
+		return config;
 	},
 };
 

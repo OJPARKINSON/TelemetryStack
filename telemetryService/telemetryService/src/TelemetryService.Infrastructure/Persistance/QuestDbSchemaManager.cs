@@ -206,15 +206,15 @@ public class QuestDbSchemaManager : IDisposable
     private async Task CreateOptimizedTable()
     {
         var createTableSql = @"
-            CREATE TABLE TelemetryTicks (
+            CREATE TABLE TelemetryTicks4 (
                 session_id SYMBOL CAPACITY 50000 INDEX,
                 track_name SYMBOL CAPACITY 100 INDEX,
                 track_id SYMBOL CAPACITY 100 INDEX,
                 lap_id SYMBOL CAPACITY 500,
                 session_num SYMBOL CAPACITY 20,
-                session_type SYMBOL CAPACITY 10,
-                session_name SYMBOL CAPACITY 50,
-                car_id VARCHAR,
+                session_type SYMBOL CAPACITY 10 INDEX,
+                session_name SYMBOL CAPACITY 50 INDEX,
+                car_id SYMBOL CAPACITY 1000 INDEX,
                 gear INT,
                 player_car_position LONG,
                 speed DOUBLE,
@@ -252,7 +252,8 @@ public class QuestDbSchemaManager : IDisposable
                 lRtempM FLOAT,
                 rRtempM FLOAT,
                 timestamp TIMESTAMP
-            ) TIMESTAMP(timestamp) PARTITION BY HOUR WITH maxUncommittedRows=1000000;
+            ) TIMESTAMP(timestamp) PARTITION BY HOUR 
+            WITH maxUncommittedRows=1000000, dedup_upsert_keys=(session_id, car_id, timestamp);
         ";
 
         await ExecuteQuery(createTableSql);
@@ -310,32 +311,32 @@ public class QuestDbSchemaManager : IDisposable
                     lap_current_lap_time,
                     lapLastLapTime,
                     lapDeltaToBestLap,
-                    cast(throttle as FLOAT) as throttle,
-                    cast(brake as FLOAT) as brake,
-                    cast(steering_wheel_angle as FLOAT) as steering_wheel_angle,
-                    cast(rpm as FLOAT) as rpm,
-                    cast(velocity_x as FLOAT) as velocity_x,
-                    cast(velocity_y as FLOAT) as velocity_y,
-                    cast(velocity_z as FLOAT) as velocity_z,
-                    cast(fuel_level as FLOAT) as fuel_level,
-                    cast(alt as FLOAT) as alt,
-                    cast(lat_accel as FLOAT) as lat_accel,
-                    cast(long_accel as FLOAT) as long_accel,
-                    cast(vert_accel as FLOAT) as vert_accel,
-                    cast(pitch as FLOAT) as pitch,
-                    cast(roll as FLOAT) as roll,
-                    cast(yaw as FLOAT) as yaw,
-                    cast(yaw_north as FLOAT) as yaw_north,
-                    cast(voltage as FLOAT) as voltage,
-                    cast(waterTemp as FLOAT) as waterTemp,
-                    cast(lFpressure as FLOAT) as lFpressure,
-                    cast(rFpressure as FLOAT) as rFpressure,
-                    cast(lRpressure as FLOAT) as lRpressure,
-                    cast(rRpressure as FLOAT) as rRpressure,
-                    cast(lFtempM as FLOAT) as lFtempM,
-                    cast(rFtempM as FLOAT) as rFtempM,
-                    cast(lRtempM as FLOAT) as lRtempM,
-                    cast(rRtempM as FLOAT) as rRtempM,
+                    throttle,  -- No cast needed since both are FLOAT
+                    brake,
+                    steering_wheel_angle,
+                    rpm,
+                    velocity_x,
+                    velocity_y,
+                    velocity_z,
+                    fuel_level,
+                    alt,
+                    lat_accel,
+                    long_accel,
+                    vert_accel,
+                    pitch,
+                    roll,
+                    yaw,
+                    yaw_north,
+                    voltage,
+                    waterTemp,
+                    lFpressure,
+                    rFpressure,
+                    lRpressure,
+                    rRpressure,
+                    lFtempM,
+                    rFtempM,
+                    lRtempM,
+                    rRtempM,
                     timestamp
                 FROM TelemetryTicks_backup_{timestamp};
             ";

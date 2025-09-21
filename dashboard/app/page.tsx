@@ -96,12 +96,20 @@ export default async function DashboardPage() {
 												Database Connection Error
 											</h3>
 											<p className="text-sm text-red-200 mt-1">
-												Unable to connect to QuestDB. Please check your
-												configuration.
+												The telemetry database is not running. Start the Docker Compose stack to access telemetry data.
 											</p>
+											<div className="mt-4 bg-zinc-900/50 rounded-lg p-4">
+												<h4 className="text-xs font-semibold text-zinc-300 mb-2">To start the system:</h4>
+												<code className="block text-xs text-zinc-400 bg-zinc-800 rounded px-2 py-1 mb-2">
+													docker compose up -d
+												</code>
+												<p className="text-xs text-zinc-500">
+													This will start QuestDB, RabbitMQ, and all required services.
+												</p>
+											</div>
 											<details className="mt-3">
 												<summary className="cursor-pointer text-xs text-red-300 hover:text-red-200">
-													Show error details
+													Show technical error details
 												</summary>
 												<div className="mt-2 p-3 bg-red-900/30 rounded border border-red-800/50">
 													<code className="text-xs text-red-200 font-mono">

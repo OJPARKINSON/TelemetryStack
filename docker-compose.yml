@@ -114,6 +114,7 @@ services:
       QDB_HTTP_ENABLED: "true"
       QDB_PG_ENABLED: "true"
       QDB_LINE_TCP_ENABLED: "true"
+      QDB_CAIRO_WAL_ENABLED_DEFAULT: "true"
     networks:
       - telemetry-network
     deploy:

@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -11,11 +12,22 @@ import {
 	useState,
 } from "react";
 import { InfoBox } from "../components/InfoBox";
-import ProfessionalTelemetryCharts from "../components/ProfessionalTelemetryCharts";
-import TrackView from "../components/TrackView";
 import { useTrackPosition } from "../hooks/useTrackPosition";
 import type { TelemetryRes } from "../lib/Fetch";
 import type { TelemetryDataPoint } from "../lib/types";
+
+const OptimizedTrackMap = dynamic(() => import("./OptimizedTrackMap"), {
+	ssr: false,
+	loading: () => <TrackMapSkeleton />,
+});
+
+const ProfessionalTelemetryCharts = dynamic(
+	() => import("./ProfessionalTelemetryCharts"),
+	{
+		ssr: false,
+		loading: () => <ChartsSkeleton />,
+	},
+);
 
 interface TelemetryPageProps {
 	initialTelemetryData: TelemetryRes;
@@ -284,11 +296,12 @@ export default function TelemetryPage({
 					<div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
 						<div className="col-span-1 lg:col-span-3 bg-zinc-900/50 border border-zinc-800/50 rounded-lg p-6">
 							{dataWithGPSCoordinates.length > 0 ? (
-								<TrackView
+								<OptimizedTrackMap
 									dataWithCoordinates={dataWithGPSCoordinates}
 									selectedPointIndex={displayIndex}
 									onPointClick={handleTrackPointClick}
 									selectedMetric={selectedMetric}
+									setSelectedMetric={setSelectedMetric}
 								/>
 							) : (
 								<div className="h-[500px] bg-zinc-800/50 rounded-lg flex items-center justify-center">
@@ -337,6 +350,8 @@ export default function TelemetryPage({
 						<InfoBox
 							telemetryData={dataWithGPSCoordinates as TelemetryDataPoint[]}
 							lapId={currentLapId.toString()}
+							selectedMetric={selectedMetric}
+							setSelectedMetric={setSelectedMetric}
 						/>
 					)}
 
@@ -394,6 +409,36 @@ function GPSAnalysisPanel({ data }: { data: any[] }) {
 					<div className="text-xs text-zinc-500">
 						{((corners.length / data.length) * 100).toFixed(1)}% of lap
 					</div>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+// Performance optimization: Skeleton components for dynamic loading
+function TrackMapSkeleton() {
+	return (
+		<div className="h-[500px] bg-zinc-800/30 rounded-lg flex items-center justify-center animate-pulse">
+			<div className="text-center">
+				<div className="w-16 h-16 mx-auto bg-zinc-700/50 rounded-lg flex items-center justify-center mb-4">
+					<div className="w-8 h-8 border-2 border-zinc-600 rounded border-dashed animate-spin"></div>
+				</div>
+				<p className="text-zinc-400 text-sm">Loading track map...</p>
+			</div>
+		</div>
+	);
+}
+
+function ChartsSkeleton() {
+	return (
+		<div className="h-[600px] bg-zinc-800/30 rounded-lg p-4 animate-pulse">
+			<div className="space-y-4">
+				<div className="h-4 bg-zinc-700/50 rounded w-1/3"></div>
+				<div className="space-y-2">
+					{[...Array(5)].map((_, i) => (
+						// biome-ignore lint/suspicious/noArrayIndexKey: na
+						<div key={i} className="h-16 bg-zinc-700/30 rounded"></div>
+					))}
 				</div>
 			</div>
 		</div>

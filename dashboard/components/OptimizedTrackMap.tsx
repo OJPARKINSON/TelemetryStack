@@ -1,17 +1,17 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import Feature from "ol/Feature";
-import { LineString, Point } from "ol/geom";
-import TileLayer from "ol/layer/Tile";
-import VectorLayer from "ol/layer/Vector";
-import OlMap from "ol/Map";
-import { fromLonLat } from "ol/proj";
-import VectorSource from "ol/source/Vector";
-import XYZ from "ol/source/XYZ";
-import { Circle, Fill, Stroke, Style } from "ol/style";
-import View from "ol/View";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+// Tree-shaken OpenLayers imports for better performance
+import Feature from "ol/Feature.js";
+import { LineString, Point } from "ol/geom.js";
+import TileLayer from "ol/layer/Tile.js";
+import VectorLayer from "ol/layer/Vector.js";
+import OlMap from "ol/Map.js";
+import { fromLonLat, toLonLat } from "ol/proj.js";
+import VectorSource from "ol/source/Vector.js";
+import XYZ from "ol/source/XYZ.js";
+import { Circle, Fill, Stroke, Style } from "ol/style.js";
+import View from "ol/View.js";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import type { TelemetryDataPoint } from "../lib/types";
 
 interface OptimizedTrackMapProps {
@@ -19,29 +19,28 @@ interface OptimizedTrackMapProps {
 	selectedPointIndex: number;
 	onPointClick?: (index: number) => void;
 	selectedMetric?: string;
+	setSelectedMetric: (metric: string) => void;
+	onMetricChange?: (metric: string) => void;
 }
 
-export default function OptimizedTrackMap({
+const OptimizedTrackMap = memo(function OptimizedTrackMap({
 	dataWithCoordinates,
 	selectedPointIndex,
 	onPointClick,
 	selectedMetric = "Speed",
+	setSelectedMetric,
 }: OptimizedTrackMapProps) {
 	const mapRef = useRef<HTMLDivElement>(null);
 	const mapInstanceRef = useRef<OlMap | null>(null);
 	const racingLineSourceRef = useRef<VectorSource | null>(null);
 	const markerSourceRef = useRef<VectorSource | null>(null);
 	const trackRenderedRef = useRef(false);
-	const path = usePathname();
-
-	const [displayMetric, setDisplayMetric] = useState<string>(
-		selectedMetric || "Speed",
-	);
 
 	const colorCacheRef = useRef<Map<string, string>>(new Map());
 
 	const getColorForMetric = useCallback(
 		(value: number, metric: string, minVal: number, maxVal: number): string => {
+			console.log("gear", minVal, maxVal);
 			if (!value || minVal === maxVal) return "#888888";
 
 			// PERFORMANCE FIX: Use cache to avoid recalculating same colors
@@ -152,11 +151,28 @@ export default function OptimizedTrackMap({
 		const baseLayer = new TileLayer({
 			source: new XYZ({
 				url: tileUrl,
+				crossOrigin: "anonymous", // Enable better caching
+				maxZoom: 20,
+				minZoom: 5,
+				// Tile loading optimization
+				transition: 250,
+				// Cache configuration for better performance
+				cacheSize: 512, // Increase cache size
+				reprojectionErrorThreshold: 0.5,
 			}),
+			// Layer-level optimizations
+			preload: 2, // Preload 2 zoom levels for smoother experience
+			useInterimTilesOnError: true,
 		});
 
 		const racingLineLayer = new VectorLayer({
 			source: racingLineSource,
+			style: new Style({
+				stroke: new Stroke({
+					color: "#888888", // Default gray color to prevent blue flashing
+					width: 3,
+				}),
+			}),
 		});
 
 		// Create marker layer (DYNAMIC - only this updates)
@@ -202,7 +218,7 @@ export default function OptimizedTrackMap({
 			markerSourceRef.current = null;
 			trackRenderedRef.current = false;
 		};
-	}, [staticTrackData, window.location.href]);
+	}, [staticTrackData]);
 
 	// ONE-TIME: Render the static racing line
 	useEffect(() => {
@@ -275,7 +291,7 @@ export default function OptimizedTrackMap({
 			source.addFeature(lineFeature);
 		}
 
-		// Fit view to track bounds
+		// Fit view to track bounds and warm tile cache
 		if (mapInstanceRef.current) {
 			const view = mapInstanceRef.current.getView();
 			view.fit(source.getExtent(), {
@@ -292,7 +308,12 @@ export default function OptimizedTrackMap({
 		);
 	}, [staticTrackData]); // Only render if track data changes
 
-	// DYNAMIC: Update ONLY the marker position with throttling
+	useEffect(() => {
+		if (staticTrackData) {
+			colorCacheRef.current.clear();
+		}
+	}, [staticTrackData]);
+
 	const lastMarkerUpdateRef = useRef<number>(0);
 	useEffect(() => {
 		if (!markerSourceRef.current || !staticTrackData || selectedPointIndex < 0)
@@ -301,14 +322,12 @@ export default function OptimizedTrackMap({
 		const point = staticTrackData.validGPSPoints[selectedPointIndex];
 		if (!point) return;
 
-		// PERFORMANCE FIX: Throttle marker updates to 60fps max
 		const now = performance.now();
 		if (now - lastMarkerUpdateRef.current < 16) {
 			return;
 		}
 		lastMarkerUpdateRef.current = now;
 
-		// Use requestAnimationFrame for smooth marker movement
 		requestAnimationFrame(() => {
 			if (!markerSourceRef.current) return;
 
@@ -327,11 +346,11 @@ export default function OptimizedTrackMap({
 		// No console log here to avoid spam - this runs frequently
 	}, [selectedPointIndex, staticTrackData]); // Updates frequently but only affects marker
 
-	// EFFICIENT: Update only line colors when metric changes (no track re-rendering)
+	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
 	useEffect(() => {
 		if (!racingLineSourceRef.current || !mapInstanceRef.current) return;
 
-		console.log("Updating racing line colors for metric:", displayMetric);
+		console.log("Updating racing line colors for metric:", selectedMetric);
 
 		// PERFORMANCE FIX: Clear color cache when metric changes to avoid stale colors
 		colorCacheRef.current.clear();
@@ -352,13 +371,13 @@ export default function OptimizedTrackMap({
 
 				// Batch style updates to avoid layout thrashing
 				features.forEach((feature) => {
-					const metricValue = feature.get(displayMetric) || 0;
-					const minVal = feature.get(`${displayMetric}_min`) || 0;
-					const maxVal = feature.get(`${displayMetric}_max`) || 1;
+					const metricValue = feature.get(selectedMetric) || 0;
+					const minVal = feature.get(`${selectedMetric}_min`) || 0;
+					const maxVal = feature.get(`${selectedMetric}_max`) || 1;
 
 					const color = getColorForMetric(
 						metricValue,
-						displayMetric,
+						selectedMetric,
 						minVal,
 						maxVal,
 					);
@@ -395,7 +414,7 @@ export default function OptimizedTrackMap({
 			// Use requestAnimationFrame for smooth updates
 			requestAnimationFrame(updateStyles);
 		}
-	}, [displayMetric, getColorForMetric]);
+	}, [getColorForMetric, staticTrackData, selectedMetric]);
 
 	// Handle click events
 	useEffect(() => {
@@ -438,29 +457,37 @@ export default function OptimizedTrackMap({
 		<>
 			<div className="flex flex-col space-y-2 z-10">
 				<div className="flex justify-between">
-					<select
-						value={displayMetric}
-						onChange={(e) => setDisplayMetric(e.target.value)}
-						className="bg-zinc-800/90 border border-zinc-600 text-white px-3 py-1 rounded text-sm font-medium hover:bg-zinc-700/90 focus:outline-none focus:ring-2 focus:ring-blue-500 h-fit"
-					>
-						<option value="Speed">Speed</option>
-						<option value="Throttle">Throttle</option>
-						<option value="Brake">Brake</option>
-						<option value="Gear">Gear</option>
-						<option value="RPM">RPM</option>
-						<option value="SteeringWheelAngle">Steering</option>
-					</select>
+					<div>
+						<div className="flex items-center space-x-2">
+							<label htmlFor="metricSelect" className="text-sm text-zinc-400">
+								Track Metric:
+							</label>
+							<select
+								name="metricSelect"
+								value={selectedMetric || "Speed"}
+								onChange={(e) => setSelectedMetric(e.target.value)}
+								className="bg-zinc-800/90 border border-zinc-600 text-white px-3 py-1 rounded text-sm font-medium hover:bg-zinc-700/90 focus:outline-none focus:ring-2 focus:ring-blue-500"
+							>
+								<option value="Speed">Speed</option>
+								<option value="Throttle">Throttle</option>
+								<option value="Brake">Brake</option>
+								<option value="Gear">Gear</option>
+								<option value="RPM">RPM</option>
+								<option value="SteeringWheelAngle">Steering</option>
+							</select>
+						</div>
+					</div>
 
 					<div className=" bg-zinc-800/90 border border-zinc-600 p-2 rounded-lg text-sm z-10 mb-2">
 						<div className="text-white font-medium mb-1">
-							{displayMetric === "Speed" && "Speed (km/h)"}
-							{displayMetric === "Throttle" && "Throttle (%)"}
-							{displayMetric === "Brake" && "Brake (%)"}
-							{displayMetric === "Gear" && "Gear"}
-							{displayMetric === "RPM" && "RPM"}
-							{displayMetric === "SteeringWheelAngle" && "Steering (deg)"}
+							{selectedMetric === "Speed" && "Speed (km/h)"}
+							{selectedMetric === "Throttle" && "Throttle (%)"}
+							{selectedMetric === "Brake" && "Brake (%)"}
+							{selectedMetric === "Gear" && "Gear"}
+							{selectedMetric === "RPM" && "RPM"}
+							{selectedMetric === "SteeringWheelAngle" && "Steering (deg)"}
 						</div>
-						{displayMetric === "Speed" && (
+						{selectedMetric === "Speed" && (
 							<>
 								<div className="flex items-center space-x-2">
 									<div
@@ -485,7 +512,7 @@ export default function OptimizedTrackMap({
 								</div>
 							</>
 						)}
-						{displayMetric === "Throttle" && (
+						{selectedMetric === "Throttle" && (
 							<>
 								<div className="flex items-center space-x-2">
 									<div
@@ -503,7 +530,7 @@ export default function OptimizedTrackMap({
 								</div>
 							</>
 						)}
-						{displayMetric === "Brake" && (
+						{selectedMetric === "Brake" && (
 							<>
 								<div className="flex items-center space-x-2">
 									<div
@@ -521,7 +548,7 @@ export default function OptimizedTrackMap({
 								</div>
 							</>
 						)}
-						{displayMetric === "Gear" && (
+						{selectedMetric === "Gear" && (
 							<>
 								<div className="flex items-center space-x-2">
 									<div
@@ -539,7 +566,7 @@ export default function OptimizedTrackMap({
 								</div>
 							</>
 						)}
-						{displayMetric === "RPM" && (
+						{selectedMetric === "RPM" && (
 							<>
 								<div className="flex items-center space-x-2">
 									<div
@@ -557,7 +584,7 @@ export default function OptimizedTrackMap({
 								</div>
 							</>
 						)}
-						{displayMetric === "SteeringWheelAngle" && (
+						{selectedMetric === "SteeringWheelAngle" && (
 							<>
 								<div className="flex items-center space-x-2">
 									<div
@@ -585,4 +612,6 @@ export default function OptimizedTrackMap({
 			/>
 		</>
 	);
-}
+});
+
+export default OptimizedTrackMap;
