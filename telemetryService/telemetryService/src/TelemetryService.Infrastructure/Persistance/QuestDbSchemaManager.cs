@@ -253,11 +253,12 @@ public class QuestDbSchemaManager : IDisposable
                 rRtempM FLOAT,
                 timestamp TIMESTAMP
             ) TIMESTAMP(timestamp) PARTITION BY HOUR WAL
-            DEDUP UPSERT keys(session_id, car_id, timestamp);
             WITH maxUncommittedRows=1000000, dedup_upsert_keys=(session_id, car_id, timestamp);
         ";
 
         await ExecuteQuery(createTableSql);
+
+        await ExecuteQuery("ALTER TABLE TelemetryTicks DEDUP ENABLE UPSERT KEYS(session_id, car_id, timestamp)");
     }
 
     private async Task OptimizeExistingTable()
