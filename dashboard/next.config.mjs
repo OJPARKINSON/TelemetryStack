@@ -48,6 +48,33 @@ const nextConfig = {
 				],
 			},
 			{
+				source: "/dashboard/api/tiles/:path*",
+				headers: [
+					{ key: "Access-Control-Allow-Origin", value: "*" },
+					{ key: "Access-Control-Allow-Methods", value: "GET" },
+					{ key: "Cache-Control", value: "public, max-age=86400, immutable" },
+					{ key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
+					{ key: "Cross-Origin-Embedder-Policy", value: "unsafe-none" },
+					{
+						key: "Cache-Control",
+						value: "public, s-maxage=300, stale-while-revalidate=60",
+					},
+				],
+			},
+			{
+				source: "/dashboard/:path*-tiles/:path*",
+				headers: [
+					{ key: "Access-Control-Allow-Origin", value: "*" },
+					{ key: "Access-Control-Allow-Methods", value: "GET" },
+					{ key: "Cache-Control", value: "public, max-age=86400, immutable" },
+					{ key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
+					{
+						key: "Cache-Control",
+						value: "public, s-maxage=300, stale-while-revalidate=60",
+					},
+				],
+			},
+			{
 				source: "/api/tiles/:path*",
 				headers: [
 					{ key: "Access-Control-Allow-Origin", value: "*" },
@@ -57,7 +84,7 @@ const nextConfig = {
 					{ key: "Cross-Origin-Embedder-Policy", value: "unsafe-none" },
 					{
 						key: "Cache-Control",
-						value: "public, s-maxage=30, stale-while-revalidate=60",
+						value: "public, s-maxage=300, stale-while-revalidate=60",
 					},
 				],
 			},
@@ -68,6 +95,10 @@ const nextConfig = {
 					{ key: "Access-Control-Allow-Methods", value: "GET" },
 					{ key: "Cache-Control", value: "public, max-age=86400, immutable" },
 					{ key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
+					{
+						key: "Cache-Control",
+						value: "public, s-maxage=300, stale-while-revalidate=60",
+					},
 				],
 			},
 			{
