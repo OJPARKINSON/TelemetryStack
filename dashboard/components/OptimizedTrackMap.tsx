@@ -149,7 +149,6 @@ export default function OptimizedTrackMap({
 			? `/dashboard/api/tiles/dark/{z}/{x}/{y}`
 			: "/api/tiles/dark/{z}/{x}/{y}";
 
-
 		const baseLayer = new TileLayer({
 			source: new XYZ({
 				url: tileUrl,
@@ -203,7 +202,7 @@ export default function OptimizedTrackMap({
 			markerSourceRef.current = null;
 			trackRenderedRef.current = false;
 		};
-	}, [staticTrackData, path]);
+	}, [staticTrackData, window.location.href]);
 
 	// ONE-TIME: Render the static racing line
 	useEffect(() => {
