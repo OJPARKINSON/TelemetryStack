@@ -40,7 +40,6 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 
 	const getColorForMetric = useCallback(
 		(value: number, metric: string, minVal: number, maxVal: number): string => {
-			console.log("gear", minVal, maxVal);
 			if (!value || minVal === maxVal) return "#888888";
 
 			// PERFORMANCE FIX: Use cache to avoid recalculating same colors
@@ -471,7 +470,7 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 								<option value="Speed">Speed</option>
 								<option value="Throttle">Throttle</option>
 								<option value="Brake">Brake</option>
-								<option value="Gear">Gear</option>
+								{/* <option value="Gear">Gear</option> */}
 								<option value="RPM">RPM</option>
 								<option value="SteeringWheelAngle">Steering</option>
 							</select>

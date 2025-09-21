@@ -113,6 +113,7 @@ services:
       JAVA_OPTS: "-Xmx2g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=100"
       QDB_HTTP_ENABLED: "true"
       QDB_PG_ENABLED: "true"
+      QDB_METRICS_ENABLED: "true"
       QDB_LINE_TCP_ENABLED: "true"
       QDB_CAIRO_WAL_ENABLED_DEFAULT: "true"
     networks:
