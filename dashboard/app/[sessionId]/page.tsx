@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { getLaps, getTelemetryData } from "../../lib/questDb";
@@ -93,12 +94,12 @@ function DatabaseUnavailableError() {
 					</code>
 				</div>
 				<div className="mt-6">
-					<a 
+					<Link 
 						href="/dashboard" 
 						className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
 					>
 						← Back to Dashboard
-					</a>
+					</Link>
 				</div>
 			</div>
 		</div>
