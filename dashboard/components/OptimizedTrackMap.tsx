@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import Feature from "ol/Feature";
 import { LineString, Point } from "ol/geom";
 import TileLayer from "ol/layer/Tile";
@@ -31,6 +32,7 @@ export default function OptimizedTrackMap({
 	const racingLineSourceRef = useRef<VectorSource | null>(null);
 	const markerSourceRef = useRef<VectorSource | null>(null);
 	const trackRenderedRef = useRef(false);
+	const path = usePathname();
 
 	const [displayMetric, setDisplayMetric] = useState<string>(
 		selectedMetric || "Speed",
@@ -143,13 +145,18 @@ export default function OptimizedTrackMap({
 		racingLineSourceRef.current = racingLineSource;
 		markerSourceRef.current = markerSource;
 
+		let tileUrl = "/api/tiles/dark/{z}/{x}/{y}";
+
+		if (path.includes("dashboard")) {
+			tileUrl = `/dashboard${tileUrl}`;
+		}
+
 		const baseLayer = new TileLayer({
 			source: new XYZ({
-				url: "/api/tiles/dark/{z}/{x}/{y}",
+				url: tileUrl,
 			}),
 		});
 
-		// Create racing line layer (STATIC - track never re-renders, only colors change)
 		const racingLineLayer = new VectorLayer({
 			source: racingLineSource,
 		});
@@ -197,7 +204,7 @@ export default function OptimizedTrackMap({
 			markerSourceRef.current = null;
 			trackRenderedRef.current = false;
 		};
-	}, [staticTrackData]);
+	}, [staticTrackData, path]);
 
 	// ONE-TIME: Render the static racing line
 	useEffect(() => {
