@@ -25,13 +25,11 @@
 		"@questdb/nodejs-client": "^4.0.1",
 		"@tailwindcss/postcss": "^4.1.11",
 		"autoprefixer": "^10.4.21",
-		"lucide-react": "^0.539.0",
 		"next": "^15.4.6",
 		"ol": "^10.6.1",
 		"pg": "^8.16.3",
 		"react": "^19.1.1",
 		"react-dom": "^19.1.1",
-		"react-globe.gl": "^2.35.0",
 		"recharts": "^3.1.2",
 		"swr": "^2.3.6",
 		"tailwindcss-animate": "^1.0.7"

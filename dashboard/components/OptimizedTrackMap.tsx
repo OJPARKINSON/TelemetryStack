@@ -145,11 +145,10 @@ export default function OptimizedTrackMap({
 		racingLineSourceRef.current = racingLineSource;
 		markerSourceRef.current = markerSource;
 
-		let tileUrl = "/api/tiles/dark/{z}/{x}/{y}";
+		const tileUrl = window.location.href.includes("dashboard")
+			? `/dashboard/api/tiles/dark/{z}/{x}/{y}`
+			: "/api/tiles/dark/{z}/{x}/{y}";
 
-		if (path.includes("dashboard")) {
-			tileUrl = `/dashboard${tileUrl}`;
-		}
 
 		const baseLayer = new TileLayer({
 			source: new XYZ({

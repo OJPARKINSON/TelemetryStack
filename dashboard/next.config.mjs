@@ -4,26 +4,24 @@ const nextConfig = {
 	serverExternalPackages: ["pg"],
 	reactStrictMode: true,
 
-	basePath: process.env.NODE_ENV === "production" ? "/dashboard" : "",
-
 	compiler: {
 		removeConsole:
 			process.env.NODE_ENV === "production"
 				? {
-						exclude: ["error", "warn"],
-					}
+					exclude: ["error", "warn"],
+				}
 				: false,
 	},
 
-	// Image optimization
+	basePath: process.env.NODE_ENV === "production" ? "/dashboard" : "",
+
 	images: {
 		formats: ["image/webp", "image/avif"],
-		minimumCacheTTL: 86400, // 24 hours
+		minimumCacheTTL: 86400,
 		dangerouslyAllowSVG: true,
 		contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
 	},
 
-	// Headers for caching and performance
 	async headers() {
 		return [
 			{

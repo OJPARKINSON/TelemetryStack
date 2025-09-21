@@ -6,7 +6,7 @@ services:
       - no-new-privileges:true
     ports:
       - "80:80"
-      - "8443:443"  
+      - "8443:443"
       - "8080:8080"
     networks:
       - telemetry-network
@@ -30,7 +30,7 @@ services:
           cpus: '0.25'
           memory: 256m
     healthcheck:
-      test: ["CMD", "traefik", "healthcheck"]
+      test: [ "CMD", "traefik", "healthcheck" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -73,13 +73,13 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.0'      
-          memory: 5g       
+          cpus: '2.0'
+          memory: 5g
         reservations:
-          cpus: '0.5'      
-          memory: 1g     
+          cpus: '0.5'
+          memory: 1g
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -103,10 +103,10 @@ services:
     container_name: questdb
     restart: unless-stopped
     ports:
-      - "9000:9000" 
-      - "8812:8812" 
-      - "9009:9009" 
-      - "9003:9003" 
+      - "9000:9000"
+      - "8812:8812"
+      - "9009:9009"
+      - "9003:9003"
     volumes:
       - questdb-data:/var/lib/questdb
     environment:
@@ -119,11 +119,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.0'     
-          memory: 3g      
+          cpus: '2.0'
+          memory: 3g
         reservations:
-          cpus: '1.0'      
-          memory: 1g       
+          cpus: '1.0'
+          memory: 1g
     labels:
       - "traefik.enable=true"
       # QuestDB API routes (no web UI, direct API access)
@@ -153,7 +153,7 @@ services:
       QUESTDB_URL: questdb:9009;username=admin;password=quest
       QUESTDB_TCP_HOST: questdb
       QUESTDB_TCP_PORT: 9009
-      
+
       # QuestDB Performance Tuning
       QUESTDB_BATCH_SIZE: 1000
       QUESTDB_AUTO_FLUSH_ROWS: 2000
@@ -161,7 +161,7 @@ services:
       QUESTDB_CONNECTION_TIMEOUT: 30000
       QUESTDB_RETRY_ATTEMPTS: 3
       QUESTDB_RETRY_DELAY: 1000
-      
+
       # RabbitMQ Configuration
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: guest
@@ -169,20 +169,20 @@ services:
       RABBITMQ_URL: amqp://guest:changeme@rabbitmq:5672/
       RABBITMQ_BATCH_SIZE: 1000
       RABBITMQ_PREFETCH_COUNT: 500
-      
+
       # Application settings
       DOTNET_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:5000
     deploy:
       resources:
         limits:
-          cpus: '1.25'      # 1 core for telemetry processing
-          memory: 8g       # Much more memory for high-volume telemetry processing
+          cpus: '1.25' # 1 core for telemetry processing
+          memory: 8g # Much more memory for high-volume telemetry processing
         reservations:
-          cpus: '0.25'     # Minimum guaranteed resources
+          cpus: '0.25' # Minimum guaranteed resources
           memory: 1g
     healthcheck:
-      test: ["CMD-SHELL", "ps aux | grep '[d]otnet TelemetryService.Worker.dll' || exit 1"]
+      test: [ "CMD-SHELL", "ps aux | grep '[d]otnet TelemetryService.Worker.dll' || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -195,16 +195,15 @@ services:
     container_name: telemetry-dashboard
     restart: unless-stopped
     environment:
-      # QuestDB connection for READING data (uses PostgreSQL wire protocol)
       QUESTDB_URL: postgresql://admin:quest@questdb:8812/qdb
       QUESTDB_HOST: questdb
       QUESTDB_PORT: 8812
       QUESTDB_DATABASE: qdb
       QUESTDB_USER: admin
       QUESTDB_PASSWORD: quest
-      
+
       NODE_ENV: production
-      NODE_OPTIONS: "--max-old-space-size=768 --max-semi-space-size=128"  
+      NODE_OPTIONS: "--max-old-space-size=768 --max-semi-space-size=128"
       NEXT_PUBLIC_APP_URL: http://${LOCAL_DOMAIN:-localhost}/dashboard
       NEXT_PUBLIC_BACKEND_URL: http://${LOCAL_DOMAIN:-localhost}/dashboard/api
     networks:
@@ -212,10 +211,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'      
-          memory: 1g       
+          cpus: '1.0'
+          memory: 1g
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://0.0.0.0:3000/dashboard || exit 1"]
+      test: [ "CMD-SHELL", "wget --quiet --tries=1 --spider http://0.0.0.0:3000/dashboard || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -261,21 +260,21 @@ services:
       GF_INSTALL_PLUGINS: grafana-clock-panel
       GF_PROVISIONING_AUTO_ASSIGN_ORG: "true"
       GF_PROVISIONING_AUTO_ASSIGN_ORG_ROLE: Admin
-      
+
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/files/system-monitoring.json
       GF_USERS_DEFAULT_THEME: dark
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
-      
+
     networks:
       - telemetry-network
     deploy:
       resources:
         limits:
-          cpus: '0.75'     
-          memory: 1.5g     
+          cpus: '0.75'
+          memory: 1.5g
         reservations:
-          cpus: '0.25'    
+          cpus: '0.25'
           memory: 256m
     labels:
       - "traefik.enable=true"
@@ -299,20 +298,20 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=30d'  # Extended retention with 16GB RAM
+      - '--storage.tsdb.retention.time=30d' # Extended retention with 16GB RAM
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--web.enable-lifecycle'
       - '--web.external-url=http://${LOCAL_DOMAIN:-localhost}/prometheus'
       - '--web.route-prefix=/'
-      - '--storage.tsdb.retention.size=4GB'   # Use more disk space for metrics
+      - '--storage.tsdb.retention.size=4GB' # Use more disk space for metrics
     networks:
       - telemetry-network
     deploy:
       resources:
         limits:
-          cpus: '0.75'     # More CPU for metrics processing
-          memory: 2g       # Double memory for larger datasets
+          cpus: '0.75' # More CPU for metrics processing
+          memory: 2g # Double memory for larger datasets
         reservations:
           cpus: '0.25'
           memory: 512m
