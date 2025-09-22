@@ -8,5 +8,8 @@
 	},
 	"[go]": {
 		"editor.defaultFormatter": "golang.go"
+	},
+	"[csharp]": {
+		"editor.defaultFormatter": "ms-dotnettools.csharp"
 	}
 }

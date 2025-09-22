@@ -101,7 +101,7 @@ public class QuestDbSchemaManager : IDisposable
             {
                 var columnName = rowArray[0].GetString();
                 var columnType = rowArray[1].GetString();
-                
+
                 if (columnName == "gear" && columnType == "SYMBOL")
                 {
                     return true;
@@ -382,11 +382,10 @@ public class QuestDbSchemaManager : IDisposable
     {
         try
         {
-            await ExecuteQuery("ALTER TABLE TelemetryTicks ADD INDEX session_lap_idx (session_id, lap_id)");
-            await ExecuteQuery("ALTER TABLE TelemetryTicks ADD INDEX track_session_idx (track_name, session_id)");
-            await ExecuteQuery("ALTER TABLE TelemetryTicks ADD INDEX session_time_idx (session_id, session_time)");
-
-            await ExecuteQuery("ALTER TABLE TelemetryTicks DEDUP ENABLE UPSERT KEYS(session_id, car_id, timestamp)");
+            await ExecuteQuery("ALTER TABLE TelemetryTicks ADD INDEX session_lap_idx (session_id, lap_id);");
+            await ExecuteQuery("ALTER TABLE TelemetryTicks ADD INDEX track_session_idx (track_name, session_id);");
+            await ExecuteQuery("ALTER TABLE TelemetryTicks ADD INDEX session_time_idx (session_id, session_time);");
+            await ExecuteQuery("ALTER TABLE TelemetryTicks DEDUP ENABLE UPSERT KEYS(session_id, car_id, timestamp);");
 
             Console.WriteLine("✅ Composite indexes added successfully");
         }
