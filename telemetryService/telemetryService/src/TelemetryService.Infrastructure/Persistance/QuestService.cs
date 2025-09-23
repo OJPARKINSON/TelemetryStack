@@ -78,12 +78,12 @@ public class QuestDbService : IDisposable
             try
             {
                 await WriteRecordsInternal(validRecords, batch.BatchId);
-                return; // Success - exit retry loop
+                return;
             }
             catch (Exception ex) when (IsRetryableError(ex) && retryCount < maxRetries)
             {
                 retryCount++;
-                var delay = Math.Min(1000 * retryCount, 5000); // Cap at 5 seconds
+                var delay = Math.Min(1000 * retryCount, 5000);
                 Console.WriteLine($"⚠️  Attempt {retryCount} failed, retrying in {delay}ms: {ex.Message}");
                 await Task.Delay(delay);
             }
@@ -199,13 +199,6 @@ public class QuestDbService : IDisposable
     {
         return double.IsNaN(value) || double.IsInfinity(value) ||
                value == double.MinValue || value == double.MaxValue ? 0.0 : value;
-    }
-
-    public async Task<bool> TriggerSchemaOptimization()
-    {
-        // Schema optimization not needed with per-batch pattern
-        Console.WriteLine("🔧 Schema optimization not applicable for per-batch connections");
-        return await Task.FromResult(true);
     }
 
     public void Dispose()

@@ -24,15 +24,15 @@ public class QuestDbSchemaManager : IDisposable
         try
         {
             Console.WriteLine("🔧 Checking QuestDB schema optimization...");
-            
+
             // Wait for QuestDB to be ready
             await WaitForQuestDbReady();
-            
+
             // Clean up any orphaned tables first
             await CleanupOrphanedTables();
-            
+
             var tableInfo = await GetTableInfo("TelemetryTicks");
-            
+
             if (tableInfo == null)
             {
                 Console.WriteLine("📋 No TelemetryTicks table found, creating optimized version...");
@@ -41,10 +41,10 @@ public class QuestDbSchemaManager : IDisposable
                 Console.WriteLine("✅ Optimized TelemetryTicks table created successfully");
                 return true;
             }
-            
+
             var needsOptimization = await NeedsOptimization(tableInfo);
             var needsIndexes = await NeedsCriticalIndexes();
-            
+
             if (needsOptimization)
             {
                 Console.WriteLine("🔄 Existing table detected, applying optimizations...");
@@ -84,7 +84,6 @@ public class QuestDbSchemaManager : IDisposable
         }
         catch
         {
-            // Table doesn't exist
             return null;
         }
     }
@@ -111,7 +110,7 @@ public class QuestDbSchemaManager : IDisposable
 
         var hasSessionIndex = await HasIndex("session_id");
         var hasTrackIndex = await HasIndex("track_name");
-        
+
         return !hasSessionIndex || !hasTrackIndex;
     }
 
@@ -121,8 +120,8 @@ public class QuestDbSchemaManager : IDisposable
         {
             var query = $"SELECT indexed FROM table_columns('TelemetryTicks') WHERE column = '{columnName}'";
             var response = await ExecuteQuery(query);
-            
-            if (response?.TryGetProperty("dataset", out var dataset) == true && 
+
+            if (response?.TryGetProperty("dataset", out var dataset) == true &&
                 dataset.EnumerateArray().Any())
             {
                 var firstRow = dataset.EnumerateArray().First();
@@ -134,7 +133,7 @@ public class QuestDbSchemaManager : IDisposable
         {
             // Assume no index if query fails
         }
-        
+
         return false;
     }
 
@@ -145,7 +144,7 @@ public class QuestDbSchemaManager : IDisposable
             // Check if essential indexes exist
             var hasSessionIndex = await HasIndex("session_id");
             var hasTrackIndex = await HasIndex("track_name");
-            
+
             return !hasSessionIndex || !hasTrackIndex;
         }
         catch
@@ -406,16 +405,16 @@ public class QuestDbSchemaManager : IDisposable
         {
             var encodedQuery = Uri.EscapeDataString(query);
             var url = $"http://{_questDbUrl}/exec?query={encodedQuery}";
-            
+
             var response = await _httpClient.GetStringAsync(url);
             var jsonDoc = JsonDocument.Parse(response);
-            
+
             // Check for errors
             if (jsonDoc.RootElement.TryGetProperty("error", out var error))
             {
                 throw new Exception($"QuestDB Error: {error.GetString()}");
             }
-            
+
             return jsonDoc.RootElement;
         }
         catch (Exception ex)
@@ -431,21 +430,21 @@ public class QuestDbSchemaManager : IDisposable
         try
         {
             var stats = new Dictionary<string, object>();
-            
+
             // Get basic table info from system tables (much faster than scanning data)
             var tableInfoQuery = "SELECT table_name FROM tables WHERE table_name = 'TelemetryTicks'";
             var tableResponse = await ExecuteQuery(tableInfoQuery);
-            if (tableResponse?.TryGetProperty("dataset", out var tableDataset) == true && 
+            if (tableResponse?.TryGetProperty("dataset", out var tableDataset) == true &&
                 tableDataset.EnumerateArray().Any())
             {
                 stats["table_exists"] = true;
-                
+
                 // Get approximate row count from table metadata (instant)
                 try
                 {
                     var quickStatsQuery = "SELECT last(timestamp) as max_time FROM TelemetryTicks LIMIT 1";
                     var quickResponse = await ExecuteQuery(quickStatsQuery);
-                    if (quickResponse?.TryGetProperty("dataset", out var quickDataset) == true && 
+                    if (quickResponse?.TryGetProperty("dataset", out var quickDataset) == true &&
                         quickDataset.EnumerateArray().Any())
                     {
                         var maxTime = quickDataset.EnumerateArray().First().EnumerateArray().First().GetString();
@@ -468,7 +467,7 @@ public class QuestDbSchemaManager : IDisposable
                 stats["table_exists"] = false;
                 stats["status"] = "missing";
             }
-            
+
             return stats;
         }
         catch (Exception ex)
@@ -481,10 +480,10 @@ public class QuestDbSchemaManager : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         _httpClient?.Dispose();
         _disposed = true;
-        
+
         GC.SuppressFinalize(this);
     }
 
@@ -493,32 +492,32 @@ public class QuestDbSchemaManager : IDisposable
         try
         {
             Console.WriteLine("🧹 Checking for orphaned tables...");
-            
+
             // Get list of all tables
             var tablesQuery = "SHOW TABLES";
             var response = await ExecuteQuery(tablesQuery);
-            
+
             if (response?.TryGetProperty("dataset", out var dataset) == true)
             {
                 var tablesToDelete = new List<string>();
-                
+
                 foreach (var row in dataset.EnumerateArray())
                 {
                     var rowArray = row.EnumerateArray().ToArray();
                     if (rowArray.Length > 0)
                     {
                         var tableName = rowArray[0].GetString();
-                        
+
                         // Check if this is an orphaned table (numeric names that look like session IDs)
-                        if (!string.IsNullOrEmpty(tableName) && 
-                            tableName != "TelemetryTicks" && 
+                        if (!string.IsNullOrEmpty(tableName) &&
+                            tableName != "TelemetryTicks" &&
                             IsOrphanedTable(tableName))
                         {
                             tablesToDelete.Add(tableName);
                         }
                     }
                 }
-                
+
                 // Delete orphaned tables
                 foreach (var tableName in tablesToDelete)
                 {
@@ -532,7 +531,7 @@ public class QuestDbSchemaManager : IDisposable
                         Console.WriteLine($"   ⚠️  Could not drop table {tableName}: {ex.Message}");
                     }
                 }
-                
+
                 if (tablesToDelete.Count > 0)
                 {
                     Console.WriteLine($"✅ Cleaned up {tablesToDelete.Count} orphaned tables");
@@ -568,7 +567,7 @@ public class QuestDbSchemaManager : IDisposable
                 await Task.Delay(2000);
             }
         }
-        
+
         throw new Exception("QuestDB is not responding after 10 attempts");
     }
 
@@ -577,25 +576,25 @@ public class QuestDbSchemaManager : IDisposable
         // Check if table name looks like a session ID (numeric) or backup table
         if (string.IsNullOrEmpty(tableName))
             return false;
-            
+
         // Remove known good table names
         if (tableName == "TelemetryTicks")
             return false;
-            
+
         // Check for numeric-only names (likely session IDs)
         if (long.TryParse(tableName, out _))
         {
             Console.WriteLine($"   Found numeric table name (likely session ID): {tableName}");
             return true;
         }
-        
+
         // Check for backup tables from failed migrations
         if (tableName.StartsWith("TelemetryTicks_backup_"))
         {
             Console.WriteLine($"   Found backup table: {tableName}");
             return true;
         }
-        
+
         return false;
     }
 }
