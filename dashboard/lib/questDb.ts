@@ -108,7 +108,7 @@ class QuestDBClient {
 			return await this.executeWithRetry(async (client) => {
 				const query = `
                     SELECT * FROM TelemetryTicks 
-                    WHERE session_id = $1 AND lap_id = $2 
+                    WHERE session_id = $1 AND lap_id = $2 AND session_type = 'Race'
                     ORDER BY session_time ASC
                 `;
 
@@ -150,7 +150,7 @@ class QuestDBClient {
 					.map((row) => ({
 						lap_id: Number.parseInt(row.lap_id, 10),
 					}))
-					.sort(({ lap_id }, b) => lap_id -  b.lap_id);
+					.sort(({ lap_id }, b) => lap_id - b.lap_id);
 
 				console.log(`Found ${laps.length} laps for session ${sessionId}`);
 				return laps;
