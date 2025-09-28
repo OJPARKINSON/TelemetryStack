@@ -42,7 +42,6 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 		(value: number, metric: string, minVal: number, maxVal: number): string => {
 			if (!value || minVal === maxVal) return "#888888";
 
-			// PERFORMANCE FIX: Use cache to avoid recalculating same colors
 			const cacheKey = `${metric}-${value}-${minVal}-${maxVal}`;
 			const cached = colorCacheRef.current.get(cacheKey);
 			if (cached) return cached;
@@ -52,19 +51,16 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 
 			switch (metric) {
 				case "Speed":
-					if (normalized < 0.3)
-						color = "#ef4444"; // Red for low speed
-					else if (normalized < 0.6)
-						color = "#f97316"; // Orange for medium
-					else if (normalized < 0.8)
-						color = "#eab308"; // Yellow for medium-high
-					else color = "#22c55e"; // Green for high speed
+					if (normalized < 0.3) color = "#ef4444";
+					else if (normalized < 0.6) color = "#f97316";
+					else if (normalized < 0.8) color = "#eab308";
+					else color = "#22c55e";
 					break;
 				case "Throttle":
-					color = `rgb(0, ${Math.round(150 + 105 * normalized)}, 0)`; // Green gradient
+					color = `rgb(0, ${Math.round(150 + 105 * normalized)}, 0)`;
 					break;
 				case "Brake":
-					color = `rgb(${Math.round(150 + 105 * normalized)}, 0, 0)`; // Red gradient
+					color = `rgb(${Math.round(150 + 105 * normalized)}, 0, 0)`;
 					break;
 				case "Gear": {
 					const gearColors = [
@@ -82,11 +78,11 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 					break;
 				}
 				case "RPM":
-					color = `rgb(${Math.round(255 * normalized)}, ${Math.round(100 + 155 * (1 - normalized))}, 255)`; // Purple-pink gradient
+					color = `rgb(${Math.round(255 * normalized)}, ${Math.round(100 + 155 * (1 - normalized))}, 255)`;
 					break;
 				case "SteeringWheelAngle": {
 					const absNormalized = Math.abs(normalized - 0.5) * 2;
-					color = `rgb(${Math.round(150 + 105 * absNormalized)}, 0, ${Math.round(150 + 105 * absNormalized)})`; // Purple for steering
+					color = `rgb(${Math.round(150 + 105 * absNormalized)}, 0, ${Math.round(150 + 105 * absNormalized)})`;
 					break;
 				}
 				default:
@@ -96,7 +92,6 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 			// Cache the result
 			colorCacheRef.current.set(cacheKey, color);
 
-			// Limit cache size to prevent memory leaks
 			if (colorCacheRef.current.size > 10000) {
 				const firstKey = colorCacheRef.current.keys().next().value;
 				colorCacheRef.current.delete(firstKey!);
@@ -107,7 +102,6 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 		[],
 	);
 
-	// Memoize the static track data - this should NEVER change once created
 	const staticTrackData = useMemo(() => {
 		if (!dataWithCoordinates?.length) return null;
 
@@ -129,13 +123,10 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 				maxLon: Math.max(...validGPSPoints.map((p) => p.Lon)),
 			},
 		};
-	}, [dataWithCoordinates]); // Only recalculate if data completely changes
+	}, [dataWithCoordinates]);
 
-	// Initialize map ONCE - never again
 	useEffect(() => {
 		if (!mapRef.current || mapInstanceRef.current || !staticTrackData) return;
-
-		console.log("ONE-TIME: Initializing optimized track map...");
 
 		const racingLineSource = new VectorSource();
 		const markerSource = new VectorSource();
@@ -150,17 +141,14 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 		const baseLayer = new TileLayer({
 			source: new XYZ({
 				url: tileUrl,
-				crossOrigin: "anonymous", // Enable better caching
+				crossOrigin: "anonymous",
 				maxZoom: 20,
 				minZoom: 5,
-				// Tile loading optimization
 				transition: 250,
-				// Cache configuration for better performance
-				cacheSize: 512, // Increase cache size
+				cacheSize: 512,
 				reprojectionErrorThreshold: 0.5,
 			}),
-			// Layer-level optimizations
-			preload: 2, // Preload 2 zoom levels for smoother experience
+			preload: 1,
 			useInterimTilesOnError: true,
 		});
 
@@ -168,7 +156,7 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 			source: racingLineSource,
 			style: new Style({
 				stroke: new Stroke({
-					color: "#888888", // Default gray color to prevent blue flashing
+					color: "#888888",
 					width: 3,
 				}),
 			}),
@@ -438,7 +426,7 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 
 	if (!staticTrackData) {
 		return (
-			<div className="h-[500px] bg-zinc-800/50 rounded-lg flex items-center justify-center">
+			<div className="h-[800px] bg-zinc-800/50 rounded-lg flex items-center justify-center">
 				<div className="text-center">
 					<div className="w-16 h-16 mx-auto bg-zinc-700/50 rounded-lg flex items-center justify-center mb-4">
 						<div className="w-8 h-8 border-2 border-zinc-600 rounded border-dashed"></div>
@@ -453,9 +441,15 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 	}
 
 	return (
-		<>
-			<div className="flex flex-col space-y-2 z-10">
-				<div className="flex justify-between">
+		<div className="relative w-full h-[800px] rounded-lg overflow-hidden">
+			<div
+				ref={mapRef}
+				className="w-full h-full"
+				style={{ minHeight: "700px", minWidth: "100%" }}
+			/>
+
+			<div className="absolute top-4 left-4 right-4 z-10 pointer-events-none">
+				<div className="flex justify-between pointer-events-auto">
 					<div>
 						<div className="flex items-center space-x-2">
 							<label htmlFor="metricSelect" className="text-sm text-zinc-400">
@@ -477,7 +471,7 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 						</div>
 					</div>
 
-					<div className=" bg-zinc-800/90 border border-zinc-600 p-2 rounded-lg text-sm z-10 mb-2">
+					<div className="bg-zinc-800/90 border border-zinc-600 p-2 rounded-lg text-sm">
 						<div className="text-white font-medium mb-1">
 							{selectedMetric === "Speed" && "Speed (km/h)"}
 							{selectedMetric === "Throttle" && "Throttle (%)"}
@@ -604,12 +598,7 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 					</div>
 				</div>
 			</div>
-
-			<div
-				ref={mapRef}
-				className="w-full h-[500px] rounded-lg overflow-hidden"
-			/>
-		</>
+		</div>
 	);
 });
 

@@ -418,7 +418,7 @@ function GPSAnalysisPanel({ data }: { data: any[] }) {
 // Performance optimization: Skeleton components for dynamic loading
 function TrackMapSkeleton() {
 	return (
-		<div className="h-[500px] bg-zinc-800/30 rounded-lg flex items-center justify-center animate-pulse">
+		<div className="h-[700px] bg-zinc-800/30 rounded-lg flex items-center justify-center animate-pulse">
 			<div className="text-center">
 				<div className="w-16 h-16 mx-auto bg-zinc-700/50 rounded-lg flex items-center justify-center mb-4">
 					<div className="w-8 h-8 border-2 border-zinc-600 rounded border-dashed animate-spin"></div>
@@ -431,7 +431,7 @@ function TrackMapSkeleton() {
 
 function ChartsSkeleton() {
 	return (
-		<div className="h-[600px] bg-zinc-800/30 rounded-lg p-4 animate-pulse">
+		<div className="h-[400px] bg-zinc-800/30 rounded-lg p-4 animate-pulse">
 			<div className="space-y-4">
 				<div className="h-4 bg-zinc-700/50 rounded w-1/3"></div>
 				<div className="space-y-2">

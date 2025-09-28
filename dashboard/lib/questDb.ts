@@ -110,6 +110,7 @@ class QuestDBClient {
                     SELECT * FROM TelemetryTicks 
                     WHERE session_id = $1 AND lap_id = $2 AND session_type = 'Race'
                     ORDER BY session_time ASC
+					LIMIT 4000
                 `;
 
 				const result = await client.query(query, [sessionId, lapId]);
