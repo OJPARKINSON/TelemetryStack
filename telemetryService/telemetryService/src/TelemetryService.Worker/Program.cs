@@ -13,49 +13,43 @@ internal class Program
         try
         {
             Console.WriteLine("🚀 Telemetry Service Starting...");
-            
-            // Log system information
-            var process = System.Diagnostics.Process.GetCurrentProcess();
-            var memoryUsageGB = (double)process.WorkingSet64 / (1024 * 1024 * 1024);
-            Console.WriteLine($"📊 Initial Memory Usage: {memoryUsageGB:F2}GB");
-            Console.WriteLine($"🖥️  Environment: {Environment.MachineName}");
-            Console.WriteLine($"⚙️  Runtime Version: {Environment.Version}");
-            
+
+
             LoadEnvironmentVariables();
 
             using var host = CreateHostBuilder(args).Build();
 
             var subscriber = host.Services.GetRequiredService<Subscriber>();
 
-            Console.WriteLine("🔌 Starting telemetry service subscriber...");
+            Console.WriteLine("Starting telemetry service subscriber...");
             await subscriber.SubscribeAsync();
 
             await host.RunAsync();
         }
         catch (OutOfMemoryException ex)
         {
-            Console.WriteLine($"❌ CRITICAL: OutOfMemoryException during service startup");
+            Console.WriteLine($"OutOfMemoryException during service startup");
             Console.WriteLine($"   Message: {ex.Message}");
             Console.WriteLine($"   Stack Trace: {ex.StackTrace}");
-            
+
             var process = System.Diagnostics.Process.GetCurrentProcess();
             var memoryUsageGB = (double)process.WorkingSet64 / (1024 * 1024 * 1024);
             Console.WriteLine($"   Memory Usage at Failure: {memoryUsageGB:F2}GB");
-            
+
             Environment.Exit(1);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ FATAL: Unhandled exception in telemetry service");
+            Console.WriteLine($" FATAL: Unhandled exception in telemetry service");
             Console.WriteLine($"   Exception Type: {ex.GetType().Name}");
             Console.WriteLine($"   Message: {ex.Message}");
             Console.WriteLine($"   Stack Trace: {ex.StackTrace}");
-            
+
             if (ex.InnerException != null)
             {
                 Console.WriteLine($"   Inner Exception: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
             }
-            
+
             Environment.Exit(1);
         }
     }
@@ -86,7 +80,6 @@ internal class Program
         return Host.CreateDefaultBuilder(args)
             .ConfigureServices((_, services) =>
             {
-                // Remove QuestDbService from DI - will be created per-batch
                 services.AddSingleton<Subscriber>();
             });
     }
