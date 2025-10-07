@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2,
+  "id": 1,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -44,74 +44,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "max": 100,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 70
-              },
-              {
-                "color": "red",
-                "value": 85
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 4,
-        "x": 0,
-        "y": 1
-      },
-      "id": 2,
-      "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "sizing": "auto",
-        "text": {}
-      },
-      "pluginVersion": "10.4.8",
-      "targets": [
-        {
-          "expr": "100 - (node_memory_MemAvailable_bytes{job=\"node-exporter\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"} * 100)",
-          "refId": "A"
-        }
-      ],
-      "title": "Memory Usage",
-      "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -145,13 +78,14 @@
       "gridPos": {
         "h": 8,
         "w": 6,
-        "x": 4,
+        "x": 0,
         "y": 1
       },
       "id": 3,
       "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -160,10 +94,9 @@
           "fields": "",
           "values": false
         },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "sizing": "auto",
-        "text": {}
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
       "pluginVersion": "10.4.8",
       "targets": [
@@ -180,13 +113,81 @@
         }
       ],
       "title": "CPU Usage",
-      "type": "gauge"
+      "type": "stat"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+      "datasource": {},
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 85
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
       },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 6,
+        "y": 1
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.4.8",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "100 - (node_memory_MemAvailable_bytes{job=\"node-exporter\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"} * 100)",
+          "legendFormat": "{{label_name}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Memory Usage",
+      "type": "stat"
+    },
+    {
+      "datasource": {},
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -224,8 +225,9 @@
       },
       "id": 4,
       "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -234,25 +236,31 @@
           "fields": "",
           "values": false
         },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "sizing": "auto",
-        "text": {}
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
       "pluginVersion": "10.4.8",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
           "expr": "100 - ((node_filesystem_avail_bytes{mountpoint=\"/\",fstype!=\"rootfs\"} / node_filesystem_size_bytes{mountpoint=\"/\",fstype!=\"rootfs\"}) * 100)",
+          "legendFormat": "{{label_name}}",
+          "range": true,
           "refId": "A"
         }
       ],
       "title": "Disk Usage",
-      "type": "gauge"
+      "type": "stat"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -291,8 +299,9 @@
       },
       "id": 5,
       "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -301,10 +310,9 @@
           "fields": "",
           "values": false
         },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "sizing": "auto",
-        "text": {}
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
       "pluginVersion": "10.4.8",
       "targets": [
@@ -314,73 +322,40 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg(node_hwmon_temp_celsius{job=\"node-exporter\"})",
-          "legendFormat": "{{label_name}}",
+          "expr": "node_hwmon_temp_celsius{job=\"node-exporter\", sensor=\"temp1\", chip=\"1000120000_pcie_1f000c8000_adc\"}",
+          "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "CPU Temperature",
-      "type": "gauge"
+      "type": "stat"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "vis": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
+            "mode": "thresholds"
           },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "dark-red",
                 "value": null
               },
               {
-                "color": "red",
-                "value": 80
+                "color": "green",
+                "value": 0.85
               }
             ]
           },
-          "unit": "short"
+          "unit": "percentunit"
         },
         "overrides": []
       },
@@ -392,37 +367,58 @@
       },
       "id": 6,
       "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "min"
+          ],
+          "fields": "",
+          "values": false
         },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
       },
       "pluginVersion": "10.4.8",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
           "expr": "up{job=\"node-exporter\"}",
-          "legendFormat": "Node Exporter",
+          "legendFormat": "{{job}}",
+          "range": true,
           "refId": "A"
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
           "expr": "up{job=\"questdb-metrics\"}",
-          "legendFormat": "QuestDB",
+          "legendFormat": "{{job}}",
+          "range": true,
           "refId": "B"
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
           "expr": "up{job=\"rabbitmq-metrics\"}",
-          "legendFormat": "RabbitMQ",
+          "legendFormat": "{{job}}",
+          "range": true,
           "refId": "C"
         }
       ],
       "title": "Service Status",
-      "type": "timeseries"
+      "type": "gauge"
     },
     {
       "collapsed": false,
@@ -438,10 +434,7 @@
       "type": "row"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "datasource": {},
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -521,7 +514,7 @@
           },
           "editorMode": "code",
           "expr": "rate(questdb_json_queries_total[1m])",
-          "legendFormat": "JSON Queries/sec",
+          "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         },
@@ -541,7 +534,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -591,7 +584,7 @@
               }
             ]
           },
-          "unit": "bytes"
+          "unit": "none"
         },
         "overrides": []
       },
@@ -616,13 +609,26 @@
       },
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
           "expr": "questdb_http_connections",
-          "legendFormat": "HTTP Connections",
+          "interval": "",
+          "legendFormat": "questdb_http_connections",
+          "range": true,
           "refId": "A"
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
           "expr": "questdb_pg_wire_connections",
-          "legendFormat": "PostgreSQL Connections",
+          "legendFormat": "questdb_pg_wire_connections",
+          "range": true,
           "refId": "B"
         }
       ],
@@ -632,7 +638,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -712,8 +718,8 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(questdb_json_queries_cache_hits_total[1m])",
-          "legendFormat": "Cache Hits/sec",
+          "expr": "rate(questdb_json_queries_cache_hits_total[20s])",
+          "legendFormat": "{{job}}",
           "range": true,
           "refId": "A"
         },
@@ -722,8 +728,10 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(questdb_json_queries_cache_misses_total[5m])",
-          "legendFormat": "Cache Misses/sec",
+          "editorMode": "code",
+          "expr": "rate(questdb_json_queries_cache_misses_total[30s])",
+          "legendFormat": "{{job}}",
+          "range": true,
           "refId": "B"
         }
       ],
@@ -733,7 +741,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -813,8 +821,8 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(questdb_json_queries_completed_total[1m])",
-          "legendFormat": "Completed Queries/sec",
+          "expr": "rate(questdb_json_queries_completed_total[20s])",
+          "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         },
@@ -823,8 +831,10 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "questdb_pg_wire_errors_total",
-          "legendFormat": "PostgreSQL Errors",
+          "editorMode": "code",
+          "expr": "rate(questdb_pg_wire_errors_total[$__rate_interval])",
+          "legendFormat": "__auto",
+          "range": true,
           "refId": "B"
         }
       ],
@@ -845,22 +855,9 @@
       "type": "row"
     },
     {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 19
-      },
-      "id": 17,
-      "panels": [],
-      "title": "System Resource Usage",
-      "type": "row"
-    },
-    {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -905,7 +902,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -917,7 +915,7 @@
         "h": 8,
         "w": 6,
         "x": 0,
-        "y": 20
+        "y": 19
       },
       "id": 31,
       "options": {
@@ -938,8 +936,10 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
+          "editorMode": "code",
           "expr": "rabbitmq_queues_declared_total",
-          "legendFormat": "Total Queues Declared",
+          "legendFormat": "{{job}}",
+          "range": true,
           "refId": "A"
         },
         {
@@ -949,7 +949,7 @@
           },
           "editorMode": "code",
           "expr": "rate(rabbitmq_connections_opened_total[1m])",
-          "legendFormat": "Connections Opened/sec",
+          "legendFormat": "{{job}}",
           "range": true,
           "refId": "B"
         },
@@ -958,8 +958,10 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
+          "editorMode": "code",
           "expr": "rate(rabbitmq_channels_opened_total[5m])",
-          "legendFormat": "Channels Opened/sec",
+          "legendFormat": "{{job}}",
+          "range": true,
           "refId": "C"
         }
       ],
@@ -969,7 +971,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -1014,7 +1016,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1026,7 +1029,7 @@
         "h": 8,
         "w": 6,
         "x": 6,
-        "y": 20
+        "y": 19
       },
       "id": 32,
       "options": {
@@ -1043,13 +1046,28 @@
       },
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
           "expr": "rabbitmq_erlang_processes_used",
-          "legendFormat": "Erlang Processes Used",
+          "format": "time_series",
+          "instant": false,
+          "legendFormat": "{{job}}",
+          "range": true,
           "refId": "A"
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
           "expr": "rabbitmq_process_open_fds",
-          "legendFormat": "Open File Descriptors",
+          "legendFormat": "{{job}}",
+          "range": true,
           "refId": "B"
         }
       ],
@@ -1059,7 +1077,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -1104,7 +1122,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1116,7 +1135,7 @@
         "h": 8,
         "w": 6,
         "x": 12,
-        "y": 20
+        "y": 19
       },
       "id": 33,
       "options": {
@@ -1138,7 +1157,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(rabbitmq_erlang_gc_runs_total[1m])",
+          "expr": "rate(rabbitmq_erlang_gc_runs_total[50s])",
           "legendFormat": "Garbage Collections/sec",
           "range": true,
           "refId": "A"
@@ -1148,8 +1167,10 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(rabbitmq_erlang_gc_reclaimed_bytes_total[5m])",
-          "legendFormat": "GC Reclaimed Bytes/sec",
+          "editorMode": "code",
+          "expr": "rate(rabbitmq_erlang_gc_reclaimed_bytes_total[10s])",
+          "legendFormat": "messages per sec",
+          "range": true,
           "refId": "B"
         }
       ],
@@ -1159,7 +1180,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -1204,7 +1225,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1216,7 +1238,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 20
+        "y": 19
       },
       "id": 34,
       "options": {
@@ -1233,13 +1255,25 @@
       },
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
           "expr": "rabbitmq_process_resident_memory_bytes",
-          "legendFormat": "Memory Usage",
+          "legendFormat": "{{__name__}}",
+          "range": true,
           "refId": "A"
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
           "expr": "rabbitmq_disk_space_available_bytes",
-          "legendFormat": "Disk Space Available",
+          "legendFormat": "{{__name__}}",
+          "range": true,
           "refId": "B"
         }
       ],
@@ -1247,9 +1281,22 @@
       "type": "timeseries"
     },
     {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
+      "id": 17,
+      "panels": [],
+      "title": "System Resource Usage",
+      "type": "row"
+    },
+    {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -1294,7 +1341,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1329,7 +1377,7 @@
           },
           "editorMode": "code",
           "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[1m])) * 100)",
-          "legendFormat": "Total CPU Usage %",
+          "legendFormat": "Total CPU ",
           "range": true,
           "refId": "A"
         },
@@ -1358,7 +1406,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -1403,7 +1451,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1432,21 +1481,39 @@
       },
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
           "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes",
           "legendFormat": "Memory Used",
+          "range": true,
           "refId": "A"
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "expr": "node_memory_Buffers_bytes",
           "legendFormat": "Buffers",
           "refId": "B"
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "expr": "node_memory_Cached_bytes",
           "legendFormat": "Cache",
           "refId": "C"
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "expr": "node_memory_MemAvailable_bytes",
           "legendFormat": "Available",
           "refId": "D"
@@ -1458,7 +1525,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -1503,7 +1570,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1537,7 +1605,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(node_network_receive_bytes_total{device!~\"lo|veth.*|docker.*|br-.*\"}[1m])",
+          "expr": "rate(node_network_receive_bytes_total{device!~\"lo|veth.*|docker.*|br-.*\"}[10s])",
           "legendFormat": "{{device}} - Received",
           "range": true,
           "refId": "A"
@@ -1547,8 +1615,10 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|docker.*|br-.*\"}[5m])",
+          "editorMode": "code",
+          "expr": "rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|docker.*|br-.*\"}[30s])",
           "legendFormat": "{{device}} - Transmitted",
+          "range": true,
           "refId": "B"
         }
       ],
@@ -1558,7 +1628,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -1603,7 +1673,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1704,7 +1775,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -1749,7 +1820,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1778,8 +1850,14 @@
       },
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
           "expr": "rate(loki_ingester_samples_received_total[5m])",
           "legendFormat": "Log Ingestion Rate",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -1798,13 +1876,13 @@
     "list": []
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-3d",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Enhanced IRacing Telemetry System",
   "uid": "enhanced-iracing-telemetry",
-  "version": 7,
+  "version": 6,
   "weekStart": ""
 }
