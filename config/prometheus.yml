@@ -22,3 +22,8 @@ scrape_configs:
       - targets: ['questdb:9003']  # QuestDB metrics port
     scrape_interval: 15s
 
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik:8080']  # Traefik metrics endpoint
+    scrape_interval: 10s
+
