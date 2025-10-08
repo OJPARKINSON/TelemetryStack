@@ -4,69 +4,13 @@ using TelemetryService.Domain.Models;
 
 namespace TelemetryService.Infrastructure.Persistence;
 
-public class QuestDbService : IDisposable
+public static class QuestDbService
 {
-    private readonly ISender _sender;
-    private readonly string _tableName;
-    private bool _disposed;
-
-    public QuestDbService()
+    public static async Task WriteBatch(ISender sender, List<Telemetry> records, string tableName = "TelemetryTicks")
     {
-        var host = Environment.GetEnvironmentVariable("QUESTDB_TCP_HOST") ?? "questdb";
-        var port = int.TryParse(Environment.GetEnvironmentVariable("QUESTDB_TCP_PORT"), out var p) ? p : 9009;
-        _tableName = Environment.GetEnvironmentVariable("QUESTDB_TABLE_NAME") ?? "TelemetryTicks";
-
-        // Try different connection string formats for QuestDB community edition
-        var connectionStrings = new[]
-        {
-            // Standard TCP format with explicit settings
-            $"tcp::addr={host}:{port};auto_flush_rows=100;auto_flush_interval=1000;",
-            // Minimal TCP format
-            $"tcp::addr={host}:{port};",
-            // TCP with protocol version
-            $"tcp::addr={host}:{port};protocol_version=1;",
-            // HTTP fallback for debugging
-            $"http::addr={host}:9000;auto_flush_rows=100;auto_flush_interval=1000;"
-        };
-
-        Exception? lastException = null;
-
-        foreach (var connectionString in connectionStrings)
-        {
-            try
-            {
-                Console.WriteLine($"🔗 Attempting QuestDB connection: {connectionString}");
-                _sender = Sender.New(connectionString);
-                Console.WriteLine($"✅ Successfully created QuestDB connection: {connectionString} → {_tableName}");
-                return; // Success - exit constructor
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"❌ Failed connection attempt: {ex.Message}");
-                lastException = ex;
-            }
-        }
-
-        // If all connection attempts failed, throw the last exception
-        Console.WriteLine($"❌ All QuestDB connection attempts failed");
-        throw new InvalidOperationException($"Failed to connect to QuestDB after trying multiple connection strings", lastException);
-    }
-
-    public async Task WriteBatch(TelemetryBatch batch)
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(QuestDbService));
-
-        if (batch?.Records == null || !batch.Records.Any())
+        if (records == null || !records.Any())
         {
             Console.WriteLine("⚠️  Empty batch received, skipping");
-            return;
-        }
-
-        var validRecords = batch.Records.Where(IsValidRecord).ToList();
-        if (!validRecords.Any())
-        {
-            Console.WriteLine("⚠️  No valid records in batch, skipping");
             return;
         }
 
@@ -77,7 +21,7 @@ public class QuestDbService : IDisposable
         {
             try
             {
-                await WriteRecordsInternal(validRecords, batch.BatchId);
+                await WriteRecordsInternal(records, sender);
                 return;
             }
             catch (Exception ex) when (IsRetryableError(ex) && retryCount < maxRetries)
@@ -89,17 +33,17 @@ public class QuestDbService : IDisposable
             }
         }
 
-        Console.WriteLine($"❌ Failed to write batch {batch.BatchId} after {maxRetries + 1} attempts");
+        Console.WriteLine($"❌ Failed to write batch after {maxRetries + 1} attempts");
         throw new InvalidOperationException($"Failed to write batch after {maxRetries + 1} attempts");
     }
 
-    private async Task WriteRecordsInternal(List<Telemetry> validRecords, string batchId)
+    private static async Task WriteRecordsInternal(List<Telemetry> validRecords, ISender sender, string tableName = "TelemetryTicks")
     {
         var processedCount = 0;
 
         foreach (var record in validRecords)
         {
-            await _sender.Table(_tableName)
+            sender.Table(tableName)
                         .Symbol("session_id", Sanitize(record.SessionId))
                         .Symbol("track_name", Sanitize(record.TrackName))
                         .Symbol("track_id", Sanitize(record.TrackId))
@@ -147,16 +91,13 @@ public class QuestDbService : IDisposable
                         .Column("rFtempM", (float)ValidateDouble(record.RFtempM))
                         .Column("lRtempM", (float)ValidateDouble(record.LRtempM))
                         .Column("rRtempM", (float)ValidateDouble(record.RRtempM))
-                        .AtAsync(record.TickTime.ToDateTime());
+                        .At(record.TickTime.ToDateTime());
 
             processedCount++;
-            if (processedCount % 1000 == 0)
-            {
-                Console.WriteLine($"   📊 {processedCount}/{validRecords.Count} records processed");
-            }
         }
+        await sender.SendAsync();
 
-        Console.WriteLine($"✅ Successfully wrote {processedCount} records to QuestDB (Batch: {batchId})");
+        Console.WriteLine($"✅ Successfully wrote {processedCount} records to QuestDB");
     }
 
     private static bool IsRetryableError(Exception ex)
@@ -173,26 +114,36 @@ public class QuestDbService : IDisposable
                innerMessage.Contains("transport connection");
     }
 
-    private static bool IsValidRecord(Telemetry record)
-    {
-        return !string.IsNullOrWhiteSpace(record.SessionId) ||
-               !string.IsNullOrWhiteSpace(record.TrackName);
-    }
-
     private static string Sanitize(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
             return "unknown";
 
-        return value.Replace(",", "_")
-                   .Replace(" ", "_")
-                   .Replace("=", "_")
-                   .Replace("\n", "_")
-                   .Replace("\r", "_")
-                   .Replace("\"", "_")
-                   .Replace("'", "_")
-                   .Replace("\\", "_")
-                   .Trim();
+        var length = value.Length;
+
+        Span<char> buffer = length <= 256 ? stackalloc char[length] : new char[length];
+
+        value.AsSpan().CopyTo(buffer);
+
+        for (int i = 0; i < buffer.Length; i++)
+        {
+            switch (buffer[i])
+            {
+                case ',':
+                case ' ':
+                case '=':
+                case '\n':
+                case '\r':
+                case '"':
+                case '\'':
+                case '\\':
+                    buffer[i] = '_';
+                    break;
+            }
+        }
+
+        var trimmed = buffer.Trim();
+        return new string(trimmed);
     }
 
     private static double ValidateDouble(double value)
@@ -201,19 +152,9 @@ public class QuestDbService : IDisposable
                value == double.MinValue || value == double.MaxValue ? 0.0 : value;
     }
 
-    public void Dispose()
+    public static bool IsValidRecord(Telemetry record)
     {
-        if (_disposed) return;
-
-        try
-        {
-            _sender?.Dispose();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"⚠️  Error disposing QuestDB sender: {ex.Message}");
-        }
-
-        _disposed = true;
+        return !string.IsNullOrWhiteSpace(record.SessionId) ||
+       !string.IsNullOrWhiteSpace(record.TrackName);
     }
 }

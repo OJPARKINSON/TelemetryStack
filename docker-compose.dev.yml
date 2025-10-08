@@ -8,7 +8,6 @@ services:
       - "8080:8080"
     networks:
       - telemetry-network
-      - default
     volumes:
       # - /run/user/oliver.parkinson/podman/podman.sock:/var/run/docker.sock
       - ./traefik:/etc/traefik:ro

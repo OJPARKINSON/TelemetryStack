@@ -356,7 +356,6 @@ curl "http://localhost:9000/exec?query=SHOW%20COLUMNS%20FROM%20TelemetryTicks"
 
 #### Throughput Optimization  
 - Increase `BatchSize` for higher message pull rates
-- Adjust `BasePollIntervalMs` for processing latency vs. CPU usage
 - Tune `prefetch` settings in RabbitMQ channel configuration
 
 #### Database Performance

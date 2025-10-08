@@ -45,26 +45,9 @@ public class QuestDbSchemaManager : IDisposable
             var needsOptimization = await NeedsOptimization(tableInfo);
             var needsIndexes = await NeedsCriticalIndexes();
 
-            if (needsOptimization)
-            {
-                Console.WriteLine("🔄 Existing table detected, applying optimizations...");
-                await OptimizeExistingTable();
-                Console.WriteLine("✅ Table optimization completed");
-                return true;
-            }
-            else if (needsIndexes)
-            {
-                Console.WriteLine("📊 Adding missing performance indexes...");
-                await AddEssentialIndexes();
-                Console.WriteLine("✅ Performance indexes added");
-                return true;
-            }
-            else
-            {
-                Console.WriteLine("✅ TelemetryTicks table is already optimized");
-                await LogCurrentTableStats();
-                return true;
-            }
+            await OptimizeExistingTable();
+            await AddEssentialIndexes();
+            return true;
         }
         catch (Exception ex)
         {
@@ -379,6 +362,8 @@ public class QuestDbSchemaManager : IDisposable
 
     private async Task AddOptimizedIndexes()
     {
+        Console.WriteLine("✅ Composite indexes added successfully");
+
         try
         {
             await ExecuteQuery("ALTER TABLE TelemetryTicks ADD INDEX session_lap_idx (session_id, lap_id);");

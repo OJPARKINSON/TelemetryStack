@@ -1,7 +1,9 @@
-using System.Text;
+using System.Buffers;
+using System.Threading.Channels;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using TelemetryService.Domain.Models;
+using TelemetryService.Infrastructure.Persistance;
 using TelemetryService.Infrastructure.Persistence;
 
 namespace TelemetryService.Infrastructure.Messaging;
@@ -11,16 +13,10 @@ public class Subscriber
 {
     private const int MaxRetryAttempts = 10;
     private const int RetryDelayMs = 5000;
-    private const int MaxConcurrentProcessing = 10; // Reduced to ease QuestDB connection pressure
-    private const int BasePollIntervalMs = 10; // Base polling interval when messages available
-    private const int EmptyQueueDelayMs = 100; // Delay when no messages available
-    private const int BatchSize = 30; // Number of messages to pull in each batch
 
-    private readonly SemaphoreSlim _processingSemaphore = new(MaxConcurrentProcessing, MaxConcurrentProcessing);
-    private volatile bool _pauseProcessing = false;
     private volatile bool _stopRequested = false;
-    private Timer? _memoryMonitorTimer;
-    private double _lastLoggedMemoryUsage = 0;
+
+    private readonly Channel<(TelemetryBatch batch, ulong deliveryTag, IChannel channel)> _messageChannel = Channel.CreateUnbounded<(TelemetryBatch, ulong, IChannel)>();
 
     public Subscriber()
     {
@@ -62,7 +58,7 @@ public class Subscriber
 
         using var channel = await connection.CreateChannelAsync();
 
-        await channel.BasicQosAsync(0, 1000, false);
+        await channel.BasicQosAsync(0, 5000, false);
 
         await channel.QueueBindAsync(
             "telemetry_queue",
@@ -71,231 +67,142 @@ public class Subscriber
 
         Console.WriteLine("Queue bound to exchange with routing key telemetry.ticks");
 
-        Console.WriteLine("🔄 Starting pull-based message consumption...");
+        Console.WriteLine("🔄 Starting push-based message consumption with batching...");
 
-        StartMemoryMonitoring();
 
-        await StartPullBasedConsumption(channel);
+        await StartPushBasedConsumption(channel);
     }
 
-    private async Task StartPullBasedConsumption(IChannel channel)
+    private async Task StartPushBasedConsumption(IChannel channel)
     {
+        var consumer = new AsyncEventingBasicConsumer(channel);
         var messagesProcessed = 0;
         var lastStatsTime = DateTime.UtcNow;
 
-        Console.WriteLine("📥 Ready to pull messages from queue...");
+        Console.WriteLine("📥 Ready to consume messages from queue...");
 
-        while (!_stopRequested)
+        consumer.ReceivedAsync += async (sender, ea) =>
         {
+            if (_stopRequested) return;
+
+
+            var bodyLength = ea.Body.Length;
+            var buffer = ArrayPool<byte>.Shared.Rent(bodyLength);
             try
             {
-                // Skip processing if memory pressure is too high
-                if (_pauseProcessing)
-                {
-                    await Task.Delay(EmptyQueueDelayMs);
-                    continue;
-                }
+                ea.Body.CopyTo(buffer);
+                var message = TelemetryBatch.Parser.ParseFrom(buffer, 0, bodyLength);
 
-                // Pull a batch of messages
-                var messagesPulled = 0;
-                var pullTasks = new List<Task>();
+                await _messageChannel.Writer.WriteAsync((message, ea.DeliveryTag, channel));
 
-                for (int i = 0; i < BatchSize && _processingSemaphore.CurrentCount > 0; i++)
-                {
-                    var result = await channel.BasicGetAsync("telemetry_queue", false);
-
-                    if (result != null)
-                    {
-                        messagesPulled++;
-
-                        // Process message in background task
-                        var processTask = ProcessMessageAsync(channel, result);
-                        pullTasks.Add(processTask);
-                    }
-                    else
-                    {
-                        // No more messages available
-                        break;
-                    }
-                }
-
-                // Log processing stats periodically
-                messagesProcessed += messagesPulled;
-                if (DateTime.UtcNow - lastStatsTime > TimeSpan.FromSeconds(10))
-                {
-                    var rate = messagesProcessed / (DateTime.UtcNow - lastStatsTime).TotalSeconds;
-                    Console.WriteLine($"📊 Pull Stats: {messagesProcessed} msgs processed, {rate:F1} msgs/sec, {_processingSemaphore.CurrentCount}/{MaxConcurrentProcessing} threads available");
-                    messagesProcessed = 0;
-                    lastStatsTime = DateTime.UtcNow;
-                }
-
-                // Wait for processing tasks to complete or use appropriate delay
-                if (pullTasks.Any())
-                {
-                    // Messages were pulled, short delay before next batch
-                    await Task.Delay(BasePollIntervalMs);
-                }
-                else
-                {
-                    // No messages available, longer delay to avoid tight polling
-                    await Task.Delay(EmptyQueueDelayMs);
-                }
+                Interlocked.Increment(ref messagesProcessed);
             }
-            catch (Exception ex)
+            finally
             {
-                Console.WriteLine($"❌ Error in pull-based consumption loop: {ex.GetType().Name}");
-                Console.WriteLine($"   Message: {ex.Message}");
-                Console.WriteLine($"   Stack Trace: {ex.StackTrace}");
-
-                // Wait before retrying to avoid tight error loop
-                await Task.Delay(RetryDelayMs);
+                ArrayPool<byte>.Shared.Return(buffer);
             }
+        };
+
+        await channel.BasicConsumeAsync(queue: "telemetry_queue", autoAck: false, consumer: consumer);
+
+        _ = Task.Run(() => ProcessBatchMessages());
+        while (!_stopRequested)
+        {
+            await Task.Delay(5000); // Log every 5 seconds
+            messagesProcessed = 0;
+            lastStatsTime = DateTime.UtcNow;
         }
     }
 
-    private async Task ProcessMessageAsync(IChannel channel, BasicGetResult result)
+    private async Task ProcessBatchMessages()
     {
-        await _processingSemaphore.WaitAsync();
+        const int targetBatchSize = 2000;
+        const int batchTimeoutMs = 500;
+
+        var batchBuffer = new List<(TelemetryBatch batch, ulong deliveryTag, IChannel channel)>(targetBatchSize);
+        var questSender = QuestDbSenderPool.Get();
+
+        Console.WriteLine($"📦 Batch processor started (target: {targetBatchSize} msgs, timeout: {batchTimeoutMs}ms)");
 
         try
         {
-            var body = result.Body.ToArray();
-            var message = TelemetryBatch.Parser.ParseFrom(body);
-
-            // Create fresh QuestDbService per batch for thread safety
-            using var questDbService = new QuestDbService();
-            await questDbService.WriteBatch(message);
-
-            // Acknowledge message after successful QuestDB write
-            await channel.BasicAckAsync(result.DeliveryTag, false);
-        }
-        catch (OutOfMemoryException ex)
-        {
-            Console.WriteLine($"❌ CRITICAL: OutOfMemoryException during message processing");
-            Console.WriteLine($"   Message: {ex.Message}");
-            Console.WriteLine($"   Stack Trace: {ex.StackTrace}");
-            Console.WriteLine($"   DeliveryTag: {result.DeliveryTag}");
-
-            // Log current memory state
-            var process = System.Diagnostics.Process.GetCurrentProcess();
-            var memoryUsageGB = (double)process.WorkingSet64 / (1024 * 1024 * 1024);
-            var gcMemoryMB = GC.GetTotalMemory(false) / (1024 * 1024);
-
-            Console.WriteLine($"   Current Memory Usage: {memoryUsageGB:F2}GB (Working Set)");
-            Console.WriteLine($"   GC Memory: {gcMemoryMB:F2}MB");
-            Console.WriteLine($"   Processing Semaphore Count: {_processingSemaphore.CurrentCount}/{MaxConcurrentProcessing}");
-
-            // Force garbage collection
-            Console.WriteLine("🧹 Forcing garbage collection...");
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-
-            var gcMemoryAfterMB = GC.GetTotalMemory(false) / (1024 * 1024);
-            Console.WriteLine($"   GC Memory after cleanup: {gcMemoryAfterMB:F2}MB");
-
-            // Reject message (requeue for retry)
-            await channel.BasicNackAsync(result.DeliveryTag, false, true);
-
-            // Pause processing temporarily and set up recovery
-            _pauseProcessing = true;
-            Console.WriteLine("⏸️  Processing PAUSED due to OutOfMemoryException");
-
-            // Schedule recovery attempt
-            _ = Task.Run(async () =>
+            while (!_stopRequested)
             {
-                await Task.Delay(TimeSpan.FromSeconds(30));
+                var deadline = DateTime.UtcNow.AddMilliseconds(batchTimeoutMs);
 
-                var processAfterDelay = System.Diagnostics.Process.GetCurrentProcess();
-                var memoryAfterDelay = (double)processAfterDelay.WorkingSet64 / (1024 * 1024 * 1024);
-
-                if (memoryAfterDelay < 4.0) // If memory usage dropped below 4GB
+                while (batchBuffer.Count < targetBatchSize && DateTime.UtcNow < deadline)
                 {
-                    _pauseProcessing = false;
-                    Console.WriteLine($"✅ Processing RESUMED after memory recovery (Memory: {memoryAfterDelay:F2}GB)");
+                    var remaining = (deadline - DateTime.UtcNow).TotalMilliseconds;
+                    if (remaining <= 0) break;
+
+                    var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(remaining));
+                    try
+                    {
+                        if (await _messageChannel.Reader.WaitToReadAsync(cts.Token))
+                        {
+                            while (_messageChannel.Reader.TryRead(out var item) && batchBuffer.Count < targetBatchSize)
+                            {
+                                batchBuffer.Add(item);
+                            }
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+
                 }
-                else
+
+
+                if (batchBuffer.Count > 0)
                 {
-                    Console.WriteLine($"⚠️  Memory still high after delay (Memory: {memoryAfterDelay:F2}GB) - keeping processing paused");
+                    try
+                    {
+                        var allRecords = batchBuffer
+                        .SelectMany(b => b.batch.Records)
+                        .Where(QuestDbService.IsValidRecord)
+                        .ToList();
+
+                        if (allRecords.Any())
+                        {
+                            try
+                            {
+                                await QuestDbService.WriteBatch(questSender, allRecords);
+
+                            }
+                            catch (Exception ex)
+                            {
+                                foreach (var item in batchBuffer)
+                                {
+                                    await item.channel.BasicNackAsync(item.deliveryTag, false, true);
+                                }
+                            }
+
+                            Console.WriteLine($"📦 Flushed {batchBuffer.Count} messages ({allRecords.Count} records)");
+                        }
+
+                        foreach (var item in batchBuffer)
+                        {
+                            await item.channel.BasicAckAsync(item.deliveryTag, false);
+                        }
+
+                    }
+                    finally
+                    {
+                        batchBuffer.Clear();
+                    }
                 }
-            });
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ Error processing message: {ex.GetType().Name}");
-            Console.WriteLine($"   Message: {ex.Message}");
-            Console.WriteLine($"   Stack Trace: {ex.StackTrace}");
-            Console.WriteLine($"   DeliveryTag: {result.DeliveryTag}");
-
-            // Log additional context for debugging
-            var process = System.Diagnostics.Process.GetCurrentProcess();
-            var memoryUsageGB = (double)process.WorkingSet64 / (1024 * 1024 * 1024);
-            Console.WriteLine($"   Current Memory Usage: {memoryUsageGB:F2}GB");
-            Console.WriteLine($"   Processing Semaphore Count: {_processingSemaphore.CurrentCount}/{MaxConcurrentProcessing}");
-
-            if (ex.InnerException != null)
-            {
-                Console.WriteLine($"   Inner Exception: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
             }
-
-            // Reject message (requeue for retry)
-            await channel.BasicNackAsync(result.DeliveryTag, false, true);
         }
         finally
         {
-            _processingSemaphore.Release();
-        }
-    }
-
-    private void StartMemoryMonitoring()
-    {
-        _memoryMonitorTimer = new Timer(CheckMemoryPressure, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
-    }
-
-    private void CheckMemoryPressure(object? state)
-    {
-        try
-        {
-            var currentMemory = GC.GetTotalMemory(false);
-            var process = System.Diagnostics.Process.GetCurrentProcess();
-            var memoryUsagePercent = (double)process.WorkingSet64 / (1024 * 1024 * 1024); // Convert to GB
-            var gcMemoryMB = currentMemory / (1024 * 1024);
-
-            // Simple heuristic: if working set > 5GB (83% of 6GB limit), pause processing
-            var shouldPause = memoryUsagePercent > 5.0;
-
-            // Log memory changes when significant (>0.5GB change) or status changes
-            var memoryDelta = Math.Abs(memoryUsagePercent - _lastLoggedMemoryUsage);
-            var statusChanged = shouldPause != _pauseProcessing;
-
-            if (statusChanged || memoryDelta > 0.5)
-            {
-                Console.WriteLine($"📊 Memory Status: {memoryUsagePercent:F2}GB (Working Set), {gcMemoryMB:F0}MB (GC), Processing: {(_pauseProcessing ? "PAUSED" : "ACTIVE")}, Semaphore: {_processingSemaphore.CurrentCount}/{MaxConcurrentProcessing}");
-                _lastLoggedMemoryUsage = memoryUsagePercent;
-            }
-
-            if (statusChanged)
-            {
-                _pauseProcessing = shouldPause;
-                Console.WriteLine($"🔄 Memory pressure {(shouldPause ? "HIGH" : "NORMAL")} - Consumer {(shouldPause ? "PAUSED" : "RESUMED")} (Memory: {memoryUsagePercent:F1}GB)");
-            }
-
-            // Warning if memory is approaching critical levels
-            if (memoryUsagePercent > 4.5 && !shouldPause)
-            {
-                Console.WriteLine($"⚠️  Memory approaching critical level: {memoryUsagePercent:F2}GB");
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ Error monitoring memory: {ex.GetType().Name}: {ex.Message}");
+            QuestDbSenderPool.Return(questSender);
+            Console.WriteLine("📦 Batch processor stopped");
         }
     }
 
     public void Dispose()
     {
         _stopRequested = true;
-        _memoryMonitorTimer?.Dispose();
-        _processingSemaphore?.Dispose();
     }
 }
