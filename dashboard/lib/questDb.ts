@@ -46,10 +46,6 @@ class QuestDBClient {
 		maxRetries = 3,
 		baseDelay = 1000,
 	): Promise<T> {
-		if (process.env.NEXT_PHASE === "phase-production-build") {
-			console.log("🏗️ Build mode detected - skipping database operation");
-			throw new Error("Database operations disabled during build");
-		}
 
 		let lastError: Error | null = null;
 
