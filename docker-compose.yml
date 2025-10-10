@@ -152,29 +152,11 @@ services:
     networks:
       - telemetry-network
     environment:
-      QUESTDB_URL: questdb:9009;username=admin;password=quest
-      QUESTDB_TCP_HOST: questdb
-      QUESTDB_TCP_PORT: 9009
-      QUESTDB_HTTP_HOST: questdb
-      QUESTDB_HTTP_PORT: 9000
+      QUESTDB_HTTP_HOST: ${QUESTDB_HOST:-questdb}
+      QUESTDB_HTTP_PORT: ${QUESTDB_HTTP_PORT:-9000}
 
-      # QuestDB Performance Tuning
-      QUESTDB_BATCH_SIZE: 1000
-      QUESTDB_AUTO_FLUSH_ROWS: 2000
-      QUESTDB_AUTO_FLUSH_INTERVAL: 2000
-      QUESTDB_CONNECTION_TIMEOUT: 30000
-      QUESTDB_RETRY_ATTEMPTS: 3
-      QUESTDB_RETRY_DELAY: 1000
+      RABBITMQ_URL: ${RABBITMQ_URL}
 
-      # RabbitMQ Configuration
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_USER: guest
-      RABBITMQ_PASS: changeme
-      RABBITMQ_URL: amqp://guest:changeme@rabbitmq:5672/
-      RABBITMQ_BATCH_SIZE: 1000
-      RABBITMQ_PREFETCH_COUNT: 500
-
-      # Application settings
       DOTNET_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:5000
     deploy:
@@ -199,15 +181,14 @@ services:
     container_name: telemetry-dashboard
     restart: unless-stopped
     environment:
-      QUESTDB_URL: postgresql://admin:quest@questdb:8812/qdb
-      QUESTDB_HOST: questdb
-      QUESTDB_PORT: 8812
-      QUESTDB_DATABASE: qdb
-      QUESTDB_USER: admin
-      QUESTDB_PASSWORD: quest
+      QUESTDB_HOST: ${QUESTDB_HOST:-questdb}
+      QUESTDB_PORT: ${QUESTDB_PG_PORT:-8812}
+      QUESTDB_DATABASE: ${QUESTDB_DATABASE:-qdb}
+      QUESTDB_USER: ${QUESTDB_USER:-admin}
+      QUESTDB_PASSWORD: ${QUESTDB_PASSWORD:-quest}
 
-      NODE_ENV: production
       NODE_OPTIONS: "--max-old-space-size=768 --max-semi-space-size=128"
+
       NEXT_PUBLIC_APP_URL: http://${LOCAL_DOMAIN:-localhost}/dashboard
       NEXT_PUBLIC_BACKEND_URL: http://${LOCAL_DOMAIN:-localhost}/dashboard/api
     networks:

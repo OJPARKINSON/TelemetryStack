@@ -30,7 +30,7 @@ tailscale/
 .env.production
 .env.development
 **/.env*
-!.env.example
+!.env.template
 
 # Secrets and tokens
 *.token
