@@ -42,11 +42,6 @@ public class QuestDbSchemaManager : IDisposable
                 return true;
             }
 
-            var needsOptimization = await NeedsOptimization(tableInfo);
-            var needsIndexes = await NeedsCriticalIndexes();
-
-            await OptimizeExistingTable();
-            await AddEssentialIndexes();
             return true;
         }
         catch (Exception ex)
@@ -69,32 +64,6 @@ public class QuestDbSchemaManager : IDisposable
         {
             return null;
         }
-    }
-
-    private async Task<bool> NeedsOptimization(JsonElement? tableInfo)
-    {
-        if (!tableInfo.HasValue || !tableInfo.Value.TryGetProperty("dataset", out var dataset))
-            return false;
-
-        foreach (var row in dataset.EnumerateArray())
-        {
-            var rowArray = row.EnumerateArray().ToArray();
-            if (rowArray.Length >= 2)
-            {
-                var columnName = rowArray[0].GetString();
-                var columnType = rowArray[1].GetString();
-
-                if (columnName == "gear" && columnType == "SYMBOL")
-                {
-                    return true;
-                }
-            }
-        }
-
-        var hasSessionIndex = await HasIndex("session_id");
-        var hasTrackIndex = await HasIndex("track_name");
-
-        return !hasSessionIndex || !hasTrackIndex;
     }
 
     private async Task<bool> HasIndex(string columnName)
@@ -120,75 +89,10 @@ public class QuestDbSchemaManager : IDisposable
         return false;
     }
 
-    private async Task<bool> NeedsCriticalIndexes()
-    {
-        try
-        {
-            // Check if essential indexes exist
-            var hasSessionIndex = await HasIndex("session_id");
-            var hasTrackIndex = await HasIndex("track_name");
-
-            return !hasSessionIndex || !hasTrackIndex;
-        }
-        catch
-        {
-            return true;
-        }
-    }
-
-    private async Task AddEssentialIndexes()
-    {
-        try
-        {
-            var hasSessionIndex = await HasIndex("session_id");
-            var hasTrackIndex = await HasIndex("track_name");
-            var hasTrackIdIndex = await HasIndex("track_id");
-
-            if (!hasSessionIndex)
-            {
-                Console.WriteLine("   Adding session_id index...");
-                await ExecuteQuery("ALTER TABLE TelemetryTicks ALTER COLUMN session_id ADD INDEX");
-            }
-
-            if (!hasTrackIndex)
-            {
-                Console.WriteLine("   Adding track_name index...");
-                await ExecuteQuery("ALTER TABLE TelemetryTicks ALTER COLUMN track_name ADD INDEX");
-            }
-
-            if (!hasTrackIdIndex)
-            {
-                Console.WriteLine("   Adding track_id index...");
-                await ExecuteQuery("ALTER TABLE TelemetryTicks ALTER COLUMN track_id ADD INDEX");
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"   Warning: Could not add some indexes: {ex.Message}");
-        }
-    }
-
-    private async Task LogCurrentTableStats()
-    {
-        try
-        {
-            var stats = await GetTableStats();
-            Console.WriteLine("📊 TelemetryTicks table stats:");
-            foreach (var stat in stats)
-            {
-                Console.WriteLine($"   {stat.Key}: {stat.Value}");
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"   Could not retrieve table stats: {ex.Message}");
-        }
-    }
-
     private async Task CreateOptimizedTable()
     {
         var createTableSql = @"
-            CREATE TABLE TelemetryTicks4 (
+            CREATE TABLE IF NOT EXISTS TelemetryTicks (
                 session_id SYMBOL CAPACITY 50000 INDEX,
                 track_name SYMBOL CAPACITY 100 INDEX,
                 track_id SYMBOL CAPACITY 100 INDEX,
@@ -234,132 +138,15 @@ public class QuestDbSchemaManager : IDisposable
                 lRtempM FLOAT,
                 rRtempM FLOAT,
                 timestamp TIMESTAMP
-            ) TIMESTAMP(timestamp) PARTITION BY HOUR WAL
-            WITH maxUncommittedRows=1000000, dedup_upsert_keys=(session_id, car_id, timestamp);
+            ) TIMESTAMP(timestamp) PARTITION BY DAY 
+            WAL
+            WITH maxUncommittedRows=1000000
+            DEDUP UPSERT KEYS(timestamp, session_id);
         ";
 
         await ExecuteQuery(createTableSql);
 
-        await ExecuteQuery("ALTER TABLE TelemetryTicks DEDUP ENABLE UPSERT KEYS(session_id, car_id, timestamp)");
     }
-
-    private async Task OptimizeExistingTable()
-    {
-        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-        Console.WriteLine($"🔄 Starting table optimization process...");
-
-        try
-        {
-            var currentStats = await GetTableStats();
-            if (currentStats.TryGetValue("row_count", out var rowCountObj))
-            {
-                Console.WriteLine($"   Current data: {rowCountObj} records");
-            }
-
-            Console.WriteLine("   Creating backup of existing table...");
-            await ExecuteQuery($"RENAME TABLE TelemetryTicks TO TelemetryTicks_backup_{timestamp}");
-
-            Console.WriteLine("   Creating optimized table structure...");
-            await CreateOptimizedTable();
-
-            var migrationSql = $@"
-                INSERT INTO TelemetryTicks 
-                SELECT 
-                    session_id,
-                    track_name,
-                    track_id,
-                    lap_id,
-                    session_num,
-                    COALESCE(session_type, 'Unknown') as session_type,
-                    COALESCE(session_name, 'Unknown') as session_name,
-                    car_id,
-                    CASE 
-                        WHEN gear = '1' THEN 1
-                        WHEN gear = '2' THEN 2  
-                        WHEN gear = '3' THEN 3
-                        WHEN gear = '4' THEN 4
-                        WHEN gear = '5' THEN 5
-                        WHEN gear = '6' THEN 6
-                        WHEN gear = '7' THEN 7
-                        WHEN gear = '8' THEN 8
-                        WHEN gear = 'R' THEN -1
-                        WHEN gear = 'N' THEN 0
-                        ELSE 0
-                    END as gear,
-                    player_car_position,
-                    speed,
-                    lap_dist_pct, 
-                    session_time,
-                    lat,
-                    lon,
-                    lap_current_lap_time,
-                    lapLastLapTime,
-                    lapDeltaToBestLap,
-                    throttle,  -- No cast needed since both are FLOAT
-                    brake,
-                    steering_wheel_angle,
-                    rpm,
-                    velocity_x,
-                    velocity_y,
-                    velocity_z,
-                    fuel_level,
-                    alt,
-                    lat_accel,
-                    long_accel,
-                    vert_accel,
-                    pitch,
-                    roll,
-                    yaw,
-                    yaw_north,
-                    voltage,
-                    waterTemp,
-                    lFpressure,
-                    rFpressure,
-                    lRpressure,
-                    rRpressure,
-                    lFtempM,
-                    rFtempM,
-                    lRtempM,
-                    rRtempM,
-                    timestamp
-                FROM TelemetryTicks_backup_{timestamp};
-            ";
-
-            await ExecuteQuery(migrationSql);
-
-
-            await AddOptimizedIndexes();
-
-            var newStats = await GetTableStats();
-            if (newStats.TryGetValue("row_count", out var newRowCountObj))
-            {
-                Console.WriteLine($"   Migration verified: {newRowCountObj} records in optimized table");
-            }
-
-
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ Migration failed: {ex.Message}");
-
-            // Attempt rollback
-            try
-            {
-                Console.WriteLine("🔄 Attempting rollback...");
-                await ExecuteQuery("DROP TABLE TelemetryTicks");
-                await ExecuteQuery($"RENAME TABLE TelemetryTicks_backup_{timestamp} TO TelemetryTicks");
-                Console.WriteLine("✅ Rollback successful, original table restored");
-            }
-            catch (Exception rollbackEx)
-            {
-                Console.WriteLine($"❌ Rollback failed: {rollbackEx.Message}");
-                Console.WriteLine($"⚠️  Manual intervention required. Backup table: TelemetryTicks_backup_{timestamp}");
-            }
-
-            throw;
-        }
-    }
-
     private async Task AddOptimizedIndexes()
     {
         Console.WriteLine("✅ Composite indexes added successfully");
@@ -369,7 +156,6 @@ public class QuestDbSchemaManager : IDisposable
             await ExecuteQuery("ALTER TABLE TelemetryTicks ADD INDEX session_lap_idx (session_id, lap_id);");
             await ExecuteQuery("ALTER TABLE TelemetryTicks ADD INDEX track_session_idx (track_name, session_id);");
             await ExecuteQuery("ALTER TABLE TelemetryTicks ADD INDEX session_time_idx (session_id, session_time);");
-            await ExecuteQuery("ALTER TABLE TelemetryTicks DEDUP ENABLE UPSERT KEYS(session_id, car_id, timestamp);");
 
             Console.WriteLine("✅ Composite indexes added successfully");
         }
@@ -391,6 +177,9 @@ public class QuestDbSchemaManager : IDisposable
             var encodedQuery = Uri.EscapeDataString(query);
             var url = $"http://{_questDbUrl}/exec?query={encodedQuery}";
 
+            Console.WriteLine($"🔍 DEBUG: _questDbUrl = '{_questDbUrl}'");
+            Console.WriteLine($"🔍 DEBUG: Full URL = '{url}'");
+
             var response = await _httpClient.GetStringAsync(url);
             var jsonDoc = JsonDocument.Parse(response);
 
@@ -407,58 +196,6 @@ public class QuestDbSchemaManager : IDisposable
             Console.WriteLine($"Query execution error: {ex.Message}");
             Console.WriteLine($"Query: {query}");
             throw;
-        }
-    }
-
-    public async Task<Dictionary<string, object>> GetTableStats()
-    {
-        try
-        {
-            var stats = new Dictionary<string, object>();
-
-            // Get basic table info from system tables (much faster than scanning data)
-            var tableInfoQuery = "SELECT table_name FROM tables WHERE table_name = 'TelemetryTicks'";
-            var tableResponse = await ExecuteQuery(tableInfoQuery);
-            if (tableResponse?.TryGetProperty("dataset", out var tableDataset) == true &&
-                tableDataset.EnumerateArray().Any())
-            {
-                stats["table_exists"] = true;
-
-                // Get approximate row count from table metadata (instant)
-                try
-                {
-                    var quickStatsQuery = "SELECT last(timestamp) as max_time FROM TelemetryTicks LIMIT 1";
-                    var quickResponse = await ExecuteQuery(quickStatsQuery);
-                    if (quickResponse?.TryGetProperty("dataset", out var quickDataset) == true &&
-                        quickDataset.EnumerateArray().Any())
-                    {
-                        var maxTime = quickDataset.EnumerateArray().First().EnumerateArray().First().GetString();
-                        stats["max_time"] = maxTime ?? "unknown";
-                        stats["status"] = "optimized";
-                    }
-                    else
-                    {
-                        stats["status"] = "empty";
-                    }
-                }
-                catch
-                {
-                    // If quick stats fail, just mark as available
-                    stats["status"] = "available";
-                }
-            }
-            else
-            {
-                stats["table_exists"] = false;
-                stats["status"] = "missing";
-            }
-
-            return stats;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error getting table stats: {ex.Message}");
-            return new Dictionary<string, object> { ["error"] = ex.Message };
         }
     }
 

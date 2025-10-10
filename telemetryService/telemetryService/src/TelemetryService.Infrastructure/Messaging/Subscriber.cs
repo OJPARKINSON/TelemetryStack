@@ -3,7 +3,6 @@ using System.Threading.Channels;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using TelemetryService.Domain.Models;
-using TelemetryService.Infrastructure.Persistance;
 using TelemetryService.Infrastructure.Persistence;
 
 namespace TelemetryService.Infrastructure.Messaging;
@@ -50,6 +49,9 @@ public class Subscriber
     {
         var factory = new ConnectionFactory();
         factory.Uri = new Uri("amqp://admin:changeme@rabbitmq:5672/");
+        factory.RequestedHeartbeat = TimeSpan.FromSeconds(60);
+        factory.AutomaticRecoveryEnabled = true;
+        factory.NetworkRecoveryInterval = TimeSpan.FromSeconds(10);
 
         Console.WriteLine($"Connecting to RabbitMQ at {factory.HostName}:{factory.Port} with user {factory.UserName}");
 
@@ -116,19 +118,27 @@ public class Subscriber
 
     private async Task ProcessBatchMessages()
     {
-        const int targetBatchSize = 2000;
-        const int batchTimeoutMs = 500;
+        const int targetBatchSize = 20;
+        const int maxRecordsPerBatch = 25000;
+        const int batchTimeoutMs = 5000;
 
         var batchBuffer = new List<(TelemetryBatch batch, ulong deliveryTag, IChannel channel)>(targetBatchSize);
-        var questSender = QuestDbSenderPool.Get();
+        (TelemetryBatch batch, ulong deliveryTag, IChannel channel)? pendingItem = null;
 
-        Console.WriteLine($"📦 Batch processor started (target: {targetBatchSize} msgs, timeout: {batchTimeoutMs}ms)");
+        Console.WriteLine($"📦 Batch processor started (target: {targetBatchSize} msgs, max: {maxRecordsPerBatch} records, timeout: {batchTimeoutMs}ms)");
 
         try
         {
             while (!_stopRequested)
             {
                 var deadline = DateTime.UtcNow.AddMilliseconds(batchTimeoutMs);
+
+                // Add pending item from previous batch if exists
+                if (pendingItem.HasValue)
+                {
+                    batchBuffer.Add(pendingItem.Value);
+                    pendingItem = null;
+                }
 
                 while (batchBuffer.Count < targetBatchSize && DateTime.UtcNow < deadline)
                 {
@@ -140,9 +150,26 @@ public class Subscriber
                     {
                         if (await _messageChannel.Reader.WaitToReadAsync(cts.Token))
                         {
-                            while (_messageChannel.Reader.TryRead(out var item) && batchBuffer.Count < targetBatchSize)
+                            while (_messageChannel.Reader.TryRead(out var item))
                             {
+                                // Check if adding this item would exceed record limit
+                                var currentRecordCount = batchBuffer.Sum(b => b.batch.Records.Count);
+                                var potentialRecordCount = currentRecordCount + item.batch.Records.Count;
+
+                                if (potentialRecordCount > maxRecordsPerBatch && batchBuffer.Count > 0)
+                                {
+                                    // Would exceed limit - save for next batch
+                                    Console.WriteLine($"   Record limit would be exceeded: {currentRecordCount} + {item.batch.Records.Count} > {maxRecordsPerBatch}");
+                                    pendingItem = item;
+                                    break;
+                                }
+
                                 batchBuffer.Add(item);
+
+                                if (batchBuffer.Count >= targetBatchSize)
+                                {
+                                    break;
+                                }
                             }
                         }
                     }
@@ -151,6 +178,11 @@ public class Subscriber
                         break;
                     }
 
+                    // Break if we have a pending item (batch is full)
+                    if (pendingItem.HasValue)
+                    {
+                        break;
+                    }
                 }
 
 
@@ -167,23 +199,52 @@ public class Subscriber
                         {
                             try
                             {
-                                await QuestDbService.WriteBatch(questSender, allRecords);
+                                await QuestDbService.WriteBatch(allRecords);
 
+                                Console.WriteLine($"📦 Flushed {batchBuffer.Count} messages ({allRecords.Count} records)");
+
+                                // Try to ACK with timeout protection
+                                try
+                                {
+                                    using var ackCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                                    foreach (var item in batchBuffer)
+                                    {
+                                        await item.channel.BasicAckAsync(item.deliveryTag, false, ackCts.Token);
+                                    }
+                                }
+                                catch (OperationCanceledException)
+                                {
+                                    Console.WriteLine($"⚠️  ACK timeout - channel may be slow");
+                                }
+                                catch (Exception ackEx)
+                                {
+                                    Console.WriteLine($"⚠️  Could not ACK messages (channel closed): {ackEx.Message}");
+                                    Console.WriteLine($"   Messages will be re-delivered by RabbitMQ");
+                                }
                             }
                             catch (Exception ex)
                             {
-                                foreach (var item in batchBuffer)
+                                Console.WriteLine($"❌ Batch write failed: {ex.Message}");
+
+                                // Try to NACK with timeout protection
+                                try
                                 {
-                                    await item.channel.BasicNackAsync(item.deliveryTag, false, true);
+                                    using var nackCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                                    foreach (var item in batchBuffer)
+                                    {
+                                        await item.channel.BasicNackAsync(item.deliveryTag, false, true, nackCts.Token);
+                                    }
+                                }
+                                catch (OperationCanceledException)
+                                {
+                                    Console.WriteLine($"⚠️  NACK timeout - channel may be slow");
+                                }
+                                catch (Exception nackEx)
+                                {
+                                    Console.WriteLine($"⚠️  Could not NACK messages (channel closed): {nackEx.Message}");
+                                    Console.WriteLine($"   Messages will be re-delivered by RabbitMQ");
                                 }
                             }
-
-                            Console.WriteLine($"📦 Flushed {batchBuffer.Count} messages ({allRecords.Count} records)");
-                        }
-
-                        foreach (var item in batchBuffer)
-                        {
-                            await item.channel.BasicAckAsync(item.deliveryTag, false);
                         }
 
                     }
@@ -196,7 +257,6 @@ public class Subscriber
         }
         finally
         {
-            QuestDbSenderPool.Return(questSender);
             Console.WriteLine("📦 Batch processor stopped");
         }
     }

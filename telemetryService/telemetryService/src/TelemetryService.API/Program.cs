@@ -27,7 +27,6 @@ builder.Services.AddCors(options =>
 });
 
 // Register telemetry services
-builder.Services.AddSingleton<QuestDbService>();
 builder.Services.AddSingleton<Subscriber>();
 
 builder.Services.AddHostedService<TelemetryBackgroundService>();

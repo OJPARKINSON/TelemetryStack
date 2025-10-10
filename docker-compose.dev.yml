@@ -110,6 +110,8 @@ services:
       - telemetry-network
     environment:
       QUESTDB_URL: questdb:9009;username=admin;password=quest
+      QUESTDB_HTTP_HOST: questdb
+      QUESTDB_HTTP_PORT: 9000
 
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: guest

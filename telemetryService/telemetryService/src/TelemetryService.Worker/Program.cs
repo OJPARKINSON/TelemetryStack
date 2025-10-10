@@ -20,6 +20,9 @@ internal class Program
             using var host = CreateHostBuilder(args).Build();
 
             var subscriber = host.Services.GetRequiredService<Subscriber>();
+            var questDbSchemaManager = host.Services.GetRequiredService<QuestDbSchemaManager>();
+
+            await questDbSchemaManager.EnsureOptimizedSchemaExists();
 
             Console.WriteLine("Starting telemetry service subscriber...");
             await subscriber.SubscribeAsync();
@@ -81,6 +84,14 @@ internal class Program
             .ConfigureServices((_, services) =>
             {
                 services.AddSingleton<Subscriber>();
+                services.AddSingleton<QuestDbSchemaManager>(sp =>
+                {
+                    var host = Environment.GetEnvironmentVariable("QUESTDB_HTTP_HOST") ?? "questdb";
+                    var port = Environment.GetEnvironmentVariable("QUESTDB_HTTP_PORT") ?? "9000";
+                    var questDbUrl = $"{host}:{port}";
+                    Console.WriteLine($"🔧 Initializing QuestDbSchemaManager with HTTP URL: http://{questDbUrl}");
+                    return new QuestDbSchemaManager(questDbUrl);
+                });
             });
     }
 }
