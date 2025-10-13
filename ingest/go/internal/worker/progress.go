@@ -6,7 +6,6 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/fatih/color"
@@ -14,18 +13,18 @@ import (
 )
 
 type ProgressDisplay struct {
-	startTime     time.Time
-	totalFiles    int
-	workers       []*WorkerProgress
-	mu            sync.RWMutex
-	isRunning     bool
-	stopChan      chan bool
-	refreshRate   time.Duration
-	termWidth     int               // Terminal width
-	termHeight    int               // Terminal height
-	statusLine    int               // Which line the status bar is on
-	resizeChan    chan os.Signal    // Channel for terminal resize signals
-	lastStatus    string            // Last rendered status to avoid unnecessary updates
+	startTime   time.Time
+	totalFiles  int
+	workers     []*WorkerProgress
+	mu          sync.RWMutex
+	isRunning   bool
+	stopChan    chan bool
+	refreshRate time.Duration
+	termWidth   int            // Terminal width
+	termHeight  int            // Terminal height
+	statusLine  int            // Which line the status bar is on
+	resizeChan  chan os.Signal // Channel for terminal resize signals
+	lastStatus  string         // Last rendered status to avoid unnecessary updates
 }
 
 type WorkerProgress struct {
@@ -84,7 +83,7 @@ func NewProgressDisplay(workerCount, totalFiles int) *ProgressDisplay {
 		resizeChan:  make(chan os.Signal, 1),
 		lastStatus:  "",
 	}
-	
+
 	// Get terminal size
 	if width, height, err := term.GetSize(int(os.Stdout.Fd())); err == nil {
 		pd.termWidth = width
@@ -96,7 +95,7 @@ func NewProgressDisplay(workerCount, totalFiles int) *ProgressDisplay {
 		pd.termHeight = 24
 		pd.statusLine = 24
 	}
-	
+
 	return pd
 }
 
@@ -124,10 +123,9 @@ func (pd *ProgressDisplay) startResizeMonitoring() {
 	if pd.resizeChan == nil {
 		return
 	}
-	
-	// Listen for terminal resize signals
-	signal.Notify(pd.resizeChan, syscall.SIGWINCH)
-	
+
+	signal.Notify(pd.resizeChan)
+
 	go func() {
 		for {
 			select {
@@ -143,14 +141,14 @@ func (pd *ProgressDisplay) startResizeMonitoring() {
 func (pd *ProgressDisplay) handleResize() {
 	pd.mu.Lock()
 	defer pd.mu.Unlock()
-	
+
 	// Get new terminal size
 	if width, height, err := term.GetSize(int(os.Stdout.Fd())); err == nil {
 		pd.termWidth = width
 		pd.termHeight = height
 		pd.statusLine = height // Update bottom line position
 		pd.lastStatus = ""     // Force re-render after resize
-		
+
 		// Clear and reinitialize status bar at new position
 		fmt.Printf("\033[%d;1H\033[K", pd.statusLine)
 	}
@@ -238,7 +236,7 @@ func (pd *ProgressDisplay) renderBottomStatus() {
 	elapsed := time.Since(pd.startTime)
 	totalFiles := pd.getTotalFilesProcessed()
 	totalRecords := pd.getTotalRecordsProcessed()
-	
+
 	overallProgress := float64(totalFiles) / float64(pd.totalFiles) * 100
 	if pd.totalFiles == 0 {
 		overallProgress = 0
@@ -261,7 +259,7 @@ func (pd *ProgressDisplay) renderBottomStatus() {
 
 	// Build compact progress line
 	progressBar := pd.buildProgressBar(overallProgress, 20)
-	
+
 	progressLine := fmt.Sprintf("⚡ %s %.1f%% (%d/%d files) | %d workers | %s records | %v%s",
 		progressBar,
 		overallProgress,
@@ -294,16 +292,16 @@ func (pd *ProgressDisplay) buildProgressBar(percentage float64, width int) strin
 
 	var bar strings.Builder
 	bar.WriteString("[")
-	
+
 	if filled > 0 {
 		bar.WriteString(accent(strings.Repeat("█", filled)))
 	}
-	
+
 	remaining := width - filled
 	if remaining > 0 {
 		bar.WriteString(muted(strings.Repeat("░", remaining)))
 	}
-	
+
 	bar.WriteString("]")
 	return bar.String()
 }
