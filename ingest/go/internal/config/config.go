@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"runtime"
 	"strconv"
 	"time"
 )
@@ -42,8 +43,19 @@ type Config struct {
 }
 
 func LoadConfig() *Config {
+	cpuCount := runtime.NumCPU()
+
+	defaultWorkerCount := cpuCount + (cpuCount / 4)
+	if defaultWorkerCount < 4 {
+		defaultWorkerCount = 4
+	}
+
+	defaultGoMaxProcs := 0
+
+	workerCount := getEnvAsInt("WORKER_COUNT", defaultWorkerCount)
+
 	return &Config{
-		WorkerCount:   getEnvAsInt("WORKER_COUNT", 20),
+		WorkerCount:   workerCount,
 		FileQueueSize: getEnvAsInt("FILE_QUEUE_SIZE", 1000),
 		WorkerTimeout: getEnvAsDuration("WORKER_TIMEOUT", 30*time.Minute),
 
@@ -57,14 +69,14 @@ func LoadConfig() *Config {
 		FileAgeThreshold:   getEnvAsDuration("FILE_AGE_THRESHOLD", 30*time.Second),
 		FileProcessTimeout: getEnvAsDuration("FILE_PROCESS_TIMEOUT", 10*time.Minute),
 
-		GoMaxProcs: getEnvAsInt("GOMAXPROCS", 20),
+		GoMaxProcs: getEnvAsInt("GOMAXPROCS", defaultGoMaxProcs),
 
 		// Development & Monitoring
 		EnablePprof:  getEnvAsBool("ENABLE_PPROF", false),
 		PprofPort:    getEnv("PPROF_PORT", "6060"),
 		MemoryTuning: getEnvAsBool("MEMORY_TUNING", true),
 
-		RabbitMQPoolSize:      getEnvAsInt("RABBITMQ_POOL_SIZE", 20),                          // Match worker count
+		RabbitMQPoolSize:      getEnvAsInt("RABBITMQ_POOL_SIZE", workerCount),
 		RabbitMQPrefetchCount: getEnvAsInt("RABBITMQ_PREFETCH_COUNT", 100000),                 // Large prefetch buffer
 		RabbitMQBatchSize:     getEnvAsInt("RABBITMQ_BATCH_SIZE", 16000),                      // Large message batches
 		RabbitMQBatchTimeout:  getEnvAsDuration("RABBITMQ_BATCH_TIMEOUT", 2*time.Millisecond), // Minimal delay

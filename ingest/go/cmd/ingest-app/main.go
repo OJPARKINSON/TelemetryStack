@@ -61,6 +61,17 @@ func main() {
 
 	cfg := config.LoadConfig()
 
+	// Apply GOMAXPROCS if explicitly configured (0 means use Go's default)
+	if cfg.GoMaxProcs > 0 {
+		oldProcs := runtime.GOMAXPROCS(cfg.GoMaxProcs)
+		logger.Info("GOMAXPROCS configured",
+			zap.Int("old", oldProcs),
+			zap.Int("new", cfg.GoMaxProcs))
+	} else {
+		logger.Info("Using Go default GOMAXPROCS",
+			zap.Int("cpus", runtime.GOMAXPROCS(0)))
+	}
+
 	// Enable profiling if ENABLE_PPROF environment variable is set
 	if os.Getenv("ENABLE_PPROF") == "true" {
 		go func() {
