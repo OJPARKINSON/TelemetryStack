@@ -59,7 +59,7 @@ type processorMetrics struct {
 func NewLoaderProcessor(pubSub *messaging.PubSub, groupNumber int, config *config.Config, workerID int) *loaderProcessor {
 	lp := &loaderProcessor{
 		pubSub:         pubSub,
-		cache:          make([]map[string]interface{}, 0, 1000), // Initial capacity
+		cache:          make([]map[string]interface{}, 0, 200), // Initial capacity
 		groupNumber:    groupNumber,
 		config:         config,
 		thresholdBytes: config.BatchSizeBytes,
@@ -259,9 +259,8 @@ func (l *loaderProcessor) Process(input ibt.Tick, hasNext bool, session *headers
 		}
 	}
 
-	// PERFORMANCE OPTIMIZATION: Pre-allocate cache capacity to reduce slice growth
 	if cap(l.cache) == 0 {
-		l.cache = make([]map[string]interface{}, 0, 3000)
+		l.cache = make([]map[string]interface{}, 0, 500)
 	}
 	l.cache = append(l.cache, enrichedInput)
 	l.currentBytes += estimatedSize
