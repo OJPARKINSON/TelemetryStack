@@ -38,6 +38,10 @@ type loaderProcessor struct {
 	memCheckInterval  time.Duration
 	adaptiveBatchSize int
 	memoryPressure    bool
+
+	// Performance: Pre-cache field keys for fast copying
+	fieldKeys []string
+	whitelist []string
 }
 
 type sessionInfo struct {
@@ -59,7 +63,7 @@ type processorMetrics struct {
 func NewLoaderProcessor(pubSub *messaging.PubSub, groupNumber int, config *config.Config, workerID int) *loaderProcessor {
 	lp := &loaderProcessor{
 		pubSub:         pubSub,
-		cache:          make([]map[string]interface{}, 0, 200), // Initial capacity
+		cache:          make([]map[string]interface{}, 0, config.BatchSizeRecords), // Initial capacity
 		groupNumber:    groupNumber,
 		config:         config,
 		thresholdBytes: config.BatchSizeBytes,
@@ -78,10 +82,21 @@ func NewLoaderProcessor(pubSub *messaging.PubSub, groupNumber int, config *confi
 		},
 
 		lastMemCheck:      time.Now(),
-		memCheckInterval:  5 * time.Second, // Check memory every 5 seconds
-		adaptiveBatchSize: 3000,            // Start with reasonable batch size
+		memCheckInterval:  60 * time.Second, // Check memory every 60 seconds
+		adaptiveBatchSize: 3000,             // Start with reasonable batch size
 		memoryPressure:    false,
+		whitelist: []string{
+			"Lap", "LapDistPct", "Speed", "Throttle", "Brake", "Gear", "RPM",
+			"SteeringWheelAngle", "VelocityX", "VelocityY", "VelocityZ", "Lat", "Lon", "SessionTime",
+			"PlayerCarPosition", "FuelLevel", "PlayerCarIdx", "SessionNum", "alt", "LatAccel", "LongAccel",
+			"VertAccel", "pitch", "roll", "yaw", "YawNorth", "Voltage", "LapLastLapTime", "WaterTemp",
+			"LapDeltaToBestLap", "LapCurrentLapTime", "LFpressure", "RFpressure", "LRpressure", "RRpressure", "LFtempM",
+			"RFtempM", "LRtempM", "RRtempM",
+		},
 	}
+
+	// Pre-cache whitelist field keys for fast copying (avoid map iteration)
+	lp.fieldKeys = lp.Whitelist()
 
 	return lp
 }
@@ -161,14 +176,7 @@ func (l *loaderProcessor) flushTimerCallback() {
 }
 
 func (l *loaderProcessor) Whitelist() []string {
-	return []string{
-		"Lap", "LapDistPct", "Speed", "Throttle", "Brake", "Gear", "RPM",
-		"SteeringWheelAngle", "VelocityX", "VelocityY", "VelocityZ", "Lat", "Lon", "SessionTime",
-		"PlayerCarPosition", "FuelLevel", "PlayerCarIdx", "SessionNum", "alt", "LatAccel", "LongAccel",
-		"VertAccel", "pitch", "roll", "yaw", "YawNorth", "Voltage", "LapLastLapTime", "WaterTemp",
-		"LapDeltaToBestLap", "LapCurrentLapTime", "LFpressure", "RFpressure", "LRpressure", "RRpressure", "LFtempM",
-		"RFtempM", "LRtempM", "RRtempM",
-	}
+	return l.whitelist
 }
 
 func (l *loaderProcessor) Process(input ibt.Tick, hasNext bool, session *headers.Session) error {
@@ -192,10 +200,20 @@ func (l *loaderProcessor) Process(input ibt.Tick, hasNext bool, session *headers
 
 	// Removed frequent logging for performance
 
+	// Get a pooled map and copy the tick data
+	// CRITICAL: We must copy because NextZeroCopy() reuses the same tick map
+	// on every call. Without copying, all cached records would reference the
+	// same map and have identical (latest) values.
+	//
+	// OPTIMIZATION: Use pre-cached field keys instead of iterating the map.
+	// This eliminates map iteration overhead (39 fields × 120M ticks = 4.68B ops saved)
 	enrichedInput := l.bufferPool.Get().(map[string]interface{})
 
-	for k, v := range input {
-		enrichedInput[k] = v
+	// Fast path: Copy using pre-cached keys (avoids map iteration)
+	for _, key := range l.fieldKeys {
+		if val, exists := input[key]; exists {
+			enrichedInput[key] = val
+		}
 	}
 
 	enrichedInput["groupNum"] = l.groupNumber
@@ -238,7 +256,7 @@ func (l *loaderProcessor) Process(input ibt.Tick, hasNext bool, session *headers
 		enrichedInput["trackID"] = 0
 	}
 
-	estimatedSize := len(input)*20 + 100 // Rough estimate
+	estimatedSize := l.estimateJSONSize(enrichedInput)
 
 	l.mu.Lock()
 

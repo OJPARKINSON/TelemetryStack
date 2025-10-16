@@ -51,21 +51,12 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 		return nil, fmt.Errorf("failed to parse time from filename: %w", err)
 	}
 
-	fullPath := filepath.Join(telemetryFolder, fileName)
-
-	files, err := filepath.Glob(fullPath)
-	if err != nil {
-		return nil, fmt.Errorf("could not glob file %s: %w", fullPath, err)
-	}
-
-	if len(files) == 0 {
-		return nil, fmt.Errorf("no files found matching pattern: %s", fullPath)
-	}
+	file := filepath.Join(telemetryFolder, fileName)
 
 	// Reduced logging for performance
-	stubs, err := ibt.ParseStubs(files...)
+	stubs, err := ibt.ParseStubs(file)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse stubs for %v: %w", files, err)
+		return nil, fmt.Errorf("failed to parse stubs for %v: %w", file, err)
 	}
 
 	if len(stubs) == 0 {

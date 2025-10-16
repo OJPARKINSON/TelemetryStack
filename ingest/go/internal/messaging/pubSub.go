@@ -364,17 +364,23 @@ func (ps *PubSub) transformRecord(record map[string]interface{}) *Telemetry {
 
 	sessionNum := ""
 	if val, ok := record["SessionNum"]; ok {
-		sessionNum = fmt.Sprintf("%v", val)
+		if v, ok := val.(int); ok {
+			sessionNum = strconv.Itoa(v)
+		}
 	}
 
 	sessionType := ""
 	if val, ok := record["sessionType"]; ok {
-		sessionType = fmt.Sprintf("%v", val)
+		if v, ok := val.(int); ok {
+			sessionType = strconv.Itoa(v)
+		}
 	}
 
 	sessionName := ""
 	if val, ok := record["sessionName"]; ok {
-		sessionName = fmt.Sprintf("%v", val)
+		if v, ok := val.(int); ok {
+			sessionName = strconv.Itoa(v)
+		}
 	}
 
 	trackName := ""
@@ -385,12 +391,16 @@ func (ps *PubSub) transformRecord(record map[string]interface{}) *Telemetry {
 
 	trackID := ""
 	if val, ok := record["trackID"]; ok {
-		trackID = fmt.Sprintf("%v", val)
+		if v, ok := val.(int); ok {
+			trackID = strconv.Itoa(v)
+		}
 	}
 
 	carID := ""
 	if val, ok := record["PlayerCarIdx"]; ok {
-		carID = fmt.Sprintf("%v", val)
+		if v, ok := val.(int); ok {
+			carID = strconv.Itoa(v)
+		}
 	}
 
 	tickTime := ps.sessionTime.Add(time.Duration(sessionTime * float64(time.Second)))
