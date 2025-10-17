@@ -3,7 +3,7 @@ module github.com/OJPARKINSON/IRacing-Display/ingest/go
 go 1.24
 
 require (
-	github.com/OJPARKINSON/ibt v0.0.0-20250726143902-84776e9ce68d
+	github.com/OJPARKINSON/ibt v0.1.3
 	github.com/fatih/color v1.18.0
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/teamjorge/ibt v0.0.0-20240923192211-5f50fa19d38d

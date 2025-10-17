@@ -78,7 +78,7 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 	totalRecords := 0
 	totalBatches := 0
 
-	processors := make([]*loaderProcessor, 0, len(groups))
+	processors := make([]ibt.Processor, 0, len(groups))
 
 	for groupNumber, group := range groups {
 		select {
@@ -93,7 +93,13 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 			return nil, ctx.Err()
 		default:
 		}
-		processor := NewLoaderProcessor(fp.pubSub, groupNumber, fp.config, fp.workerID)
+
+		var processor ibt.Processor
+		if fp.config.UseStructPipeline {
+			processor = NewStructProcessor(fp.pubSub, groupNumber, fp.config, fp.workerID)
+		} else {
+			processor = NewLoaderProcessor(fp.pubSub, groupNumber, fp.config, fp.workerID)
+		}
 		processors = append(processors, processor)
 
 		if err := ibt.Process(ctx, group, processor); err != nil {
@@ -109,8 +115,10 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 		}
 
 		metrics := processor.GetMetrics()
-		totalRecords += metrics.totalProcessed
-		totalBatches += metrics.totalBatches
+		if m, ok := metrics.(ProcessorMetrics); ok {
+			totalRecords += m.TotalProcessed
+			totalBatches += m.TotalBatches
+		}
 	}
 
 	ibt.CloseAllStubs(groups)

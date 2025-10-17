@@ -22,7 +22,7 @@ type loaderProcessor struct {
 	mu             sync.Mutex
 	lastFlush      time.Time
 	flushTimer     *time.Timer
-	metrics        processorMetrics
+	metrics        ProcessorMetrics
 	currentBytes   int
 	batchBuffer    []map[string]interface{}
 	bufferPool     *sync.Pool
@@ -50,14 +50,14 @@ type sessionInfo struct {
 	sessionName string
 }
 
-type processorMetrics struct {
-	totalProcessed       int
-	totalBatches         int
-	processingTime       time.Duration
-	maxBatchSize         int
-	processingStarted    time.Time
-	memoryPressureEvents int
-	adaptiveBatchSize    int
+type ProcessorMetrics struct {
+	TotalProcessed       int
+	TotalBatches         int
+	ProcessingTime       time.Duration
+	MaxBatchSize         int
+	ProcessingStarted    time.Time
+	MemoryPressureEvents int
+	AdaptiveBatchSize    int
 }
 
 func NewLoaderProcessor(pubSub *messaging.PubSub, groupNumber int, config *config.Config, workerID int) *loaderProcessor {
@@ -71,8 +71,8 @@ func NewLoaderProcessor(pubSub *messaging.PubSub, groupNumber int, config *confi
 		lastFlush:      time.Now(),
 		currentBytes:   0,
 		sessionMap:     make(map[int]sessionInfo),
-		metrics: processorMetrics{
-			processingStarted: time.Now(),
+		metrics: ProcessorMetrics{
+			ProcessingStarted: time.Now(),
 		},
 		batchBuffer: make([]map[string]interface{}, 0, 1000),
 		bufferPool: &sync.Pool{
@@ -130,7 +130,7 @@ func (l *loaderProcessor) checkMemoryPressure() {
 		if l.adaptiveBatchSize > 500 {
 			l.adaptiveBatchSize = l.adaptiveBatchSize / 2
 			if !previousPressure {
-				l.metrics.memoryPressureEvents++
+				l.metrics.MemoryPressureEvents++
 				log.Printf("Worker %d: MEMORY PRESSURE detected (heap: %.1fMB, usage: %.1f%%, GC pause: %dus) - reducing batch size to %d",
 					l.workerID, heapMB, heapUsageRatio*100, memStats.PauseNs[(memStats.NumGC+255)%256]/1000, l.adaptiveBatchSize)
 			}
@@ -283,9 +283,9 @@ func (l *loaderProcessor) Process(input ibt.Tick, hasNext bool, session *headers
 	l.cache = append(l.cache, enrichedInput)
 	l.currentBytes += estimatedSize
 
-	l.metrics.totalProcessed++
-	if len(l.cache) > l.metrics.maxBatchSize {
-		l.metrics.maxBatchSize = len(l.cache)
+	l.metrics.TotalProcessed++
+	if len(l.cache) > l.metrics.MaxBatchSize {
+		l.metrics.MaxBatchSize = len(l.cache)
 	}
 
 	l.mu.Unlock()
@@ -383,7 +383,7 @@ func (l *loaderProcessor) loadBatch() error {
 	l.currentBytes = 0
 	l.lastFlush = time.Now()
 
-	l.metrics.totalBatches++
+	l.metrics.TotalBatches++
 
 	return err
 }
@@ -422,28 +422,28 @@ func (l *loaderProcessor) Close() error {
 }
 
 func (l *loaderProcessor) logMetrics() {
-	totalTime := time.Since(l.metrics.processingStarted).Milliseconds()
+	totalTime := time.Since(l.metrics.ProcessingStarted).Milliseconds()
 	var pointsPerSecond int64
 	if totalTime > 0 {
-		pointsPerSecond = int64(l.metrics.totalProcessed) * 1000 / totalTime
+		pointsPerSecond = int64(l.metrics.TotalProcessed) * 1000 / totalTime
 	}
 
 	log.Printf("Worker %d processing metrics for group %d:", l.workerID, l.groupNumber)
-	log.Printf("  Total points processed: %d", l.metrics.totalProcessed)
-	log.Printf("  Total batches sent: %d", l.metrics.totalBatches)
-	log.Printf("  Maximum batch size: %d", l.metrics.maxBatchSize)
+	log.Printf("  Total points processed: %d", l.metrics.TotalProcessed)
+	log.Printf("  Total batches sent: %d", l.metrics.TotalBatches)
+	log.Printf("  Maximum batch size: %d", l.metrics.MaxBatchSize)
 	log.Printf("  Final adaptive batch size: %d", l.adaptiveBatchSize)
-	log.Printf("  Memory pressure events: %d", l.metrics.memoryPressureEvents)
+	log.Printf("  Memory pressure events: %d", l.metrics.MemoryPressureEvents)
 	log.Printf("  Processing time: %d milliseconds", totalTime)
 	log.Printf("  Points per second: %d", pointsPerSecond)
 }
 
-func (l *loaderProcessor) GetMetrics() processorMetrics {
+func (l *loaderProcessor) GetMetrics() interface{} {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
 	// Update current adaptive batch size in metrics
-	l.metrics.adaptiveBatchSize = l.adaptiveBatchSize
+	l.metrics.AdaptiveBatchSize = l.adaptiveBatchSize
 
 	return l.metrics
 }

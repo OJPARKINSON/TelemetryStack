@@ -40,6 +40,8 @@ type Config struct {
 	RabbitMQFrameSize     int
 
 	BatchSizeRecords int
+
+	UseStructPipeline bool
 }
 
 func LoadConfig() *Config {
@@ -85,6 +87,8 @@ func LoadConfig() *Config {
 		RabbitMQHeartbeat:     getEnvAsDuration("RABBITMQ_HEARTBEAT", 60*time.Second),
 		RabbitMQChannelMax:    getEnvAsInt("RABBITMQ_CHANNEL_MAX", 8192),
 		RabbitMQFrameSize:     getEnvAsInt("RABBITMQ_FRAME_SIZE", 16777216),
+
+		UseStructPipeline: getEnvAsBool("USE_STRUCT_PIPELINE", true),
 
 		// Record Processing
 		BatchSizeRecords: getEnvAsInt("BATCH_SIZE_RECORDS", 16000),
