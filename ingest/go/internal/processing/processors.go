@@ -10,7 +10,7 @@ import (
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/config"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/messaging"
 	"github.com/OJPARKINSON/ibt"
-	"github.com/teamjorge/ibt/headers"
+	"github.com/OJPARKINSON/ibt/headers"
 )
 
 type loaderProcessor struct {
@@ -160,19 +160,6 @@ func min(a, b int) int {
 		return a
 	}
 	return b
-}
-
-func (l *loaderProcessor) flushTimerCallback() {
-	l.mu.Lock()
-	hasData := len(l.cache) > 0
-	if hasData {
-		if err := l.loadBatch(); err != nil {
-			log.Printf("Worker %d: Error during auto-flush: %v", l.workerID, err)
-		}
-	}
-	l.mu.Unlock()
-
-	l.flushTimer.Reset(l.config.BatchTimeout)
 }
 
 func (l *loaderProcessor) Whitelist() []string {

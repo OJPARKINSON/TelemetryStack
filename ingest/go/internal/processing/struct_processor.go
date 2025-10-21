@@ -8,7 +8,7 @@ import (
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/config"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/messaging"
 	"github.com/OJPARKINSON/ibt"
-	"github.com/teamjorge/ibt/headers"
+	"github.com/OJPARKINSON/ibt/headers"
 )
 
 type structLoaderProcessor struct {
@@ -26,6 +26,10 @@ type structLoaderProcessor struct {
 	sessionInfoSet bool
 
 	tickPool *sync.Pool
+
+	// Metrics tracking
+	totalProcessed int
+	totalBatches   int
 }
 
 func NewStructProcessor(pubSub *messaging.PubSub, groupNumber int, config *config.Config, workerID int) *structLoaderProcessor {
@@ -84,6 +88,7 @@ func (l *structLoaderProcessor) ProcessStruct(tick *ibt.TelemetryTick, hasNext b
 	}
 
 	l.cache = append(l.cache, tick)
+	l.totalProcessed++
 
 	return nil
 }
@@ -105,6 +110,7 @@ func (l *structLoaderProcessor) loadBatch() error {
 	}
 
 	l.cache = l.cache[:0]
+	l.totalBatches++
 
 	return nil
 }
@@ -156,6 +162,7 @@ func (l *structLoaderProcessor) GetMetrics() interface{} {
 	defer l.mu.Unlock()
 
 	return ProcessorMetrics{
-		TotalProcessed: len(l.cache),
+		TotalProcessed: l.totalProcessed,
+		TotalBatches:   l.totalBatches,
 	}
 }

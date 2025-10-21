@@ -1,7 +1,6 @@
 package messaging
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -17,12 +16,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
-var jsonBufferPool = sync.Pool{
-	New: func() interface{} {
-		return &bytes.Buffer{}
-	},
-}
 
 type ConnectionPool struct {
 	connections []*amqp.Connection
@@ -75,7 +68,7 @@ func (p *ConnectionPool) GetChannel() *amqp.Channel {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	if p.channels == nil || len(p.channels) == 0 {
+	if len(p.channels) == 0 {
 		return nil
 	}
 

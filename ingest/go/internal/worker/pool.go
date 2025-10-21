@@ -69,12 +69,18 @@ type PoolMetrics struct {
 func NewWorkerPool(cfg *config.Config, logger *zap.Logger) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	rabbitPool, err := messaging.NewConnectionPool(cfg.RabbitMQURL, cfg.RabbitMQPoolSize)
-	if err != nil {
-		logger.Fatal("Failed to create RabbitMQ connection pool", zap.Error(err))
-	}
+	var rabbitPool *messaging.ConnectionPool
+	var err error
 
-	logger.Info("Created RabbitMQ connection pool", zap.Int("connections", cfg.RabbitMQPoolSize))
+	if !cfg.DisableRabbitMQ {
+		rabbitPool, err = messaging.NewConnectionPool(cfg.RabbitMQURL, cfg.RabbitMQPoolSize)
+		if err != nil {
+			logger.Fatal("Failed to create RabbitMQ connection pool", zap.Error(err))
+		}
+		logger.Info("Created RabbitMQ connection pool", zap.Int("connections", cfg.RabbitMQPoolSize))
+	} else {
+		logger.Info("RabbitMQ disabled - running in benchmark mode")
+	}
 
 	workerMetrics := make([]WorkerMetrics, cfg.WorkerCount)
 	for i := range workerMetrics {
