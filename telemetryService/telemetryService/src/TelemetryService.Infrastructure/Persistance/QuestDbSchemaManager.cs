@@ -102,7 +102,7 @@ public class QuestDbSchemaManager : IDisposable
                 session_name SYMBOL CAPACITY 50 INDEX,
                 car_id SYMBOL CAPACITY 1000 INDEX,
                 gear INT,
-                player_car_position LONG,
+                player_car_position INT,
                 speed DOUBLE,
                 lap_dist_pct DOUBLE,
                 session_time DOUBLE,

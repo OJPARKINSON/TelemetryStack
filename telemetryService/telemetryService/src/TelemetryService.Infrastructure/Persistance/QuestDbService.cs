@@ -40,6 +40,8 @@ public static class QuestDbService
 
     private static async Task WritePartitionedBatch(List<Telemetry> records, string tableName)
     {
+
+        return;
         // Partition records by session_id hash for consistent routing (dedup safety)
         var partitions = records
             .GroupBy(r => Math.Abs((r.SessionId ?? "unknown").GetHashCode()) % PartitionCount)

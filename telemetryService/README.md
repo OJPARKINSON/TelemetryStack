@@ -157,7 +157,7 @@ CREATE TABLE TelemetryTicks (
     -- Core telemetry data
     car_id VARCHAR,
     gear INT,
-    player_car_position LONG,
+    player_car_position INT,
     speed DOUBLE,
     lap_dist_pct DOUBLE,
     session_time DOUBLE,
