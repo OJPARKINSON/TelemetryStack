@@ -94,12 +94,8 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 		default:
 		}
 
-		var processor ibt.Processor
-		if fp.config.UseStructPipeline {
-			processor = NewStructProcessor(fp.pubSub, groupNumber, fp.config, fp.workerID)
-		} else {
-			processor = NewLoaderProcessor(fp.pubSub, groupNumber, fp.config, fp.workerID)
-		}
+		// Create telemetry processor
+		processor := NewProcessor(fp.pubSub, groupNumber, fp.config, fp.workerID)
 		processors = append(processors, processor)
 
 		if err := ibt.Process(ctx, group, processor); err != nil {
