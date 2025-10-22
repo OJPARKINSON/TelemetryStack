@@ -224,11 +224,5 @@ func (l *loaderProcessor) FlushPendingData() error {
 }
 
 func (l *loaderProcessor) GetMetrics() interface{} {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	return ProcessorMetrics{
-		TotalProcessed: l.totalProcessed,
-		TotalBatches:   l.totalBatches,
-	}
+	return nil // Return nil for now - can be extended later if needed
 }

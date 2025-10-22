@@ -181,6 +181,11 @@ func (wp *WorkerPool) Stop() {
 	close(wp.resultsChan)
 	close(wp.errorsChan)
 
+	// Stop progress display
+	if wp.progressDisplay != nil {
+		wp.progressDisplay.Stop()
+	}
+
 	wp.logFinalMetrics()
 	wp.logger.Info("Worker pool stopped gracefully")
 }
@@ -222,27 +227,7 @@ func (wp *WorkerPool) UpdateWorkerStatus(workerID int, currentFile, status strin
 		wp.workerMetrics[workerID].LastActivity = time.Now()
 
 		if wp.progressDisplay != nil {
-			var displayStatus WorkerStatus
-			switch status {
-			case "PROCESSING":
-				displayStatus = StatusProcessing
-			case "ERROR":
-				displayStatus = StatusError
-			case "COMPLETED":
-				displayStatus = StatusCompleted
-			default:
-				displayStatus = StatusIdle
-			}
-
-			wm := wp.workerMetrics[workerID]
-			wp.progressDisplay.UpdateWorker(
-				workerID,
-				wm.FilesProcessed,
-				wm.TotalRecords,
-				wm.TotalBatches,
-				wm.CurrentFile,
-				displayStatus,
-			)
+			wp.progressDisplay.UpdateWorker(workerID, currentFile, status)
 		}
 	}
 }
@@ -313,19 +298,25 @@ func (wp *WorkerPool) handleResult(result WorkResult) {
 	}
 
 	if wp.progressDisplay != nil {
-		status := StatusCompleted
 		if result.WorkerID >= 0 && result.WorkerID < len(wp.workerMetrics) {
-			wm := wp.workerMetrics[result.WorkerID]
-			wp.progressDisplay.UpdateWorkerWithTiming(
-				result.WorkerID,
-				wm.FilesProcessed,
-				wm.TotalRecords,
-				wm.TotalBatches,
-				wm.CurrentFile,
-				status,
-				wm.AvgTimePerFile,
-				wm.TotalFileTime,
-			)
+			wm := &wp.workerMetrics[result.WorkerID]
+
+			// Update status to IDLE (worker is now waiting for more work)
+			wp.progressDisplay.UpdateWorker(result.WorkerID, "", "IDLE")
+
+			// Update stats
+			throughput := 0.0
+			if result.Duration.Seconds() > 0 {
+				// Rough estimate: assuming average record size of 512 bytes
+				bytesProcessed := float64(result.ProcessedCount * 512)
+				throughput = (bytesProcessed / 1024 / 1024) / result.Duration.Seconds()
+			}
+
+			wp.progressDisplay.UpdateWorkerStats(result.WorkerID, WorkerStats{
+				FilesProcessed:   wm.FilesProcessed,
+				RecordsProcessed: int(wm.TotalRecords),
+				Throughput:       throughput,
+			})
 		}
 	}
 

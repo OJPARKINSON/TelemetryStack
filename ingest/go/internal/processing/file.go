@@ -110,11 +110,8 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 			return nil, fmt.Errorf("error closing processor for group %d: %w", groupNumber, err)
 		}
 
-		metrics := processor.GetMetrics()
-		if m, ok := metrics.(ProcessorMetrics); ok {
-			totalRecords += m.TotalProcessed
-			totalBatches += m.TotalBatches
-		}
+		// Get metrics if available (currently returns nil)
+		_ = processor.GetMetrics()
 	}
 
 	ibt.CloseAllStubs(groups)

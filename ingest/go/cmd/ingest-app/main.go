@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -26,20 +27,14 @@ var logger *zap.Logger
 
 func main() {
 	// Define CLI flags
-	var (
-		quiet        = flag.Bool("quiet", false, "Disable progress display entirely")
-		help         = flag.Bool("help", false, "Show help message")
-	)
+	var quiet = flag.Bool("quiet", false, "Disable progress display")
+	var verbose = flag.Bool("verbose", false, "Enable verbose logging")
+	var help = flag.Bool("help", false, "Show help")
+
 	flag.Parse()
 
 	if *help {
-		fmt.Println("IRacing Telemetry Ingest Service")
-		fmt.Println()
-		fmt.Println("Usage: ./ingest-app [options] <telemetry-folder-path>")
-		fmt.Println()
-		fmt.Println("Options:")
-		fmt.Println("  --quiet          Disable progress display entirely")
-		fmt.Println("  --help           Show this help message")
+		printHelp()
 		os.Exit(0)
 	}
 
@@ -47,18 +42,21 @@ func main() {
 
 	// Initialize Zap logger
 	var err error
-	if *quiet {
-		// Production logger config when quiet
-		logger, err = zap.NewProduction()
-	} else {
-		// Development logger config for better terminal output
+	if *verbose {
+		// Verbose mode: full development logging
 		logger, err = zap.NewDevelopment()
+	} else {
+		// Silent mode: only fatal errors
+		config := zap.NewProductionConfig()
+		config.Level = zap.NewAtomicLevelAt(zap.FatalLevel)
+		logger, err = config.Build()
 	}
 	if err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
 	defer logger.Sync()
 
+	// Load configuration
 	cfg := config.LoadConfig()
 
 	// Apply GOMAXPROCS if explicitly configured (0 means use Go's default)
@@ -97,6 +95,7 @@ func main() {
 		logger.Info("CPU profiling enabled", zap.String("file", cpuProfile))
 	}
 
+	// Setup context and signal handling
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -115,24 +114,23 @@ func main() {
 	}
 
 	telemetryFolder := args[0]
-
 	if !strings.HasSuffix(telemetryFolder, string(filepath.Separator)) {
 		telemetryFolder += string(filepath.Separator)
 	}
 
+	// Create worker pool
 	pool := worker.NewWorkerPool(cfg, logger)
 
+	// Discover and queue files
 	expectedFiles, err := discoverAndQueueFiles(ctx, pool, telemetryFolder, cfg, logger)
 	if err != nil {
 		logger.Error("Error during file discovery", zap.Error(err))
 		return
 	}
 
-	// Initialize progress display - bottom status is now the only mode
+	// Initialize progress display
 	if !*quiet {
 		progress = worker.NewProgressDisplay(cfg.WorkerCount, expectedFiles)
-		// Zap logs will flow above the bottom status bar
-
 		pool.SetProgressDisplay(progress)
 		progress.Start()
 		defer progress.Stop()
@@ -146,9 +144,11 @@ func main() {
 			zap.Int("files", expectedFiles))
 	}
 
+	// Start worker pool
 	pool.Start()
 	defer pool.Stop()
 
+	// Wait for completion
 	waitForCompletion(ctx, pool, startTime, expectedFiles, *quiet)
 
 	if !*quiet {
@@ -171,7 +171,31 @@ func main() {
 		}
 	}
 
+	// Give a moment for final logs to flush
 	time.Sleep(2 * time.Second)
+}
+
+func printHelp() {
+	fmt.Println("IRacing Telemetry Ingest Service")
+	fmt.Println()
+	fmt.Println("Usage: ./ingest-app [options] <telemetry-folder-path>")
+	fmt.Println()
+	fmt.Println("Options:")
+	fmt.Println("  --quiet          Disable progress display")
+	fmt.Println("  --verbose        Enable verbose logging (default: silent except errors)")
+	fmt.Println("  --help           Show this help message")
+	fmt.Println()
+	fmt.Println("Environment Variables:")
+	fmt.Println("  WORKER_COUNT              Number of parallel workers (default: CPU count + 25%)")
+	fmt.Println("  BATCH_SIZE_BYTES          Batch size in bytes (default: 32MB)")
+	fmt.Println("  BATCH_SIZE_RECORDS        Records per batch (default: 16000)")
+	fmt.Println("  DISABLE_RABBITMQ          Set to 'true' to disable RabbitMQ (default: false)")
+	fmt.Println("  RABBITMQ_URL              RabbitMQ connection URL")
+	fmt.Println("  ENABLE_PPROF              Enable pprof profiling server on :6060")
+	fmt.Println("  CPU_PROFILE               Write CPU profile to file")
+	fmt.Println("  MEM_PROFILE               Write memory profile to file")
+	fmt.Println("  GOMAXPROCS                Set GOMAXPROCS (default: auto)")
+	fmt.Println()
 }
 
 func discoverAndQueueFiles(ctx context.Context, pool *worker.WorkerPool, telemetryFolder string, cfg *config.Config, logger *zap.Logger) (int, error) {

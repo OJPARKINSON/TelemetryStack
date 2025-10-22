@@ -122,9 +122,9 @@ type PubSub struct {
 	maxConsecutiveFailures int
 
 	// Async publishing
-	publishQueue chan *publishRequest
-	publishWg    sync.WaitGroup
-	publishDone  chan struct{}
+	publishQueue   chan *publishRequest
+	publishWg      sync.WaitGroup
+	publishDone    chan struct{}
 	isShuttingDown atomic.Bool
 
 	mu sync.Mutex
@@ -689,5 +689,18 @@ func (ps *PubSub) GetMetrics() PublishMetrics {
 		PersistedBatches:    ps.persistedBatches,
 		CircuitBreakerOpen:  ps.circuitBreakerOpen,
 		ConsecutiveFailures: ps.consecutiveFailures,
+	}
+}
+
+func (ps *PubSub) GetDisplayMetrics() map[string]interface{} {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	return map[string]interface{}{
+		"batches_sent":    ps.totalBatches,
+		"records_send":    ps.totalRecords,
+		"queue_size":      len(ps.publishQueue),
+		"circuit_breaker": ps.circuitBreakerOpen,
+		"failed_batches":  ps.failedBatchCount,
 	}
 }
