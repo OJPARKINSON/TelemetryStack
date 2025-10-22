@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/config"
@@ -20,10 +21,9 @@ import (
 type ConnectionPool struct {
 	connections []*amqp.Connection
 	channels    []*amqp.Channel
-	mu          sync.RWMutex
 	url         string
 	poolSize    int
-	current     int
+	current     atomic.Uint32 // Lock-free round-robin counter
 }
 
 func NewConnectionPool(url string, poolSize int) (*ConnectionPool, error) {
@@ -65,19 +65,17 @@ func NewConnectionPool(url string, poolSize int) (*ConnectionPool, error) {
 }
 
 func (p *ConnectionPool) GetChannel() *amqp.Channel {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
 	if len(p.channels) == 0 {
 		return nil
 	}
 
-	ch := p.channels[p.current]
-	p.current = (p.current + 1) % p.poolSize
+	// Lock-free round-robin using atomic operations
+	idx := p.current.Add(1) % uint32(p.poolSize)
+	ch := p.channels[idx]
 
 	// Check if channel is still open
 	if ch == nil || ch.IsClosed() {
-		log.Printf("Channel %d is closed, attempting to recreate", p.current-1)
+		log.Printf("Channel %d is closed, attempting to recreate", idx)
 		return nil
 	}
 
@@ -85,9 +83,6 @@ func (p *ConnectionPool) GetChannel() *amqp.Channel {
 }
 
 func (p *ConnectionPool) Close() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	for i := 0; i < len(p.channels); i++ {
 		if p.channels[i] != nil {
 			p.channels[i].Close()
@@ -126,7 +121,19 @@ type PubSub struct {
 	circuitBreakerTimeout  time.Duration
 	maxConsecutiveFailures int
 
+	// Async publishing
+	publishQueue chan *publishRequest
+	publishWg    sync.WaitGroup
+	publishDone  chan struct{}
+	isShuttingDown atomic.Bool
+
 	mu sync.Mutex
+}
+
+type publishRequest struct {
+	batch *TelemetryBatch
+	data  []byte
+	errCh chan error
 }
 
 type PublishMetrics struct {
@@ -167,9 +174,17 @@ func NewPubSub(sessionId string, sessionTime time.Time, cfg *config.Config, pool
 		consecutiveFailures:    0,
 		circuitBreakerTimeout:  30 * time.Second, // 30 seconds before retrying RabbitMQ
 		maxConsecutiveFailures: 3,                // Open circuit after 3 consecutive failures
+
+		// Async publishing - buffer up to 20 batches to prevent blocking
+		publishQueue: make(chan *publishRequest, 20),
+		publishDone:  make(chan struct{}),
 	}
 
 	ps.recordBatch = make([]*Telemetry, 0, cfg.BatchSizeRecords)
+
+	// Start async publisher goroutine
+	ps.publishWg.Add(1)
+	go ps.publishWorker()
 
 	return ps
 }
@@ -448,6 +463,113 @@ func (ps *PubSub) transformRecord(record map[string]interface{}) *Telemetry {
 	}
 }
 
+// publishWorker runs in background goroutine to handle async publishing
+func (ps *PubSub) publishWorker() {
+	defer ps.publishWg.Done()
+
+	for {
+		select {
+		case req := <-ps.publishQueue:
+			err := ps.doPublish(req.batch, req.data)
+			req.errCh <- err
+		case <-ps.publishDone:
+			// Drain remaining messages before shutting down
+			for len(ps.publishQueue) > 0 {
+				req := <-ps.publishQueue
+				err := ps.doPublish(req.batch, req.data)
+				req.errCh <- err
+			}
+			return
+		}
+	}
+}
+
+// doPublish performs the actual RabbitMQ publish operation
+func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte) error {
+	// Check circuit breaker - if open, skip RabbitMQ and go straight to persistence
+	if ps.shouldSkipRabbitMQ() {
+		log.Printf("Worker %d: Circuit breaker open, persisting batch %s directly", ps.workerID, batch.BatchId)
+		if persistErr := ps.persistBatch(data, batch.BatchId); persistErr != nil {
+			return fmt.Errorf("circuit breaker open AND failed to persist batch: %v", persistErr)
+		}
+		return nil
+	}
+
+	// During shutdown, only try once with no retries to avoid delays
+	maxRetries := 3
+	if ps.isShuttingDown.Load() {
+		maxRetries = 1
+	}
+
+	for retry := 0; retry < maxRetries; retry++ {
+		ch := ps.pool.GetChannel()
+		if ch == nil {
+			if retry < maxRetries-1 {
+				time.Sleep(time.Duration(retry+1) * 100 * time.Millisecond)
+				continue
+			}
+			return fmt.Errorf("failed to get channel after %d retries", maxRetries)
+		}
+
+		// Reduce timeout from 10s to 1s for fast-fail
+		ctx, cancel := context.WithTimeout(ps.ctx, 1*time.Second)
+
+		err := ch.PublishWithContext(ctx, "telemetry_topic", "telemetry.ticks", false, false,
+			amqp.Publishing{
+				ContentType:  "application/x-protobuf",
+				Body:         data,
+				DeliveryMode: amqp.Transient,
+				Timestamp:    time.Now(),
+				MessageId:    batch.BatchId,
+				Headers: amqp.Table{
+					"worker_id":    ps.workerID,
+					"record_count": len(batch.Records),
+					"batch_size":   len(data),
+					"format":       "protobuf",
+				},
+			})
+
+		cancel()
+
+		if err == nil {
+			// Success! Record this and reset circuit breaker
+			ps.recordRabbitMQSuccess()
+			return nil
+		}
+
+		log.Printf("Worker %d: Failed to publish batch (attempt %d/%d): %v",
+			ps.workerID, retry+1, maxRetries, err)
+
+		// Skip sleep during shutdown to speed up
+		if retry < maxRetries-1 && !ps.isShuttingDown.Load() {
+			time.Sleep(time.Duration(retry+1) * 250 * time.Millisecond)
+		}
+	}
+
+	// If we reach here, RabbitMQ publish failed completely
+	// Record the failure for circuit breaker
+	ps.recordRabbitMQFailure()
+
+	// Persist the batch to disk for later recovery
+	if persistErr := ps.persistBatch(data, batch.BatchId); persistErr != nil {
+		log.Printf("Worker %d: CRITICAL - Failed to persist batch %s: %v", ps.workerID, batch.BatchId, persistErr)
+		return fmt.Errorf("failed to publish batch after %d retries AND failed to persist: %v", maxRetries, persistErr)
+	}
+
+	log.Printf("Worker %d: Batch %s persisted to disk after RabbitMQ failure (consecutive failures: %d)",
+		ps.workerID, batch.BatchId, ps.consecutiveFailures)
+
+	// Periodically clean up old batches
+	ps.mu.Lock()
+	ps.failedBatchCount++
+	if ps.failedBatchCount%10 == 0 {
+		go ps.cleanupOldBatches()
+	}
+	ps.mu.Unlock()
+
+	return nil // Don't return error since we've handled it via persistence
+}
+
 func (ps *PubSub) flushBatchInternal() error {
 	if len(ps.recordBatch) == 0 {
 		return nil
@@ -466,103 +588,49 @@ func (ps *PubSub) flushBatchInternal() error {
 		return fmt.Errorf("failed to marshal protobuf batch: %w", err)
 	}
 
-	// Check circuit breaker - if open, skip RabbitMQ and go straight to persistence
-	if ps.shouldSkipRabbitMQ() {
-		log.Printf("Worker %d: Circuit breaker open, persisting batch %s directly", ps.workerID, batch.BatchId)
-		if persistErr := ps.persistBatch(data, batch.BatchId); persistErr != nil {
-			return fmt.Errorf("circuit breaker open AND failed to persist batch: %v", persistErr)
-		}
-
-		// Mark batch as handled
+	// During shutdown, publish synchronously to avoid queuing delays
+	if ps.isShuttingDown.Load() {
+		err := ps.doPublish(batch, data)
 		ps.recordBatch = ps.recordBatch[:0]
 		ps.totalBytes = 0
 		ps.totalBatches++
-		ps.failedBatchCount++
 		ps.lastFlush = time.Now()
+		return err
+	}
+
+	// Try async publishing first (non-blocking if queue has space)
+	req := &publishRequest{
+		batch: batch,
+		data:  data,
+		errCh: make(chan error, 1),
+	}
+
+	select {
+	case ps.publishQueue <- req:
+		// Successfully queued for async publishing
+		// Clear batch immediately so parser can continue
+		ps.recordBatch = ps.recordBatch[:0]
+		ps.totalBytes = 0
+		ps.totalBatches++
+		ps.lastFlush = time.Now()
+
+		// Don't wait for result - let it publish async
+		// Errors are handled by the async worker
 		return nil
+
+	case <-time.After(100 * time.Millisecond):
+		// Queue is full/slow - do sync publish to avoid blocking parser too long
+		log.Printf("Worker %d: Publish queue full, falling back to sync publish", ps.workerID)
+		err := ps.doPublish(batch, data)
+
+		// Clear batch regardless of error (error is handled via persistence)
+		ps.recordBatch = ps.recordBatch[:0]
+		ps.totalBytes = 0
+		ps.totalBatches++
+		ps.lastFlush = time.Now()
+
+		return err
 	}
-
-	maxRetries := 3
-	for retry := 0; retry < maxRetries; retry++ {
-		ch := ps.pool.GetChannel()
-		if ch == nil {
-			if retry < maxRetries-1 {
-				time.Sleep(time.Duration(retry+1) * 100 * time.Millisecond)
-				continue
-			}
-			return fmt.Errorf("failed to get channel after %d retries", maxRetries)
-		}
-
-		ctx, cancel := context.WithTimeout(ps.ctx, 10*time.Second)
-
-		err := ch.PublishWithContext(ctx, "telemetry_topic", "telemetry.ticks", false, false,
-			amqp.Publishing{
-				ContentType:  "application/x-protobuf",
-				Body:         data,
-				DeliveryMode: amqp.Transient,
-				Timestamp:    time.Now(),
-				MessageId:    batch.BatchId,
-				Headers: amqp.Table{
-					"worker_id":    ps.workerID,
-					"record_count": len(ps.recordBatch),
-					"batch_size":   len(data),
-					"format":       "protobuf",
-				},
-			})
-
-		cancel()
-
-		if err == nil {
-			// Success! Record this and reset circuit breaker
-			ps.recordRabbitMQSuccess()
-
-			ps.recordBatch = ps.recordBatch[:0]
-			ps.totalBytes = 0
-			ps.totalBatches++
-			ps.lastFlush = time.Now()
-
-			if ps.totalBatches%50 == 0 {
-				log.Printf("Worker %d: Published batch %d (%d records, %d bytes)",
-					ps.workerID, ps.totalBatches, len(batch.Records), len(batch.Records))
-			}
-
-			return nil
-		}
-
-		log.Printf("Worker %d: Failed to publish batch (attempt %d/%d): %v",
-			ps.workerID, retry+1, maxRetries, err)
-
-		if retry < maxRetries-1 {
-			time.Sleep(time.Duration(retry+1) * 250 * time.Millisecond)
-		}
-	}
-
-	// If we reach here, RabbitMQ publish failed completely
-	// Record the failure for circuit breaker
-	ps.recordRabbitMQFailure()
-
-	// Persist the batch to disk for later recovery
-	if persistErr := ps.persistBatch(data, batch.BatchId); persistErr != nil {
-		log.Printf("Worker %d: CRITICAL - Failed to persist batch %s: %v", ps.workerID, batch.BatchId, persistErr)
-		return fmt.Errorf("failed to publish batch after %d retries AND failed to persist: %v", maxRetries, persistErr)
-	}
-
-	// Mark batch as handled (persisted) and continue processing
-	ps.recordBatch = ps.recordBatch[:0]
-	ps.totalBytes = 0
-	ps.totalBatches++
-	ps.failedBatchCount++
-	ps.lastFlush = time.Now()
-
-	log.Printf("Worker %d: Batch %s persisted to disk after RabbitMQ failure (consecutive failures: %d)",
-		ps.workerID, batch.BatchId, ps.consecutiveFailures)
-
-	// Periodically clean up old batches
-	if ps.failedBatchCount%10 == 0 {
-		go ps.cleanupOldBatches()
-	}
-
-	return nil // Don't return error since we've handled it via persistence
 }
 
 func (ps *PubSub) FlushBatch() error {
@@ -572,9 +640,31 @@ func (ps *PubSub) FlushBatch() error {
 }
 
 func (ps *PubSub) Close() error {
+	// Mark as shutting down to skip retries/delays
+	ps.isShuttingDown.Store(true)
+
+	// Flush any remaining batches
 	if err := ps.FlushBatch(); err != nil {
 		log.Printf("Worker %d: Error flushing final batch: %v", ps.workerID, err)
-		return err
+	}
+
+	// Signal async publisher to shut down
+	close(ps.publishDone)
+
+	// Wait for async publisher to finish with timeout
+	done := make(chan struct{})
+	go func() {
+		ps.publishWg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Normal shutdown completed
+	case <-time.After(2 * time.Second):
+		// Timeout - queue taking too long, abandon remaining messages
+		log.Printf("Worker %d: WARNING - Shutdown timeout, %d messages may be lost",
+			ps.workerID, len(ps.publishQueue))
 	}
 
 	log.Printf("Worker %d: Published %d batches with %d total records", ps.workerID, ps.totalBatches, ps.totalRecords)

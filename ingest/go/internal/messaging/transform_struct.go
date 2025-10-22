@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/OJPARKINSON/ibt"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -60,8 +59,8 @@ func TransformStructBatch(ticks []*ibt.TelemetryTick) ([]*Telemetry, error) {
 			SessionType: tick.SessionType,
 			SessionName: tick.SessionName,
 			TrackName:   tick.TrackName,
-			TrackId:  fmt.Sprintf("%d", tick.TrackID),
-			WorkerId: uint32(tick.WorkerID),
+			TrackId:     fmt.Sprintf("%d", tick.TrackID),
+			WorkerId:    uint32(tick.WorkerID),
 
 			TickTime: timestamppb.New(tick.TickTime),
 		}
@@ -80,33 +79,36 @@ func (ps *PubSub) ExecStructs(ticks []*ibt.TelemetryTick) error {
 		ps.workerID = ticks[0].WorkerID
 	}
 
+	// Transform batch (no lock needed - pure transformation)
 	protoTicks, err := TransformStructBatch(ticks)
 	if err != nil {
 		return fmt.Errorf("failed to transform struct batch: %w", err)
 	}
 
-	// Append records to batch and flush when needed
+	// Pre-calculate batch size ONCE instead of per-tick
+	// Use fixed estimate to avoid expensive proto.Size() calls
+	const estimatedTickSize = 512
+	batchSize := int64(len(protoTicks) * estimatedTickSize)
+
+	// Lock ONCE for the entire batch operation
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
-	for _, tick := range protoTicks {
-		ps.recordBatch = append(ps.recordBatch, tick)
-		ps.totalRecords++
+	// Check if adding this batch would exceed limits - flush first if needed
+	wouldExceedRecords := len(ps.recordBatch)+len(protoTicks) >= ps.batchSizeRecords
+	wouldExceedBytes := ps.totalBytes+batchSize >= int64(ps.batchSizeBytes)
+	shouldFlushTime := time.Since(ps.lastFlush) > time.Duration(ps.config.BatchTimeout)
 
-		// Estimate size and check if we should flush
-		estimatedSize := proto.Size(tick)
-		ps.totalBytes += int64(estimatedSize)
-
-		shouldFlush := len(ps.recordBatch) >= ps.batchSizeRecords ||
-			ps.totalBytes >= int64(ps.batchSizeBytes) ||
-			time.Since(ps.lastFlush) > time.Duration(ps.config.BatchTimeout)
-
-		if shouldFlush {
-			if err := ps.flushBatchInternal(); err != nil {
-				return err
-			}
+	if (wouldExceedRecords || wouldExceedBytes || shouldFlushTime) && len(ps.recordBatch) > 0 {
+		if err := ps.flushBatchInternal(); err != nil {
+			return err
 		}
 	}
+
+	// Append entire batch at once (fast slice append)
+	ps.recordBatch = append(ps.recordBatch, protoTicks...)
+	ps.totalRecords += len(protoTicks)
+	ps.totalBytes += batchSize
 
 	return nil
 }
