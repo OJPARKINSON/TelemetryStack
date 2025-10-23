@@ -370,11 +370,6 @@ func (ps *PubSub) transformRecord(record map[string]interface{}) *Telemetry {
 	lapID := getIntValue(record, "Lap")
 	sessionTime := getFloatValue(record, "SessionTime")
 
-	// Debug: log session ID once per batch
-	if len(ps.recordBatch) == 0 {
-		log.Printf("[DEBUG] Worker %d: Creating telemetry record with SessionID='%s' (length=%d)", ps.workerID, ps.sessionID, len(ps.sessionID))
-	}
-
 	sessionNum := ""
 	if val, ok := record["SessionNum"]; ok {
 		if v, ok := val.(int); ok {
