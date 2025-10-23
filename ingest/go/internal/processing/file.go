@@ -19,7 +19,6 @@ import (
 type FileProcessor struct {
 	config   *config.Config
 	workerID int
-	pubSub   *messaging.PubSub
 	pool     *messaging.ConnectionPool
 }
 
@@ -63,22 +62,17 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 		return nil, fmt.Errorf("no telemetry data found in IBT file: %s", fileName)
 	}
 
-	headers := stubs[0].Headers()
-	weekendInfo := headers.SessionInfo.WeekendInfo
-
-	fp.pubSub = messaging.NewPubSub(
-		strconv.Itoa(weekendInfo.SubSessionID),
-		sessionTime,
-		fp.config,
-		fp.pool,
-	)
-
 	groups := stubs.Group()
 
 	totalRecords := 0
 	totalBatches := 0
 
 	processors := make([]ibt.Processor, 0, len(groups))
+
+	// Track metrics across all groups
+	var allMessagingMetrics *messaging.PublishMetrics
+	var firstSessionID string
+	var firstTrackName string
 
 	for groupNumber, group := range groups {
 		select {
@@ -94,8 +88,31 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 		default:
 		}
 
-		// Create telemetry processor
-		processor := NewProcessor(fp.pubSub, groupNumber, fp.config, fp.workerID)
+		// Extract SubSessionID from this group
+		if len(group) == 0 {
+			continue
+		}
+
+		groupHeaders := group[0].Headers()
+		groupWeekendInfo := groupHeaders.SessionInfo.WeekendInfo
+		groupSessionID := strconv.Itoa(groupWeekendInfo.SubSessionID)
+
+		// Track first session's info for result
+		if groupNumber == 0 {
+			firstSessionID = groupSessionID
+			firstTrackName = groupWeekendInfo.TrackDisplayName
+		}
+
+		// Create PubSub for this specific group
+		pubSub := messaging.NewPubSub(
+			groupSessionID,
+			sessionTime,
+			fp.config,
+			fp.pool,
+		)
+
+		// Create telemetry processor with the correct SubSessionID
+		processor := NewProcessor(pubSub, groupNumber, fp.config, fp.workerID, groupSessionID)
 		processors = append(processors, processor)
 
 		if err := ibt.Process(ctx, group, processor); err != nil {
@@ -103,47 +120,52 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 			if flushErr := processor.FlushPendingData(); flushErr != nil {
 				log.Printf("Failed to flush processor on error: %v", flushErr)
 			}
+			pubSub.Close()
 			return nil, err
 		}
 
 		if err := processor.Close(); err != nil {
+			pubSub.Close()
 			return nil, fmt.Errorf("error closing processor for group %d: %w", groupNumber, err)
 		}
 
-		// Get metrics if available (currently returns nil)
-		_ = processor.GetMetrics()
+		// Collect metrics from this group's PubSub
+		metrics := pubSub.GetMetrics()
+		if allMessagingMetrics == nil {
+			allMessagingMetrics = &metrics
+		} else {
+			// Accumulate metrics across groups
+			allMessagingMetrics.TotalBatches += metrics.TotalBatches
+			allMessagingMetrics.TotalRecords += metrics.TotalRecords
+			allMessagingMetrics.TotalBytes += metrics.TotalBytes
+			allMessagingMetrics.FailedBatches += metrics.FailedBatches
+			allMessagingMetrics.PersistedBatches += metrics.PersistedBatches
+		}
+
+		// Close PubSub for this group
+		if err := pubSub.Close(); err != nil {
+			log.Printf("Failed to close PubSub for group %d: %v", groupNumber, err)
+		}
 	}
 
 	ibt.CloseAllStubs(groups)
 
-	// Collect messaging metrics if pubSub exists
-	var messagingMetrics *messaging.PublishMetrics
-	if fp.pubSub != nil {
-		metrics := fp.pubSub.GetMetrics()
-		messagingMetrics = &metrics
-	}
-
 	return &ProcessResult{
 		RecordCount:      totalRecords,
 		BatchCount:       totalBatches,
-		SessionID:        strconv.Itoa(weekendInfo.SubSessionID),
-		TrackName:        weekendInfo.TrackDisplayName,
-		MessagingMetrics: messagingMetrics,
+		SessionID:        firstSessionID,
+		TrackName:        firstTrackName,
+		MessagingMetrics: allMessagingMetrics,
 	}, nil
 }
 
 func (fp *FileProcessor) FlushPendingData() error {
-	if fp.pubSub != nil {
-		log.Printf("FileProcessor: Flushing pending data for worker %d", fp.workerID)
-		return fp.pubSub.FlushBatch()
-	}
+	// No-op: each processor handles its own flushing
 	return nil
 }
 
 func (fp *FileProcessor) Close() error {
-	if fp.pubSub != nil {
-		return fp.pubSub.Close()
-	}
+	// No-op: PubSub instances are closed per-group
 	return nil
 }
 

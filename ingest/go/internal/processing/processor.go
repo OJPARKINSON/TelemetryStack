@@ -23,6 +23,7 @@ type loaderProcessor struct {
 	mu             sync.Mutex
 	config         *config.Config
 
+	subSessionID   string // The unique SubSessionID for this group
 	sessionMap     map[int]sessionInfo
 	trackName      string
 	trackID        int
@@ -54,7 +55,7 @@ type ProcessorMetrics struct {
 }
 
 // NewProcessor creates a new telemetry processor
-func NewProcessor(pubSub *messaging.PubSub, groupNumber int, config *config.Config, workerID int) *loaderProcessor {
+func NewProcessor(pubSub *messaging.PubSub, groupNumber int, config *config.Config, workerID int, subSessionID string) *loaderProcessor {
 	return &loaderProcessor{
 		pubSub:         pubSub,
 		cache:          make([]*ibt.TelemetryTick, 0, config.BatchSizeRecords),
@@ -62,6 +63,7 @@ func NewProcessor(pubSub *messaging.PubSub, groupNumber int, config *config.Conf
 		config:         config,
 		thresholdBytes: config.BatchSizeBytes,
 		workerID:       workerID,
+		subSessionID:   subSessionID,
 		sessionMap:     make(map[int]sessionInfo),
 		tickPool: &sync.Pool{
 			New: func() interface{} {
@@ -90,8 +92,10 @@ func (l *loaderProcessor) ProcessStruct(tick *ibt.TelemetryTick, hasNext bool, s
 	tick.TrackName = l.trackName
 	tick.TrackID = l.trackID
 
+	// Use the SubSessionID from the header instead of SessionNum
+	tick.SessionID = l.subSessionID
+
 	if sessionInfo, exists := l.sessionMap[int(tick.SessionNum)]; exists {
-		tick.SessionID = fmt.Sprintf("%d", sessionInfo.sessionNum)
 		tick.SessionType = sessionInfo.sessionType
 		tick.SessionName = sessionInfo.sessionName
 	}

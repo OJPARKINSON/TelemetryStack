@@ -16,5 +16,4 @@ func main() {
 
 	fmt.Println("Starting to consume")
 	messaging.Subscribe(config)
-
 }

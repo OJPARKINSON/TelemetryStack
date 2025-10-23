@@ -50,7 +50,6 @@ func (m *Subscriber) Subscribe(config *config.Config) {
 
 func parseBatch(batch *messaging.TelemetryBatch, event amqp.Delivery) {
 	for _, tick := range batch.Records {
-		fmt.Printf("data: %v \n", tick.Speed)
 		persistance.SaveTickToDB(tick)
 	}
 
