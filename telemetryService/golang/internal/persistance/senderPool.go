@@ -26,7 +26,7 @@ func NewSenderPool(size int, host string, port int) (*SenderPool, error) {
 	for i := 0; i < size; i++ {
 		sender, err := qdb.NewLineSender(
 			context.Background(),
-			qdb.WithTcp(),
+			qdb.WithHttp(),
 			qdb.WithAddress(fmt.Sprintf("%s:%d", host, port)),
 			qdb.WithAutoFlushRows(10000),
 			qdb.WithRequestTimeout(60*time.Second),

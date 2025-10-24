@@ -518,7 +518,7 @@ func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte) error {
 			amqp.Publishing{
 				ContentType:  "application/x-protobuf",
 				Body:         data,
-				DeliveryMode: amqp.Transient,
+				DeliveryMode: amqp.Persistent,
 				Timestamp:    time.Now(),
 				MessageId:    batch.BatchId,
 				Headers: amqp.Table{

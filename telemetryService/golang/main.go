@@ -13,9 +13,9 @@ func main() {
 
 	config := config.NewConfig()
 
-	senderPool, err := persistance.NewSenderPool(10, "localhost", 9009)
+	senderPool, err := persistance.NewSenderPool(10, "localhost", 9000)
 	if err != nil {
-		fmt.Println("Failed to create sender pool")
+		fmt.Println("Failed to create sender pool: ", err)
 	}
 	messaging := queue.NewSubscriber(senderPool)
 
