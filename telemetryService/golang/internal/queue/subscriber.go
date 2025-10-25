@@ -30,8 +30,29 @@ type batchItem struct {
 }
 
 func (m *Subscriber) Subscribe(config *config.Config) {
-	conn, err := amqp.Dial("amqp://admin:changeme@" + config.RabbitMQHost + ":5672")
-	failOnError(err, "Failed to connect to RabbitMQ")
+	var conn *amqp.Connection
+	var err error
+
+	maxRetries := 10
+	baseDelay := 1 * time.Second
+
+	// Retry connection with exponential backoff
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		conn, err = amqp.Dial("amqp://admin:changeme@" + config.RabbitMQHost + ":5672")
+		if err == nil {
+			fmt.Println("Successfully connected to RabbitMQ")
+			break
+		}
+
+		if attempt < maxRetries-1 {
+			delay := baseDelay * time.Duration(1<<uint(attempt))
+			fmt.Printf("RabbitMQ connection failed (attempt %d/%d), retrying in %v: %v\n", attempt+1, maxRetries, delay, err)
+			time.Sleep(delay)
+		} else {
+			failOnError(err, "Failed to connect to RabbitMQ after all retries")
+		}
+	}
+
 	defer conn.Close()
 
 	channel, err := conn.Channel()

@@ -3,9 +3,9 @@ services:
     image: traefik:v3.5
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "8443:443"  
-      - "8080:8080"
+      - "8080:80"
+      - "8443:443"
+      - "8081:8080"
     networks:
       - telemetry-network
     volumes:
@@ -137,16 +137,31 @@ services:
   #     start_period: 30s
 
   telemetry-service:
-    build: 
+    build:
       context: ./telemetryService/golang
       dockerfile: Dockerfile
-      container_name: telemetry-service
+    container_name: telemetry-service
+    restart: unless-stopped
     networks:
       - telemetry-network
     environment:
-      QUESTDB_URL: questdb:9009;username=admin;password=quest
-      QUESTDB_HTTP_HOST: questdb
-      QUESTDB_HTTP_PORT: 9000
+      QUESTDB_URL: questdb:8812;username=admin;password=quest
+      QUESTDB_HOST: questdb
+      QUESTDB_PORT: 9000
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      questdb:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: '1.25'
+          memory: 2g
+        reservations:
+          cpus: '0.25'
+          memory: 256m
 
 
   telemetry-dashboard:
@@ -200,12 +215,14 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
       - ./config/grafana:/etc/grafana/provisioning:ro
+    ports:
+      - "3002:3000"
     environment:
       # Grafana settings optimized for high performance
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin123}
       GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_SERVER_ROOT_URL: https://${LOCAL_DOMAIN:-pi.local}/grafana
-      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SERVER_ROOT_URL: http://localhost:3002
+      GF_SERVER_SERVE_FROM_SUB_PATH: "false"
       GF_INSTALL_PLUGINS: grafana-clock-panel
       GF_PROVISIONING_AUTO_ASSIGN_ORG: "true"
       GF_PROVISIONING_AUTO_ASSIGN_ORG_ROLE: Admin
@@ -227,7 +244,7 @@ services:
           memory: 256m
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.grafana-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && PathPrefix(`/grafana`)"
+      - "traefik.http.routers.grafana-local.rule=(Host(`${LOCAL_DOMAIN:-pi.local}`) || Host(`localhost`)) && PathPrefix(`/grafana`)"
       - "traefik.http.routers.grafana-local.entrypoints=websecure"
       - "traefik.http.routers.grafana-local.tls=true"
       - "traefik.http.routers.grafana-local.middlewares=secure-management@file"
@@ -290,22 +307,6 @@ services:
         limits:
           cpus: 0.2
           memory: 128m
-
-  # Optional: Watchtower for auto-updates (can be disabled)
-  watchtower:
-    image: containrrr/watchtower
-    container_name: watchtower
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 3600 --cleanup --label-enable
-    environment:
-      TZ: Europe/London
-    deploy:
-      resources:
-        limits:
-          cpus: 0.1
-          memory: 256m
 
 volumes:
   rabbitmq-data:

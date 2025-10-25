@@ -24,7 +24,6 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -40,6 +39,77 @@
       "panels": [],
       "title": "System Overview",
       "type": "row"
+    },
+    {
+      "datasource": {},
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 85
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 0,
+        "y": 1
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.4.8",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "100 - (node_memory_MemAvailable_bytes{job=\"node-exporter\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"} * 100)",
+          "legendFormat": "{{label_name}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Memory Usage",
+      "type": "stat"
     },
     {
       "datasource": {
@@ -78,7 +148,7 @@
       "gridPos": {
         "h": 8,
         "w": 6,
-        "x": 0,
+        "x": 4,
         "y": 1
       },
       "id": 3,
@@ -113,77 +183,6 @@
         }
       ],
       "title": "CPU Usage",
-      "type": "stat"
-    },
-    {
-      "datasource": {},
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "max": 100,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 70
-              },
-              {
-                "color": "red",
-                "value": 85
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 4,
-        "x": 6,
-        "y": 1
-      },
-      "id": 2,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "10.4.8",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "100 - (node_memory_MemAvailable_bytes{job=\"node-exporter\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"} * 100)",
-          "legendFormat": "{{label_name}}",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Memory Usage",
       "type": "stat"
     },
     {
@@ -258,10 +257,7 @@
       "type": "stat"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
+      "datasource": {},
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -322,7 +318,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "node_hwmon_temp_celsius{job=\"node-exporter\", sensor=\"temp1\", chip=\"1000120000_pcie_1f000c8000_adc\"}",
+          "expr": "avg(node_hwmon_temp_celsius{job=\"node-exporter\"})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -339,23 +335,56 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "vis": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "dark-red",
+                "color": "green",
                 "value": null
               },
               {
-                "color": "green",
-                "value": 0.85
+                "color": "red",
+                "value": 80
               }
             ]
           },
-          "unit": "percentunit"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -367,19 +396,16 @@
       },
       "id": 6,
       "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "min"
-          ],
-          "fields": "",
-          "values": false
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "sizing": "auto"
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "pluginVersion": "10.4.8",
       "targets": [
@@ -418,7 +444,7 @@
         }
       ],
       "title": "Service Status",
-      "type": "gauge"
+      "type": "timeseries"
     },
     {
       "collapsed": false,
@@ -584,7 +610,7 @@
               }
             ]
           },
-          "unit": "none"
+          "unit": "bytes"
         },
         "overrides": []
       },
@@ -616,7 +642,7 @@
           "editorMode": "code",
           "expr": "questdb_http_connections",
           "interval": "",
-          "legendFormat": "questdb_http_connections",
+          "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         },
@@ -627,7 +653,7 @@
           },
           "editorMode": "code",
           "expr": "questdb_pg_wire_connections",
-          "legendFormat": "questdb_pg_wire_connections",
+          "legendFormat": "__auto",
           "range": true,
           "refId": "B"
         }
@@ -718,8 +744,8 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(questdb_json_queries_cache_hits_total[20s])",
-          "legendFormat": "{{job}}",
+          "expr": "rate(questdb_json_queries_cache_hits_total[1m])",
+          "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         },
@@ -729,8 +755,8 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(questdb_json_queries_cache_misses_total[30s])",
-          "legendFormat": "{{job}}",
+          "expr": "rate(questdb_json_queries_cache_misses_total[5m])",
+          "legendFormat": "__auto",
           "range": true,
           "refId": "B"
         }
@@ -821,7 +847,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(questdb_json_queries_completed_total[20s])",
+          "expr": "rate(questdb_json_queries_completed_total[1m])",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -832,7 +858,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(questdb_pg_wire_errors_total[$__rate_interval])",
+          "expr": "questdb_pg_wire_errors_total",
           "legendFormat": "__auto",
           "range": true,
           "refId": "B"
@@ -1051,10 +1077,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "exemplar": false,
           "expr": "rabbitmq_erlang_processes_used",
-          "format": "time_series",
-          "instant": false,
           "legendFormat": "{{job}}",
           "range": true,
           "refId": "A"
@@ -1157,7 +1180,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(rabbitmq_erlang_gc_runs_total[50s])",
+          "expr": "rate(rabbitmq_erlang_gc_runs_total[1m])",
           "legendFormat": "Garbage Collections/sec",
           "range": true,
           "refId": "A"
@@ -1168,7 +1191,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(rabbitmq_erlang_gc_reclaimed_bytes_total[10s])",
+          "expr": "rate(rabbitmq_erlang_gc_reclaimed_bytes_total[1m])",
           "legendFormat": "messages per sec",
           "range": true,
           "refId": "B"
@@ -1605,7 +1628,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(node_network_receive_bytes_total{device!~\"lo|veth.*|docker.*|br-.*\"}[10s])",
+          "expr": "rate(node_network_receive_bytes_total{device!~\"lo|veth.*|docker.*|br-.*\"}[1m])",
           "legendFormat": "{{device}} - Received",
           "range": true,
           "refId": "A"
@@ -1615,10 +1638,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "editorMode": "code",
-          "expr": "rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|docker.*|br-.*\"}[30s])",
+          "expr": "rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|docker.*|br-.*\"}[5m])",
           "legendFormat": "{{device}} - Transmitted",
-          "range": true,
           "refId": "B"
         }
       ],
@@ -1876,13 +1897,13 @@
     "list": []
   },
   "time": {
-    "from": "now-3d",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Enhanced IRacing Telemetry System",
   "uid": "enhanced-iracing-telemetry",
-  "version": 6,
+  "version": 2,
   "weekStart": ""
 }

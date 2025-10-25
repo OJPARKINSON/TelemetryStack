@@ -1,9 +1,8 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"os"
-	"strconv"
 
 	"github.com/ojparkinson/telemetryService/internal/config"
 	"github.com/ojparkinson/telemetryService/internal/persistance"
@@ -11,36 +10,30 @@ import (
 )
 
 func main() {
-	fmt.Println("Starting subscriber")
-
-	questdbHost := getEnv("QUESTDB_HOST", "localhost")
-	questdbPort := getEnvInt("QUESTDB_PORT", 9000)
-	poolSize := getEnvInt("SENDER_POOL_SIZE", 10)
+	log.Println("Starting telemetry service")
 
 	config := config.NewConfig()
 
-	senderPool, err := persistance.NewSenderPool(poolSize, questdbHost, questdbPort)
+	// Create database schema
+	schema := persistance.NewSchema(config)
+	if err := schema.CreateTableHTTP(); err != nil {
+		log.Printf("Failed to create table: %v", err)
+		log.Println("Exiting due to database initialization failure")
+		os.Exit(1)
+	}
+	log.Println("Database schema initialized successfully")
+
+	// Create sender pool
+	senderPool, err := persistance.NewSenderPool(config)
 	if err != nil {
-		fmt.Println("Failed to create sender pool: ", err)
+		log.Printf("Failed to create sender pool: %v", err)
+		log.Println("Exiting due to sender pool initialization failure")
+		os.Exit(1)
 	}
+	log.Println("Sender pool created successfully")
+
+	// Start message queue subscriber
 	messaging := queue.NewSubscriber(senderPool)
-
-	fmt.Println("Starting to consume")
+	log.Println("Starting to consume messages from RabbitMQ")
 	messaging.Subscribe(config)
-}
-
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-func getEnvInt(key string, defaultValue int) int {
-	if value := os.Getenv(key); value != "" {
-		if intVal, err := strconv.Atoi(value); err == nil {
-			return intVal
-		}
-	}
-	return defaultValue
 }
