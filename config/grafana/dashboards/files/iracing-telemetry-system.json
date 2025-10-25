@@ -80,8 +80,9 @@
       },
       "id": 2,
       "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -90,10 +91,9 @@
           "fields": "",
           "values": false
         },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "sizing": "auto",
-        "text": {}
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
       "pluginVersion": "10.4.8",
       "targets": [
@@ -110,7 +110,7 @@
         }
       ],
       "title": "Memory Usage",
-      "type": "gauge"
+      "type": "stat"
     },
     {
       "datasource": {
@@ -154,8 +154,9 @@
       },
       "id": 3,
       "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -164,10 +165,9 @@
           "fields": "",
           "values": false
         },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "sizing": "auto",
-        "text": {}
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
       "pluginVersion": "10.4.8",
       "targets": [
@@ -184,7 +184,7 @@
         }
       ],
       "title": "CPU Usage",
-      "type": "gauge"
+      "type": "stat"
     },
     {
       "datasource": {},
@@ -225,8 +225,9 @@
       },
       "id": 4,
       "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -235,10 +236,9 @@
           "fields": "",
           "values": false
         },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "sizing": "auto",
-        "text": {}
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
       "pluginVersion": "10.4.8",
       "targets": [
@@ -255,7 +255,7 @@
         }
       ],
       "title": "Disk Usage",
-      "type": "gauge"
+      "type": "stat"
     },
     {
       "datasource": {},
@@ -265,8 +265,8 @@
             "mode": "thresholds"
           },
           "mappings": [],
-          "max": 85,
-          "min": 30,
+          "max": 100,
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -296,8 +296,9 @@
       },
       "id": 5,
       "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -306,10 +307,9 @@
           "fields": "",
           "values": false
         },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "sizing": "auto",
-        "text": {}
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
       "pluginVersion": "10.4.8",
       "targets": [
@@ -326,7 +326,7 @@
         }
       ],
       "title": "CPU Temperature",
-      "type": "gauge"
+      "type": "stat"
     },
     {
       "datasource": {
@@ -1905,6 +1905,6 @@
   "timezone": "",
   "title": "Enhanced IRacing Telemetry System",
   "uid": "enhanced-iracing-telemetry",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }
