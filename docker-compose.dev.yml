@@ -136,7 +136,7 @@ services:
   #     retries: 3
   #     start_period: 30s
 
-  telemetryService:
+  telemetry-service:
     build: 
       context: ./telemetryService/golang
       dockerfile: Dockerfile
