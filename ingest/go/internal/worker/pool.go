@@ -8,6 +8,7 @@ import (
 
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/config"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/messaging"
+	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/metrics"
 	"go.uber.org/zap"
 )
 
@@ -140,6 +141,9 @@ func (wp *WorkerPool) Start() {
 	wp.metrics.ActiveWorkers = wp.config.WorkerCount
 	wp.mu.Unlock()
 
+	// Update Prometheus metrics
+	metrics.ActiveWorkers.Set(float64(wp.config.WorkerCount))
+
 	wp.logger.Info("Worker pool started successfully")
 }
 
@@ -148,6 +152,7 @@ func (wp *WorkerPool) SubmitFile(item WorkItem) error {
 	case wp.fileQueue <- item:
 		wp.mu.Lock()
 		wp.metrics.QueueDepth++
+		metrics.QueueDepth.Set(float64(wp.metrics.QueueDepth))
 		wp.mu.Unlock()
 		return nil
 	case <-wp.ctx.Done():
@@ -268,6 +273,13 @@ func (wp *WorkerPool) handleResult(result WorkResult) {
 	wp.metrics.TotalRecordsProcessed += result.ProcessedCount
 	wp.metrics.TotalBatchesProcessed += result.BatchCount
 	wp.metrics.QueueDepth--
+
+	// Update Prometheus metrics
+	metrics.FilesProcessedTotal.Inc()
+	metrics.RecordsProcessedTotal.Add(float64(result.ProcessedCount))
+	metrics.BatchesSentTotal.Add(float64(result.BatchCount))
+	metrics.FileProcessingDuration.Observe(result.Duration.Seconds())
+	metrics.QueueDepth.Set(float64(wp.metrics.QueueDepth))
 	
 	// Aggregate messaging metrics from result if available
 	if result.MessagingMetrics != nil {

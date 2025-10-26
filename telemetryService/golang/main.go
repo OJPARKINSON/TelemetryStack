@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/ojparkinson/telemetryService/internal/config"
+	"github.com/ojparkinson/telemetryService/internal/metrics"
 	"github.com/ojparkinson/telemetryService/internal/persistance"
 	"github.com/ojparkinson/telemetryService/internal/queue"
 )
@@ -31,6 +32,9 @@ func main() {
 		os.Exit(1)
 	}
 	log.Println("Sender pool created successfully")
+
+	// Start Prometheus metrics server
+	go metrics.MetricsHandler()
 
 	// Start message queue subscriber
 	messaging := queue.NewSubscriber(senderPool)

@@ -146,6 +146,8 @@ services:
       dockerfile: Dockerfile
     container_name: telemetry-service
     restart: unless-stopped
+    ports:
+      - "9092:9092"  # Prometheus metrics
     networks:
       - telemetry-network
     environment:

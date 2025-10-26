@@ -7,6 +7,7 @@ import (
 
 	"github.com/ojparkinson/telemetryService/internal/config"
 	"github.com/ojparkinson/telemetryService/internal/messaging"
+	"github.com/ojparkinson/telemetryService/internal/metrics"
 	"github.com/ojparkinson/telemetryService/internal/persistance"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"google.golang.org/protobuf/proto"
@@ -84,6 +85,9 @@ func (m *Subscriber) Subscribe(config *config.Config) {
 		}
 
 		fmt.Printf("Received batch: session=%v, records=%d\n", batch.SessionId, len(batch.Records))
+
+		// Update Prometheus metrics
+		metrics.RecordsReceivedTotal.Add(float64(len(batch.Records)))
 
 		batchChan <- batchItem{
 			batch:       batch,
@@ -186,9 +190,19 @@ func (m *Subscriber) flushBatches(items []batchItem, channel *amqp.Channel) {
 	defer m.senderPool.Return(sender)
 
 	fmt.Printf("Writing %d records from %d messages\n", len(validRecords), len(items))
+
+	// Track write duration
+	start := time.Now()
 	err := persistance.WriteBatch(sender, validRecords)
+	duration := time.Since(start)
+
+	// Update Prometheus metrics
+	metrics.BatchSizeRecords.Observe(float64(len(validRecords)))
+	metrics.DBWriteDuration.Observe(duration.Seconds())
+
 	if err == nil {
 		// Success - ACK all messages
+		metrics.RecordsWrittenTotal.Add(float64(len(validRecords)))
 		fmt.Printf("✅ Successfully wrote %d records, ACKing %d messages\n",
 			len(validRecords), len(items))
 		for _, item := range items {
@@ -196,6 +210,7 @@ func (m *Subscriber) flushBatches(items []batchItem, channel *amqp.Channel) {
 		}
 	} else {
 		// Failure - NACK all messages for redelivery
+		metrics.DBWriteErrors.Inc()
 		fmt.Printf("❌ Write failed: %v\n", err)
 		fmt.Printf("   NACKing %d messages for redelivery\n", len(items))
 		for _, item := range items {

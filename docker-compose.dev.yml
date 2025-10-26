@@ -149,6 +149,8 @@ services:
       QUESTDB_HOST: questdb
       QUESTDB_PORT: 9000
       RABBITMQ_HOST: rabbitmq
+    ports:
+      - "9092:9092"  # Prometheus metrics
     depends_on:
       rabbitmq:
         condition: service_healthy

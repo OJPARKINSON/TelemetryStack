@@ -27,3 +27,13 @@ scrape_configs:
       - targets: ['traefik:8080']  # Traefik metrics endpoint
     scrape_interval: 10s
 
+  - job_name: 'ingest-service'
+    static_configs:
+      - targets: ['host.docker.internal:9091']  # Ingest service running on host
+    scrape_interval: 5s
+
+  - job_name: 'telemetry-service'
+    static_configs:
+      - targets: ['telemetry-service:9092']  # Telemetry service metrics
+    scrape_interval: 5s
+
