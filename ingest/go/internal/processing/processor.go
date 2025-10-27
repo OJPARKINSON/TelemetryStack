@@ -71,7 +71,7 @@ func NewProcessor(pubSub *messaging.PubSub, groupNumber int, config *config.Conf
 		sessionMap:       make(map[int]sessionInfo),
 		progressCallback: &NoOpProgressCallback{},
 		tickPool: &sync.Pool{
-			New: func() interface{} {
+			New: func() any {
 				return &ibt.TelemetryTick{}
 			},
 		},
@@ -173,7 +173,7 @@ func (l *loaderProcessor) Close() error {
 
 // Fields defines the telemetry fields this processor needs.
 // Whitelist is automatically extracted from ibt tags.
-func (l *loaderProcessor) Fields() interface{} {
+func (l *loaderProcessor) Fields() any {
 	return struct {
 		// Lap & Position
 		LapID             int32   `ibt:"Lap"`
@@ -244,6 +244,6 @@ func (l *loaderProcessor) FlushPendingData() error {
 	return nil
 }
 
-func (l *loaderProcessor) GetMetrics() interface{} {
+func (l *loaderProcessor) GetMetrics() any {
 	return nil // Return nil for now - can be extended later if needed
 }
