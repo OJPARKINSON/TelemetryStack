@@ -11,8 +11,6 @@ import (
 )
 
 func (wp *WorkerPool) startWorker(workerID int) {
-	wp.logger.Info("Worker starting", zap.Int("worker_id", workerID))
-
 	workerCtx, cancel := context.WithTimeout(wp.ctx, wp.config.WorkerTimeout)
 	defer cancel()
 
@@ -20,14 +18,14 @@ func (wp *WorkerPool) startWorker(workerID int) {
 		select {
 		case workItem, ok := <-wp.fileQueue:
 			if !ok {
-				wp.logger.Info("Worker shutting down - queue closed", zap.Int("worker_id", workerID))
+				// Worker shutting down - queue closed (normal shutdown)
 				return
 			}
 
 			wp.processWorkItem(workerCtx, workerID, workItem)
 
 		case <-workerCtx.Done():
-			wp.logger.Info("Worker shutting down - context done", zap.Int("worker_id", workerID), zap.Error(workerCtx.Err()))
+			// Worker shutting down due to context cancellation (normal shutdown)
 			return
 		}
 	}
@@ -52,12 +50,13 @@ func (wp *WorkerPool) processWorkItem(ctx context.Context, workerID int, item Wo
 	filename := item.FileInfo.Name()
 	wp.UpdateWorkerStatus(workerID, filename, "PROCESSING")
 
-	wp.logger.Info("Worker processing file", zap.Int("worker_id", workerID), zap.String("file_path", item.FilePath), zap.Int("retry", item.RetryCount))
-
 	processor, err := processing.NewFileProcessor(wp.config, workerID, wp.rabbitPool)
 
 	if err != nil {
-		wp.logger.Error("Worker error creating file processor", zap.Int("worker_id", workerID), zap.String("filename", filename), zap.Error(err))
+		wp.logger.Error("Failed to create file processor",
+			zap.String("file", item.FilePath),
+			zap.Error(err),
+			zap.String("action", "Check system resources and RabbitMQ connectivity"))
 		wp.UpdateWorkerStatus(workerID, filename, "ERROR")
 		wp.errorsChan <- WorkError{
 			FilePath:   item.FilePath,
@@ -70,6 +69,11 @@ func (wp *WorkerPool) processWorkItem(ctx context.Context, workerID int, item Wo
 		return
 	}
 	defer processor.Close()
+
+	// Set progress callback if progress display is available
+	if wp.progressDisplay != nil {
+		processor.SetProgressCallback(wp.progressDisplay)
+	}
 
 	processCtx, processCancel := context.WithTimeout(ctx, wp.config.FileProcessTimeout)
 	defer processCancel()
@@ -97,18 +101,23 @@ func (wp *WorkerPool) processWorkItem(ctx context.Context, workerID int, item Wo
 	case <-processCtx.Done():
 		if processCtx.Err() == context.DeadlineExceeded {
 			processErr = fmt.Errorf("file processing timeout after %v", wp.config.FileProcessTimeout)
-			wp.logger.Warn("Worker file processing timeout", zap.Int("worker_id", workerID), zap.String("filename", filename))
+			wp.logger.Error("File processing timeout",
+				zap.String("file", item.FilePath),
+				zap.Duration("timeout", wp.config.FileProcessTimeout),
+				zap.String("action", "File may be corrupted or unusually large - consider increasing FILE_PROCESS_TIMEOUT"))
 		} else {
-			wp.logger.Info("Worker graceful shutdown - attempting data flush", zap.Int("worker_id", workerID), zap.String("filename", filename))
+			// Graceful shutdown - attempt data flush
 			if flushErr := processor.FlushPendingData(); flushErr != nil {
-				wp.logger.Error("Worker failed to flush pending data", zap.Int("worker_id", workerID), zap.String("filename", filename), zap.Error(flushErr))
+				wp.logger.Error("Failed to flush pending data during shutdown",
+					zap.String("file", item.FilePath),
+					zap.Error(flushErr),
+					zap.String("action", "Some data may be lost - check disk persistence directory"))
 			}
 			processErr = fmt.Errorf("processing cancelled due to graceful shutdown")
 		}
 	}
 
 	if processErr != nil {
-		wp.logger.Error("Worker error processing file", zap.Int("worker_id", workerID), zap.String("filename", filename), zap.Error(processErr))
 		wp.UpdateWorkerStatus(workerID, filename, "ERROR")
 		wp.errorsChan <- WorkError{
 			FilePath:   item.FilePath,

@@ -42,6 +42,9 @@ type Config struct {
 	BatchSizeRecords int
 
 	UseStructPipeline bool
+
+	// Data directory configuration
+	DataDirectory string
 }
 
 func LoadConfig() *Config {
@@ -93,6 +96,9 @@ func LoadConfig() *Config {
 
 		// Record Processing
 		BatchSizeRecords: getEnvAsInt("BATCH_SIZE_RECORDS", 16000),
+
+		// Data Directory - defaults to ./ibt_files/ for backward compatibility
+		DataDirectory: getEnv("IBT_DATA_DIR", "./ibt_files/"),
 	}
 }
 

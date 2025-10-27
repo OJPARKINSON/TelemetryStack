@@ -10,6 +10,7 @@ import (
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/messaging"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/metrics"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 // Helper to convert os.FileInfo to os.DirEntry for retry logic
@@ -32,7 +33,7 @@ type WorkerPool struct {
 	errorsChan  chan WorkError
 	ctx         context.Context
 	cancel      context.CancelFunc
-	wg          sync.WaitGroup
+	eg          *errgroup.Group
 	metrics     PoolMetrics
 	mu          sync.Mutex
 
@@ -41,7 +42,7 @@ type WorkerPool struct {
 
 	workerMetrics   []WorkerMetrics
 	progressDisplay *ProgressDisplay
-	
+
 	// Data loss monitoring
 	totalRabbitMQFailures     int
 	totalPersistedBatches     int
@@ -76,11 +77,11 @@ func NewWorkerPool(cfg *config.Config, logger *zap.Logger) *WorkerPool {
 	if !cfg.DisableRabbitMQ {
 		rabbitPool, err = messaging.NewConnectionPool(cfg.RabbitMQURL, cfg.RabbitMQPoolSize)
 		if err != nil {
-			logger.Fatal("Failed to create RabbitMQ connection pool", zap.Error(err))
+			logger.Fatal("Failed to create RabbitMQ connection pool",
+				zap.Error(err),
+				zap.String("url", cfg.RabbitMQURL),
+				zap.String("action", "Verify RabbitMQ is running and accessible"))
 		}
-		logger.Info("Created RabbitMQ connection pool", zap.Int("connections", cfg.RabbitMQPoolSize))
-	} else {
-		logger.Info("RabbitMQ disabled - running in benchmark mode")
 	}
 
 	workerMetrics := make([]WorkerMetrics, cfg.WorkerCount)
@@ -113,28 +114,30 @@ func (wp *WorkerPool) SetProgressDisplay(pd *ProgressDisplay) {
 	wp.progressDisplay = pd
 }
 
-func (wp *WorkerPool) Start() {
-	wp.logger.Info("Starting worker pool", zap.Int("workers", wp.config.WorkerCount))
+func (wp *WorkerPool) Start() error {
+	eg, ctx := errgroup.WithContext(wp.ctx)
+	wp.eg = eg
+	wp.ctx = ctx
 
-	wp.wg.Add(1)
-	go func() {
-		defer wp.wg.Done()
+	// Start result collector
+	wp.eg.Go(func() error {
 		wp.resultCollector()
-	}()
+		return nil
+	})
 
-	wp.wg.Add(1)
-	go func() {
-		defer wp.wg.Done()
+	// Start error collector
+	wp.eg.Go(func() error {
 		wp.errorCollector()
-	}()
+		return nil
+	})
 
+	// Start workers
 	for i := 0; i < wp.config.WorkerCount; i++ {
-		wp.wg.Add(1)
 		workerID := i
-		go func() {
-			defer wp.wg.Done()
+		wp.eg.Go(func() error {
 			wp.startWorker(workerID)
-		}()
+			return nil
+		})
 	}
 
 	wp.mu.Lock()
@@ -144,7 +147,7 @@ func (wp *WorkerPool) Start() {
 	// Update Prometheus metrics
 	metrics.ActiveWorkers.Set(float64(wp.config.WorkerCount))
 
-	wp.logger.Info("Worker pool started successfully")
+	return nil
 }
 
 func (wp *WorkerPool) SubmitFile(item WorkItem) error {
@@ -160,27 +163,21 @@ func (wp *WorkerPool) SubmitFile(item WorkItem) error {
 	}
 }
 
-func (wp *WorkerPool) Stop() {
-	wp.logger.Info("Stopping worker pool")
-
+func (wp *WorkerPool) Stop() error {
 	// First close the file queue to prevent new work
 	close(wp.fileQueue)
 
 	// Give workers a chance to finish current files and flush data
-	wp.logger.Info("Waiting for workers to complete current tasks and flush data")
-	
-	// Wait a short time before cancelling context to allow graceful completion
 	time.Sleep(2 * time.Second)
 
 	// Now cancel the context for any remaining operations
 	wp.cancel()
 
-	// Wait for all workers to finish
-	wp.wg.Wait()
+	// Wait for all workers to finish using errgroup
+	err := wp.eg.Wait()
 
 	if wp.rabbitPool != nil {
 		wp.rabbitPool.Close()
-		wp.logger.Info("Closed RabbitMQ connection pool")
 	}
 
 	close(wp.resultsChan)
@@ -192,7 +189,8 @@ func (wp *WorkerPool) Stop() {
 	}
 
 	wp.logFinalMetrics()
-	wp.logger.Info("Worker pool stopped gracefully")
+
+	return err
 }
 
 func (wp *WorkerPool) GetMetrics() PoolMetrics {
@@ -332,36 +330,23 @@ func (wp *WorkerPool) handleResult(result WorkResult) {
 		}
 	}
 
-	wp.logger.Info("Worker completed file",
-		zap.Int("worker_id", result.WorkerID),
-		zap.String("file_path", result.FilePath),
-		zap.Int("records_processed", result.ProcessedCount),
-		zap.Int("batches_processed", result.BatchCount),
-		zap.Duration("processing_time", result.Duration))
+	// Removed non-actionable Info log - metrics tracked via Prometheus
 }
 
 func (wp *WorkerPool) handleError(workError WorkError) {
-	wp.logger.Error("Worker pool error",
-		zap.Int("worker_id", workError.WorkerID),
-		zap.String("file_path", workError.FilePath),
-		zap.Error(workError.Error))
 	wp.mu.Lock()
 	wp.metrics.TotalErrors++
 	wp.metrics.QueueDepth--
 	wp.mu.Unlock()
 
-	wp.logger.Error("Worker error processing file",
-		zap.Int("worker_id", workError.WorkerID),
-		zap.String("file_path", workError.FilePath),
-		zap.Error(workError.Error))
-
 	if workError.Retry && workError.RetryCount < wp.config.MaxRetries {
 		// Try to get FileInfo for retry
 		fileInfo, err := os.Stat(workError.FilePath)
 		if err != nil {
-			wp.logger.Error("Cannot retry file - stat error",
+			wp.logger.Error("Cannot retry file",
 				zap.String("file_path", workError.FilePath),
-				zap.Error(err))
+				zap.Error(err),
+				zap.String("action", "Check file exists and has read permissions"))
 			return
 		}
 
@@ -377,15 +362,16 @@ func (wp *WorkerPool) handleError(workError WorkError) {
 		time.AfterFunc(wp.config.RetryDelay, func() {
 			select {
 			case wp.fileQueue <- retryItem:
-				wp.logger.Info("Retrying file",
-					zap.String("file_path", workError.FilePath),
-					zap.Int("attempt", retryItem.RetryCount))
+				// Retry scheduled - no log needed
 			case <-wp.ctx.Done():
 			}
 		})
 	} else {
-		wp.logger.Error("File failed permanently after retries",
-			zap.String("file_path", workError.FilePath))
+		wp.logger.Error("File processing failed",
+			zap.String("file_path", workError.FilePath),
+			zap.Int("attempts", workError.RetryCount+1),
+			zap.Error(workError.Error),
+			zap.String("action", "Check file format is valid IBT or investigate error above"))
 	}
 }
 
@@ -393,47 +379,24 @@ func (wp *WorkerPool) logFinalMetrics() {
 	wp.mu.Lock()
 	defer wp.mu.Unlock()
 
-	duration := time.Since(wp.metrics.StartTime)
-
-	wp.logger.Info("=== Final Worker Pool Metrics ===")
-	wp.logger.Info("Total processing time", zap.Duration("duration", duration))
-	wp.logger.Info("Files processed", zap.Int("files", wp.metrics.TotalFilesProcessed))
-	wp.logger.Info("Records processed", zap.Int("records", wp.metrics.TotalRecordsProcessed))
-	wp.logger.Info("Batches sent", zap.Int("batches", wp.metrics.TotalBatchesProcessed))
-	wp.logger.Info("Errors encountered", zap.Int("errors", wp.metrics.TotalErrors))
-
-	// Data loss and reliability metrics
-	wp.logger.Info("=== Data Loss Monitoring ===")
-	wp.logger.Info("RabbitMQ failures", zap.Int("failures", wp.totalRabbitMQFailures))
-	wp.logger.Info("Batches persisted", zap.Int("persisted", wp.totalPersistedBatches))
-	wp.logger.Info("Circuit breaker events", zap.Int("events", wp.totalCircuitBreakerEvents))
-	wp.logger.Info("Memory pressure events", zap.Int("events", wp.totalMemoryPressureEvents))
-	
+	// Only log actionable warnings/errors - all metrics available via Prometheus
 	totalBatches := wp.metrics.TotalBatchesProcessed + wp.totalPersistedBatches
 	if totalBatches > 0 {
 		dataLossRate := (float64(wp.totalPersistedBatches) / float64(totalBatches)) * 100
-		successRate := (float64(wp.metrics.TotalBatchesProcessed) / float64(totalBatches)) * 100
-		wp.logger.Info("Data persistence rate",
-			zap.Float64("rate_percent", dataLossRate),
-			zap.Int("persisted_batches", wp.totalPersistedBatches),
-			zap.Int("total_batches", totalBatches))
-		wp.logger.Info("RabbitMQ success rate", zap.Float64("success_rate_percent", successRate))
-		
+
 		if dataLossRate > 5.0 {
-			wp.logger.Warn("High data persistence rate detected! Check RabbitMQ connectivity")
+			wp.logger.Warn("High data persistence rate detected",
+				zap.Float64("rate_percent", dataLossRate),
+				zap.Int("persisted_batches", wp.totalPersistedBatches),
+				zap.Int("total_batches", totalBatches),
+				zap.String("action", "Check RabbitMQ connectivity and service health at "+wp.config.RabbitMQURL))
 		}
 	}
 
-	if wp.metrics.TotalFilesProcessed > 0 {
-		avgPerFile := duration / time.Duration(wp.metrics.TotalFilesProcessed)
-		wp.logger.Info("Average time per file", zap.Duration("avg_time", avgPerFile))
-	}
-
-	if duration.Seconds() > 0 {
-		filesPerSec := float64(wp.metrics.TotalFilesProcessed) / duration.Seconds()
-		recordsPerSec := float64(wp.metrics.TotalRecordsProcessed) / duration.Seconds()
-		wp.logger.Info("Throughput",
-			zap.Float64("files_per_sec", filesPerSec),
-			zap.Float64("records_per_sec", recordsPerSec))
+	if wp.metrics.TotalErrors > 0 {
+		wp.logger.Error("Processing completed with errors",
+			zap.Int("total_errors", wp.metrics.TotalErrors),
+			zap.Int("files_processed", wp.metrics.TotalFilesProcessed),
+			zap.String("action", "Review error logs above for failed files"))
 	}
 }

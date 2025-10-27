@@ -1,6 +1,6 @@
 module github.com/OJPARKINSON/IRacing-Display/ingest/go
 
-go 1.24
+go 1.25.1
 
 require (
 	github.com/OJPARKINSON/ibt v0.1.4
@@ -33,6 +33,7 @@ require (
 	go.uber.org/multierr v1.10.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	golang.org/x/exp v0.0.0-20240604190554-fc45aab8b7f8 // indirect
+	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/term v0.34.0 // indirect
 	golang.org/x/text v0.28.0 // indirect

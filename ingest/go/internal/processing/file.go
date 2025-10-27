@@ -17,9 +17,10 @@ import (
 )
 
 type FileProcessor struct {
-	config   *config.Config
-	workerID int
-	pool     *messaging.ConnectionPool
+	config           *config.Config
+	workerID         int
+	pool             *messaging.ConnectionPool
+	progressCallback ProgressCallback
 }
 
 type ProcessResult struct {
@@ -32,37 +33,52 @@ type ProcessResult struct {
 
 func NewFileProcessor(cfg *config.Config, workerID int, pool *messaging.ConnectionPool) (*FileProcessor, error) {
 	return &FileProcessor{
-		config:   cfg,
-		workerID: workerID,
-		pool:     pool,
+		config:           cfg,
+		workerID:         workerID,
+		pool:             pool,
+		progressCallback: &NoOpProgressCallback{},
 	}, nil
+}
+
+func (fp *FileProcessor) SetProgressCallback(callback ProgressCallback) {
+	if callback != nil {
+		fp.progressCallback = callback
+	}
 }
 
 func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string, fileEntry os.DirEntry) (*ProcessResult, error) {
 	fileName := fileEntry.Name()
 
 	if !strings.Contains(fileName, ".ibt") {
-		return nil, fmt.Errorf("not an IBT file: %s", fileName)
+		return nil, fmt.Errorf("not an IBT file: %s\nAction: Ensure file has .ibt extension", fileName)
 	}
 
 	sessionTime, err := fp.parseFileName(fileName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse time from filename: %w", err)
+		return nil, fmt.Errorf("failed to parse time from filename %s: %w\nAction: Ensure filename contains date pattern YYYY-MM-DD HH-MM-SS", fileName, err)
 	}
 
 	file := filepath.Join(telemetryFolder, fileName)
 
-	// Reduced logging for performance
 	stubs, err := ibt.ParseStubs(file)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse stubs for %v: %w", file, err)
+		return nil, fmt.Errorf("failed to parse stubs for %v: %w\nAction: File may be corrupted or incomplete - verify file integrity", file, err)
 	}
 
 	if len(stubs) == 0 {
-		return nil, fmt.Errorf("no telemetry data found in IBT file: %s", fileName)
+		return nil, fmt.Errorf("no telemetry data found in IBT file: %s\nAction: File is empty or contains no valid telemetry data", fileName)
 	}
 
 	groups := stubs.Group()
+
+	// Pre-count total records for progress tracking
+	totalExpectedRecords := 0
+	for _, group := range groups {
+		totalExpectedRecords += len(group)
+	}
+
+	// Notify progress callback that file processing is starting
+	fp.progressCallback.OnFileStart(fileName, totalExpectedRecords)
 
 	totalRecords := 0
 	totalBatches := 0
@@ -113,6 +129,7 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 
 		// Create telemetry processor with the correct SubSessionID
 		processor := NewProcessor(pubSub, groupNumber, fp.config, fp.workerID, groupSessionID)
+		processor.SetProgressCallback(fp.progressCallback, fileName)
 		processors = append(processors, processor)
 
 		if err := ibt.Process(ctx, group, processor); err != nil {
@@ -126,7 +143,7 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 
 		if err := processor.Close(); err != nil {
 			pubSub.Close()
-			return nil, fmt.Errorf("error closing processor for group %d: %w", groupNumber, err)
+			return nil, fmt.Errorf("error closing processor for group %d: %w\nAction: Check RabbitMQ connectivity and disk space", groupNumber, err)
 		}
 
 		// Collect metrics from this group's PubSub
@@ -149,6 +166,9 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 	}
 
 	ibt.CloseAllStubs(groups)
+
+	// Notify progress callback that file processing is complete
+	fp.progressCallback.OnFileComplete(fileName)
 
 	return &ProcessResult{
 		RecordCount:      totalRecords,
@@ -174,12 +194,12 @@ func (fp *FileProcessor) parseFileName(fileName string) (time.Time, error) {
 
 	match := regex.FindString(fileName)
 	if match == "" {
-		return time.Time{}, fmt.Errorf("no date pattern found in filename: %s", fileName)
+		return time.Time{}, fmt.Errorf("no date pattern found in filename: %s\nAction: Filename must contain YYYY-MM-DD HH-MM-SS pattern", fileName)
 	}
 
 	parts := strings.Split(match, " ")
 	if len(parts) != 2 {
-		return time.Time{}, fmt.Errorf("invalid date format: %s", match)
+		return time.Time{}, fmt.Errorf("invalid date format: %s\nAction: Date pattern must be YYYY-MM-DD HH-MM-SS", match)
 	}
 
 	timeStr := strings.ReplaceAll(parts[1], "-", ":")
@@ -187,7 +207,7 @@ func (fp *FileProcessor) parseFileName(fileName string) (time.Time, error) {
 
 	parsedTime, err := time.Parse(time.RFC3339, rfc3339Str)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to parse time %s: %w", rfc3339Str, err)
+		return time.Time{}, fmt.Errorf("failed to parse time %s: %w\nAction: Verify date format is valid YYYY-MM-DD HH-MM-SS", rfc3339Str, err)
 	}
 
 	return parsedTime, nil

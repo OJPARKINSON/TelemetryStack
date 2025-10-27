@@ -61,21 +61,16 @@ func main() {
 
 	// Apply GOMAXPROCS if explicitly configured (0 means use Go's default)
 	if cfg.GoMaxProcs > 0 {
-		oldProcs := runtime.GOMAXPROCS(cfg.GoMaxProcs)
-		logger.Info("GOMAXPROCS configured",
-			zap.Int("old", oldProcs),
-			zap.Int("new", cfg.GoMaxProcs))
-	} else {
-		logger.Info("Using Go default GOMAXPROCS",
-			zap.Int("cpus", runtime.GOMAXPROCS(0)))
+		runtime.GOMAXPROCS(cfg.GoMaxProcs)
 	}
 
 	// Enable profiling if ENABLE_PPROF environment variable is set
 	if os.Getenv("ENABLE_PPROF") == "true" {
 		go func() {
-			logger.Info("Starting pprof server on :6060")
 			if err := http.ListenAndServe(":6060", nil); err != nil {
-				logger.Error("pprof server failed", zap.Error(err))
+				logger.Error("pprof server failed",
+					zap.Error(err),
+					zap.String("action", "Check port 6060 is not in use"))
 			}
 		}()
 	}
@@ -84,15 +79,19 @@ func main() {
 	if cpuProfile := os.Getenv("CPU_PROFILE"); cpuProfile != "" {
 		f, err := os.Create(cpuProfile)
 		if err != nil {
-			logger.Fatal("Could not create CPU profile", zap.Error(err))
+			logger.Fatal("Could not create CPU profile",
+				zap.Error(err),
+				zap.String("path", cpuProfile),
+				zap.String("action", "Check directory exists and has write permissions"))
 		}
 		defer f.Close()
 
 		if err := pprof.StartCPUProfile(f); err != nil {
-			logger.Fatal("Could not start CPU profile", zap.Error(err))
+			logger.Fatal("Could not start CPU profile",
+				zap.Error(err),
+				zap.String("action", "Check file can be written"))
 		}
 		defer pprof.StopCPUProfile()
-		logger.Info("CPU profiling enabled", zap.String("file", cpuProfile))
 	}
 
 	// Setup context and signal handling
@@ -103,19 +102,27 @@ func main() {
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-signalCh
-		logger.Info("Graceful shutdown initiated - allowing data to be flushed...")
 		cancel()
 	}()
 
-	// Get telemetry folder from remaining args after flag parsing
+	// Get telemetry folder from args or use configured default
+	var telemetryFolder string
 	args := flag.Args()
-	if len(args) < 1 {
-		logger.Fatal("Usage: ./ingest-app [options] <telemetry-folder-path>")
+	if len(args) >= 1 {
+		telemetryFolder = args[0]
+	} else {
+		telemetryFolder = cfg.DataDirectory
 	}
 
-	telemetryFolder := args[0]
 	if !strings.HasSuffix(telemetryFolder, string(filepath.Separator)) {
 		telemetryFolder += string(filepath.Separator)
+	}
+
+	// Verify telemetry folder exists
+	if _, err := os.Stat(telemetryFolder); os.IsNotExist(err) {
+		logger.Fatal("Telemetry directory does not exist",
+			zap.String("path", telemetryFolder),
+			zap.String("action", "Create directory or set IBT_DATA_DIR environment variable"))
 	}
 
 	// Create worker pool
@@ -124,7 +131,10 @@ func main() {
 	// Discover and queue files
 	expectedFiles, err := discoverAndQueueFiles(ctx, pool, telemetryFolder, cfg, logger)
 	if err != nil {
-		logger.Error("Error during file discovery", zap.Error(err))
+		logger.Error("File discovery failed",
+			zap.Error(err),
+			zap.String("path", telemetryFolder),
+			zap.String("action", "Check directory permissions and IBT files exist"))
 		return
 	}
 
@@ -134,45 +144,42 @@ func main() {
 		pool.SetProgressDisplay(progress)
 		progress.Start()
 		defer progress.Stop()
-
-		logger.Info("Starting ingest service",
-			zap.Int("workers", cfg.WorkerCount),
-			zap.Int("files", expectedFiles))
-	} else {
-		logger.Info("Starting ingest service in quiet mode",
-			zap.Int("workers", cfg.WorkerCount),
-			zap.Int("files", expectedFiles))
 	}
 
 	// Start worker pool
-	pool.Start()
-	defer pool.Stop()
+	if err := pool.Start(); err != nil {
+		logger.Fatal("Failed to start worker pool",
+			zap.Error(err),
+			zap.String("action", "Check system resources and configuration"))
+	}
+	defer func() {
+		if err := pool.Stop(); err != nil {
+			logger.Error("Error stopping worker pool",
+				zap.Error(err))
+		}
+	}()
 
 	// Wait for completion
 	waitForCompletion(ctx, pool, startTime, expectedFiles, *quiet)
-
-	if !*quiet {
-		logger.Info("Processing completed", zap.Duration("duration", time.Since(startTime)))
-	}
 
 	// Write memory profile if MEM_PROFILE environment variable is set
 	if memProfile := os.Getenv("MEM_PROFILE"); memProfile != "" {
 		f, err := os.Create(memProfile)
 		if err != nil {
-			logger.Error("Could not create memory profile", zap.Error(err))
+			logger.Error("Could not create memory profile",
+				zap.Error(err),
+				zap.String("path", memProfile),
+				zap.String("action", "Check directory exists and has write permissions"))
 		} else {
 			defer f.Close()
 			runtime.GC() // get up-to-date statistics
 			if err := pprof.WriteHeapProfile(f); err != nil {
-				logger.Error("Could not write memory profile", zap.Error(err))
-			} else {
-				logger.Info("Memory profile written", zap.String("file", memProfile))
+				logger.Error("Could not write memory profile",
+					zap.Error(err),
+					zap.String("action", "Check disk space and file permissions"))
 			}
 		}
 	}
-
-	// Give a moment for final logs to flush
-	time.Sleep(2 * time.Second)
 }
 
 func printHelp() {
@@ -186,6 +193,7 @@ func printHelp() {
 	fmt.Println("  --help           Show this help message")
 	fmt.Println()
 	fmt.Println("Environment Variables:")
+	fmt.Println("  IBT_DATA_DIR              Data directory path (default: ./ibt_files/)")
 	fmt.Println("  WORKER_COUNT              Number of parallel workers (default: CPU count + 25%)")
 	fmt.Println("  BATCH_SIZE_BYTES          Batch size in bytes (default: 32MB)")
 	fmt.Println("  BATCH_SIZE_RECORDS        Records per batch (default: 16000)")
@@ -236,20 +244,14 @@ func waitForCompletion(ctx context.Context, pool *worker.WorkerPool, startTime t
 	for {
 		select {
 		case <-ctx.Done():
-			if !quiet {
-				logger.Info("Shutdown requested")
-			}
+			// Shutdown requested - no log needed, handled by pool
 			return
 		default:
 			time.Sleep(20 * time.Millisecond)
 			metrics := pool.GetMetrics()
 
 			if metrics.QueueDepth == 0 && metrics.TotalFilesProcessed >= expectedFiles {
-				if !quiet {
-					logger.Info("All files processed",
-						zap.Int("total_files", expectedFiles),
-						zap.Duration("duration", time.Since(startTime)))
-				}
+				// Completion - metrics available via Prometheus, no log needed
 				return
 			}
 		}

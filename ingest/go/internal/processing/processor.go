@@ -34,6 +34,10 @@ type loaderProcessor struct {
 	// Metrics tracking
 	totalProcessed int
 	totalBatches   int
+
+	// Progress tracking
+	progressCallback ProgressCallback
+	currentFile      string
 }
 
 // sessionInfo holds session metadata
@@ -57,19 +61,27 @@ type ProcessorMetrics struct {
 // NewProcessor creates a new telemetry processor
 func NewProcessor(pubSub *messaging.PubSub, groupNumber int, config *config.Config, workerID int, subSessionID string) *loaderProcessor {
 	return &loaderProcessor{
-		pubSub:         pubSub,
-		cache:          make([]*ibt.TelemetryTick, 0, config.BatchSizeRecords),
-		groupNumber:    groupNumber,
-		config:         config,
-		thresholdBytes: config.BatchSizeBytes,
-		workerID:       workerID,
-		subSessionID:   subSessionID,
-		sessionMap:     make(map[int]sessionInfo),
+		pubSub:           pubSub,
+		cache:            make([]*ibt.TelemetryTick, 0, config.BatchSizeRecords),
+		groupNumber:      groupNumber,
+		config:           config,
+		thresholdBytes:   config.BatchSizeBytes,
+		workerID:         workerID,
+		subSessionID:     subSessionID,
+		sessionMap:       make(map[int]sessionInfo),
+		progressCallback: &NoOpProgressCallback{},
 		tickPool: &sync.Pool{
 			New: func() interface{} {
 				return &ibt.TelemetryTick{}
 			},
 		},
+	}
+}
+
+func (l *loaderProcessor) SetProgressCallback(callback ProgressCallback, filename string) {
+	if callback != nil {
+		l.progressCallback = callback
+		l.currentFile = filename
 	}
 }
 
@@ -109,7 +121,7 @@ func (l *loaderProcessor) ProcessStruct(tick *ibt.TelemetryTick, hasNext bool, s
 
 	if shouldFlush && len(l.cache) > 0 {
 		if err := l.loadBatch(); err != nil {
-			return fmt.Errorf("failed to laod batch: %w", err)
+			return fmt.Errorf("failed to load batch: %w", err)
 		}
 	}
 
@@ -123,6 +135,8 @@ func (l *loaderProcessor) loadBatch() error {
 	if len(l.cache) == 0 {
 		return nil
 	}
+
+	batchSize := len(l.cache)
 
 	if !l.config.DisableRabbitMQ {
 		err := l.pubSub.ExecStructs(l.cache)
@@ -138,6 +152,11 @@ func (l *loaderProcessor) loadBatch() error {
 	l.cache = l.cache[:0]
 	l.totalBatches++
 
+	// Report progress after batch is sent
+	l.progressCallback.OnBatchSent(l.currentFile, l.totalProcessed, l.totalBatches)
+
+	_ = batchSize // Keep for potential future use
+
 	return nil
 }
 
@@ -146,8 +165,6 @@ func (l *loaderProcessor) Close() error {
 	defer l.mu.Unlock()
 
 	if len(l.cache) > 0 {
-		log.Printf("Worker %d: Flushing remaining %d struct records on close",
-			l.workerID, len(l.cache))
 		return l.loadBatch()
 	}
 

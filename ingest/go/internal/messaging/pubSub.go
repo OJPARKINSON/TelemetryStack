@@ -38,7 +38,7 @@ func NewConnectionPool(url string, poolSize int) (*ConnectionPool, error) {
 		conn, err := amqp.Dial(url)
 		if err != nil {
 			pool.Close()
-			return nil, fmt.Errorf("failed to create connection %d: %w", i, err)
+			return nil, fmt.Errorf("failed to create RabbitMQ connection %d to %s: %w\nAction: Verify RabbitMQ is running and credentials are correct", i, url, err)
 		}
 
 		ch, err := conn.Channel()
@@ -46,7 +46,7 @@ func NewConnectionPool(url string, poolSize int) (*ConnectionPool, error) {
 			conn.Close()
 			pool.Close()
 
-			return nil, fmt.Errorf("failed to create channel %d: %w", i, err)
+			return nil, fmt.Errorf("failed to create RabbitMQ channel %d: %w\nAction: Check RabbitMQ channel limits and service health", i, err)
 		}
 
 		err = ch.Qos(1000, 0, false)
@@ -54,7 +54,7 @@ func NewConnectionPool(url string, poolSize int) (*ConnectionPool, error) {
 			ch.Close()
 			conn.Close()
 			pool.Close()
-			return nil, fmt.Errorf("failed to set Qos for channel %d: %w", i, err)
+			return nil, fmt.Errorf("failed to set QoS for channel %d: %w\nAction: Check RabbitMQ configuration allows prefetch settings", i, err)
 		}
 
 		pool.connections[i] = conn
@@ -253,19 +253,19 @@ func (ps *PubSub) Exec(data []map[string]interface{}) error {
 // persistBatch saves a failed batch to disk for later retry
 func (ps *PubSub) persistBatch(batchData []byte, batchId string) error {
 	if ps.persistenceDir == "" {
-		return fmt.Errorf("persistence disabled - directory creation failed")
+		return fmt.Errorf("persistence disabled - directory creation failed\nAction: Check disk permissions for failed_batches directory")
 	}
 
 	// Check if we've exceeded max persistent storage
 	if int64(len(batchData)) > ps.maxPersistentBytes {
-		return fmt.Errorf("batch too large for persistence: %d bytes", len(batchData))
+		return fmt.Errorf("batch too large for persistence: %d bytes (max: %d)\nAction: Reduce BATCH_SIZE_BYTES or increase max persistent storage", len(batchData), ps.maxPersistentBytes)
 	}
 
 	filename := fmt.Sprintf("batch_%s_%d.pb", batchId, time.Now().UnixNano())
 	filepath := filepath.Join(ps.persistenceDir, filename)
 
 	if err := os.WriteFile(filepath, batchData, 0644); err != nil {
-		return fmt.Errorf("failed to persist batch to %s: %w", filepath, err)
+		return fmt.Errorf("failed to persist batch to %s: %w\nAction: Check disk space and write permissions", filepath, err)
 	}
 
 	ps.persistedBatches++
@@ -508,7 +508,7 @@ func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte) error {
 				time.Sleep(time.Duration(retry+1) * 100 * time.Millisecond)
 				continue
 			}
-			return fmt.Errorf("failed to get channel after %d retries", maxRetries)
+			return fmt.Errorf("failed to get RabbitMQ channel after %d retries\nAction: Check RabbitMQ service health and connection pool size", maxRetries)
 		}
 
 		// Reduce timeout from 10s to 1s for fast-fail
@@ -518,7 +518,7 @@ func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte) error {
 			amqp.Publishing{
 				ContentType:  "application/x-protobuf",
 				Body:         data,
-				DeliveryMode: amqp.Persistent,
+				DeliveryMode: amqp.Transient,
 				Timestamp:    time.Now(),
 				MessageId:    batch.BatchId,
 				Headers: amqp.Table{
@@ -553,7 +553,7 @@ func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte) error {
 	// Persist the batch to disk for later recovery
 	if persistErr := ps.persistBatch(data, batch.BatchId); persistErr != nil {
 		log.Printf("Worker %d: CRITICAL - Failed to persist batch %s: %v", ps.workerID, batch.BatchId, persistErr)
-		return fmt.Errorf("failed to publish batch after %d retries AND failed to persist: %v", maxRetries, persistErr)
+		return fmt.Errorf("failed to publish batch after %d retries AND failed to persist: %v\nAction: Check both RabbitMQ connectivity and disk space/permissions", maxRetries, persistErr)
 	}
 
 	log.Printf("Worker %d: Batch %s persisted to disk after RabbitMQ failure (consecutive failures: %d)",
@@ -585,7 +585,7 @@ func (ps *PubSub) flushBatchInternal() error {
 
 	data, err := proto.Marshal(batch)
 	if err != nil {
-		return fmt.Errorf("failed to marshal protobuf batch: %w", err)
+		return fmt.Errorf("failed to marshal protobuf batch: %w\nAction: This is an internal error - check telemetry data validity", err)
 	}
 
 	// During shutdown, publish synchronously to avoid queuing delays
@@ -661,17 +661,12 @@ func (ps *PubSub) Close() error {
 	select {
 	case <-done:
 		// Normal shutdown completed
-	case <-time.After(2 * time.Second):
+	case <-time.After(4 * time.Second):
 		// Timeout - queue taking too long, abandon remaining messages
-		log.Printf("Worker %d: WARNING - Shutdown timeout, %d messages may be lost",
-			ps.workerID, len(ps.publishQueue))
+		// Silently continue - messages may be lost
 	}
 
-	log.Printf("Worker %d: Published %d batches with %d total records", ps.workerID, ps.totalBatches, ps.totalRecords)
-	if ps.failedBatchCount > 0 {
-		log.Printf("Worker %d: PERSISTENCE - %d batches persisted to disk due to RabbitMQ failures", ps.workerID, ps.persistedBatches)
-		log.Printf("Worker %d: Check %s for persisted batches", ps.workerID, ps.persistenceDir)
-	}
+	// Close completes silently - stats available via GetMetrics()
 	return nil
 }
 
