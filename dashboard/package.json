@@ -22,34 +22,34 @@
 		"test:install": "playwright install"
 	},
 	"dependencies": {
-		"@questdb/nodejs-client": "^4.0.1",
-		"@tailwindcss/postcss": "^4.1.11",
+		"@questdb/nodejs-client": "^4.0.2",
+		"@tailwindcss/postcss": "^4.1.16",
 		"autoprefixer": "^10.4.21",
-		"next": "^15.4.6",
+		"next": "^16.0.1",
 		"ol": "^10.6.1",
 		"pg": "^8.16.3",
-		"react": "^19.1.1",
-		"react-dom": "^19.1.1",
-		"recharts": "^3.1.2",
+		"react": "^19.2.0",
+		"react-dom": "^19.2.0",
+		"recharts": "^3.3.0",
 		"swr": "^2.3.6",
 		"tailwindcss-animate": "^1.0.7"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.1.4",
-		"@next/bundle-analyzer": "^15.4.6",
-		"@playwright/test": "^1.54.2",
+		"@biomejs/biome": "2.3.2",
+		"@next/bundle-analyzer": "^16.0.1",
+		"@playwright/test": "^1.56.1",
 		"@types/d3": "^7.4.3",
 		"@types/node": "^24",
-		"@types/pg": "^8.15.5",
+		"@types/pg": "^8.15.6",
 		"@types/react": "^19",
 		"@types/react-dom": "^19",
-		"@types/three": "^0.179.0",
-		"cross-env": "^10.0.0",
+		"@types/three": "^0.180.0",
+		"cross-env": "^10.1.0",
 		"eslint": "^9",
-		"eslint-config-next": "15.4.6",
-		"playwright": "^1.54.2",
+		"eslint-config-next": "16.0.1",
+		"playwright": "^1.56.1",
 		"postcss": "^8.5.6",
-		"tailwindcss": "^4.1.11",
+		"tailwindcss": "^4.1.16",
 		"typescript": "^5"
 	},
 	"engines": {
@@ -69,7 +69,7 @@
 		]
 	},
 	"overrides": {
-		"react": "^19.1.1",
-		"react-dom": "^19.1.1"
+		"react": "^19.2.0",
+		"react-dom": "^19.2.0"
 	}
 }
