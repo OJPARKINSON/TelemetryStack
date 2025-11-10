@@ -64,13 +64,13 @@ func LoadConfig() *Config {
 		FileQueueSize: getEnvAsInt("FILE_QUEUE_SIZE", 1000),
 		WorkerTimeout: getEnvAsDuration("WORKER_TIMEOUT", 30*time.Minute),
 
-		BatchSizeBytes: getEnvAsInt("BATCH_SIZE_BYTES", 33554432), // 32MB default (reduced from 64MB for lower memory usage)
+		BatchSizeBytes: getEnvAsInt("BATCH_SIZE_BYTES", 33554432),
 		BatchTimeout:   getEnvAsDuration("BATCH_TIMEOUT", 50*time.Millisecond),
 		MaxRetries:     getEnvAsInt("MAX_RETRIES", 3),
 		RetryDelay:     getEnvAsDuration("RETRY_DELAY", 250*time.Millisecond),
 
-		RabbitMQURL:     getEnv("RABBITMQ_URL", "amqp://admin:changeme@localhost:5672"),
 		DisableRabbitMQ: getEnvAsBool("DISABLE_RABBITMQ", false),
+		RabbitMQURL:     getEnv("RABBITMQ_URL", "amqp://admin:changeme@localhost:5672"),
 
 		FileAgeThreshold:   getEnvAsDuration("FILE_AGE_THRESHOLD", 30*time.Second),
 		FileProcessTimeout: getEnvAsDuration("FILE_PROCESS_TIMEOUT", 10*time.Minute),
