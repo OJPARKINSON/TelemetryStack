@@ -5,13 +5,14 @@ go 1.25.1
 require (
 	github.com/OJPARKINSON/ibt v0.1.4
 	github.com/jedib0t/go-pretty/v6 v6.6.8
+	github.com/fatih/color v1.18.0
 	github.com/rabbitmq/amqp091-go v1.10.0
 	go.uber.org/zap v1.27.0
 	google.golang.org/protobuf v1.36.8
 )
 
-// Use local fork instead of remote dependency
-replace github.com/OJPARKINSON/ibt => ./ibt
+// // Use local fork instead of remote dependency
+// replace github.com/OJPARKINSON/ibt => ./ibt
 
 require (
 	github.com/kr/pretty v0.3.1 // indirect

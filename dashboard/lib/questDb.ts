@@ -166,9 +166,9 @@ class QuestDBClient {
 			return await this.executeWithRetry(async (client) => {
 				const query = `
 				SELECT DISTINCT session_id, 
-				track_name,
-				MAX(timestamp) as last_updated
+				track_name, session_name, MAX(lap_id), MAX(timestamp) as last_updated
 				FROM TelemetryTicks 
+       			WHERE session_name = 'RACE' and lap_id > 0
 				ORDER BY last_updated DESC
                 `;
 
