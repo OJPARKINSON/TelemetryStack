@@ -1,4 +1,4 @@
-FROM golang:1.25.1-bookworm as base
+FROM golang:1.25-bookworm as base
 
 WORKDIR /app
 COPY go.mod  .

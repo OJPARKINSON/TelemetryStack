@@ -60,7 +60,7 @@ func (m *Subscriber) Subscribe(config *config.Config) {
 	failOnError(err, "Failed to open a channel")
 	defer channel.Close()
 
-	err = channel.Qos(5000, 0, false)
+	err = channel.Qos(500, 0, false) // reducing prefetch for mem usage
 	failOnError(err, "Failed to bind to queue")
 
 	errs := channel.QueueBind("telemetry_queue",
@@ -166,18 +166,26 @@ func (m *Subscriber) processBatches(batchChan chan batchItem, channel *amqp.Chan
 	}
 }
 
-func (m *Subscriber) flushBatches(items []batchItem, channel *amqp.Channel) {
-	var allRecords []*messaging.Telemetry
+// collectValidRecords extracts and filters valid telemetry records from batch items
+func CollectValidRecords(items []batchItem) []*messaging.Telemetry {
+	totalRecords := 0
 	for _, item := range items {
-		allRecords = append(allRecords, item.batch.Records...)
+		totalRecords += len(item.batch.Records)
 	}
 
-	validRecords := make([]*messaging.Telemetry, 0, len(allRecords))
-	for _, record := range allRecords {
-		if IsValidRecord(record) {
-			validRecords = append(validRecords, record)
+	validRecords := make([]*messaging.Telemetry, 0, totalRecords)
+	for _, item := range items {
+		for _, record := range item.batch.Records {
+			if IsValidRecord(record) {
+				validRecords = append(validRecords, record)
+			}
 		}
 	}
+	return validRecords
+}
+
+func (m *Subscriber) flushBatches(items []batchItem, channel *amqp.Channel) {
+	validRecords := CollectValidRecords(items)
 
 	if len(validRecords) == 0 {
 		for _, item := range items {
