@@ -26,7 +26,6 @@ var progress *worker.ProgressDisplay
 var logger *zap.Logger
 
 func main() {
-	// Define CLI flags
 	var quiet = flag.Bool("quiet", false, "Disable progress display")
 	var verbose = flag.Bool("verbose", false, "Enable verbose logging")
 	var help = flag.Bool("help", false, "Show help")
@@ -46,9 +45,9 @@ func main() {
 		// Verbose mode: full development logging
 		logger, err = zap.NewDevelopment()
 	} else {
-		// Silent mode: only fatal errors
+		// Silent mode: errors and above
 		config := zap.NewProductionConfig()
-		config.Level = zap.NewAtomicLevelAt(zap.FatalLevel)
+		config.Level = zap.NewAtomicLevelAt(zap.ErrorLevel)
 		logger, err = config.Build()
 	}
 	if err != nil {
@@ -64,7 +63,6 @@ func main() {
 		runtime.GOMAXPROCS(cfg.GoMaxProcs)
 	}
 
-	// Enable profiling if ENABLE_PPROF environment variable is set
 	if os.Getenv("ENABLE_PPROF") == "true" {
 		go func() {
 			if err := http.ListenAndServe(":6060", nil); err != nil {
@@ -75,7 +73,6 @@ func main() {
 		}()
 	}
 
-	// Enable CPU profiling if CPU_PROFILE environment variable is set
 	if cpuProfile := os.Getenv("CPU_PROFILE"); cpuProfile != "" {
 		f, err := os.Create(cpuProfile)
 		if err != nil {
@@ -128,7 +125,6 @@ func main() {
 	// Create worker pool
 	pool := worker.NewWorkerPool(cfg, logger)
 
-	// Discover and queue files
 	expectedFiles, err := discoverAndQueueFiles(ctx, pool, telemetryFolder, cfg, logger)
 	if err != nil {
 		logger.Error("File discovery failed",
@@ -137,6 +133,7 @@ func main() {
 			zap.String("action", "Check directory permissions and IBT files exist"))
 		return
 	}
+	log.Printf("STARTUP: Found %d IBT files to process", expectedFiles)
 
 	// Initialize progress display
 	if !*quiet {

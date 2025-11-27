@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -109,7 +107,6 @@ type PubSub struct {
 	batchSizeRecords int
 
 	// Data persistence for RabbitMQ failures
-	persistenceDir     string
 	failedBatchCount   int
 	persistedBatches   int
 	maxPersistentBytes int64
@@ -149,12 +146,6 @@ type PublishMetrics struct {
 }
 
 func NewPubSub(sessionId string, sessionTime time.Time, cfg *config.Config, pool *ConnectionPool) *PubSub {
-	// Create persistence directory for failed batches
-	persistenceDir := filepath.Join("./failed_batches", sessionId)
-	if err := os.MkdirAll(persistenceDir, 0755); err != nil {
-		log.Printf("Failed to create persistence directory %s: %v", persistenceDir, err)
-		persistenceDir = "" // Disable persistence if directory creation fails
-	}
 
 	ps := &PubSub{
 		pool:               pool,
@@ -166,7 +157,6 @@ func NewPubSub(sessionId string, sessionTime time.Time, cfg *config.Config, pool
 		batchSizeBytes:     cfg.BatchSizeBytes,
 		batchSizeRecords:   cfg.BatchSizeRecords,
 		lastFlush:          time.Now(),
-		persistenceDir:     persistenceDir,
 		maxPersistentBytes: 500 * 1024 * 1024, // 500MB max persistent storage per worker
 
 		// Circuit breaker configuration
@@ -252,57 +242,7 @@ func (ps *PubSub) Exec(data []map[string]interface{}) error {
 
 // persistBatch saves a failed batch to disk for later retry
 func (ps *PubSub) persistBatch(batchData []byte, batchId string) error {
-	if ps.persistenceDir == "" {
-		return fmt.Errorf("persistence disabled - directory creation failed\nAction: Check disk permissions for failed_batches directory")
-	}
-
-	// Check if we've exceeded max persistent storage
-	if int64(len(batchData)) > ps.maxPersistentBytes {
-		return fmt.Errorf("batch too large for persistence: %d bytes (max: %d)\nAction: Reduce BATCH_SIZE_BYTES or increase max persistent storage", len(batchData), ps.maxPersistentBytes)
-	}
-
-	filename := fmt.Sprintf("batch_%s_%d.pb", batchId, time.Now().UnixNano())
-	filepath := filepath.Join(ps.persistenceDir, filename)
-
-	if err := os.WriteFile(filepath, batchData, 0644); err != nil {
-		return fmt.Errorf("failed to persist batch to %s: %w\nAction: Check disk space and write permissions", filepath, err)
-	}
-
-	ps.persistedBatches++
-	log.Printf("Worker %d: Persisted batch %s to disk (%d bytes)", ps.workerID, batchId, len(batchData))
-	return nil
-}
-
-// cleanupOldBatches removes old persisted batches to prevent disk overflow
-func (ps *PubSub) cleanupOldBatches() {
-	if ps.persistenceDir == "" {
-		return
-	}
-
-	// Remove batch files older than 24 hours
-	cutoff := time.Now().Add(-24 * time.Hour)
-
-	files, err := os.ReadDir(ps.persistenceDir)
-	if err != nil {
-		log.Printf("Worker %d: Failed to read persistence directory: %v", ps.workerID, err)
-		return
-	}
-
-	for _, file := range files {
-		if strings.HasSuffix(file.Name(), ".pb") {
-			filepath := filepath.Join(ps.persistenceDir, file.Name())
-			info, err := file.Info()
-			if err != nil {
-				continue
-			}
-
-			if info.ModTime().Before(cutoff) {
-				if err := os.Remove(filepath); err != nil {
-					log.Printf("Worker %d: Failed to cleanup old batch %s: %v", ps.workerID, file.Name(), err)
-				}
-			}
-		}
-	}
+	return fmt.Errorf("failed to send batch " + batchId)
 }
 
 // Circuit breaker methods
@@ -466,17 +406,29 @@ func (ps *PubSub) transformRecord(record map[string]interface{}) *Telemetry {
 // publishWorker runs in background goroutine to handle async publishing
 func (ps *PubSub) publishWorker() {
 	defer ps.publishWg.Done()
+	log.Printf("Worker %d: publishWorker goroutine started", ps.workerID)
 
 	for {
 		select {
 		case req := <-ps.publishQueue:
+			log.Printf("Worker %d: Processing batch %s from async queue", ps.workerID, req.batch.BatchId)
 			err := ps.doPublish(req.batch, req.data)
+			if err != nil {
+				log.Printf("Worker %d: ERROR publishing batch %s asynchronously: %v",
+					ps.workerID, req.batch.BatchId, err)
+			} else {
+				log.Printf("Worker %d: Successfully published batch %s", ps.workerID, req.batch.BatchId)
+			}
 			req.errCh <- err
 		case <-ps.publishDone:
 			// Drain remaining messages before shutting down
 			for len(ps.publishQueue) > 0 {
 				req := <-ps.publishQueue
 				err := ps.doPublish(req.batch, req.data)
+				if err != nil {
+					log.Printf("Worker %d: ERROR publishing batch %s during shutdown: %v",
+						ps.workerID, req.batch.BatchId, err)
+				}
 				req.errCh <- err
 			}
 			return
@@ -562,9 +514,6 @@ func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte) error {
 	// Periodically clean up old batches
 	ps.mu.Lock()
 	ps.failedBatchCount++
-	if ps.failedBatchCount%10 == 0 {
-		go ps.cleanupOldBatches()
-	}
 	ps.mu.Unlock()
 
 	return nil // Don't return error since we've handled it via persistence
@@ -615,7 +564,7 @@ func (ps *PubSub) flushBatchInternal() error {
 		ps.lastFlush = time.Now()
 
 		// Don't wait for result - let it publish async
-		// Errors are handled by the async worker
+		// Errors are logged by the async worker
 		return nil
 
 	case <-time.After(100 * time.Millisecond):

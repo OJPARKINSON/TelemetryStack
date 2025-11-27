@@ -8,6 +8,6 @@ RUN go mod download
 
 COPY . .
 
-RUN GOOS=linux GOARCH=arm64 go build -o /telemetryService -ldflags="-w -s"
+RUN GOOS=linux GOARCH=amd64 go build -o /telemetryService -ldflags="-w -s"
 
 CMD ["/telemetryService"]
