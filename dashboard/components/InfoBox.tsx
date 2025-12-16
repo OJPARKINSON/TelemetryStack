@@ -1,4 +1,4 @@
-import { useCallback, useMemo, memo } from "react";
+import { memo, useCallback, useMemo } from "react";
 import {
 	CartesianGrid,
 	Line,
@@ -18,32 +18,35 @@ interface InfoBoxProps {
 	setSelectedMetric?: (metric: string) => void;
 }
 
-export const InfoBox = memo(function InfoBox({ telemetryData, lapId }: InfoBoxProps) {
+export const InfoBox = memo(function InfoBox({
+	telemetryData,
+	lapId,
+}: InfoBoxProps) {
 	return (
-		<div className="bg-zinc-900/50 border border-zinc-800/50 rounded-lg p-6">
-			<div className="flex justify-between items-center mb-6"></div>
-			<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-				<div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-4">
-					<div className="text-sm text-zinc-400 mb-2">Lap</div>
-					<div className="text-2xl font-bold text-white">{lapId}</div>
+		<div className="rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-6">
+			<div className="mb-6 flex items-center justify-between" />
+			<div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+				<div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+					<div className="mb-2 text-sm text-zinc-400">Lap</div>
+					<div className="font-bold text-2xl text-white">{lapId}</div>
 				</div>
-				<div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-4">
-					<div className="text-sm text-zinc-400 mb-2">Lap Time</div>
-					<div className="text-2xl font-bold text-blue-400">
+				<div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+					<div className="mb-2 text-sm text-zinc-400">Lap Time</div>
+					<div className="font-bold text-2xl text-blue-400">
 						{telemetryData[telemetryData.length - 1].LapCurrentLapTime?.toFixed(
 							2,
 						) || "0.00"}
 					</div>
 				</div>
-				<div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-4">
-					<div className="text-sm text-zinc-400 mb-2">Position</div>
-					<div className="text-2xl font-bold text-orange-400">
+				<div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+					<div className="mb-2 text-sm text-zinc-400">Position</div>
+					<div className="font-bold text-2xl text-orange-400">
 						{telemetryData[telemetryData.length - 1].PlayerCarPosition || 0}
 					</div>
 				</div>
-				<div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-4">
-					<div className="text-sm text-zinc-400 mb-2">Fuel</div>
-					<div className="text-2xl font-bold text-green-400">
+				<div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+					<div className="mb-2 text-sm text-zinc-400">Fuel</div>
+					<div className="font-bold text-2xl text-green-400">
 						{telemetryData[telemetryData.length - 1].FuelLevel?.toFixed(1) || 0}{" "}
 						L
 					</div>
@@ -95,8 +98,8 @@ export const TelemetryChart = ({
 
 	return (
 		<div>
-			<div className="flex justify-between items-center mb-4">
-				<h2 className="text-lg font-semibold text-white">Telemetry Data</h2>
+			<div className="mb-4 flex items-center justify-between">
+				<h2 className="font-semibold text-lg text-white">Telemetry Data</h2>
 			</div>
 
 			<div className="h-64">
@@ -123,7 +126,7 @@ export const TelemetryChart = ({
 								if (active && payload && payload.length) {
 									const dataPoint = payload[0].payload as TelemetryDataPoint;
 									return (
-										<div className="bg-gray-700 p-2 rounded shadow">
+										<div className="rounded bg-gray-700 p-2 shadow">
 											<p className="text-gray-300">
 												Time: {dataPoint.sessionTime.toFixed(2)}s
 											</p>
@@ -140,7 +143,7 @@ export const TelemetryChart = ({
 										</div>
 									);
 								}
-								return <></>;
+								return;
 							}}
 						/>
 
@@ -202,10 +205,10 @@ export const TelemetryChart = ({
 			</div>
 
 			{/* Metric info boxes with additional information */}
-			<div className="grid grid-cols-2 gap-3 mt-4">
-				<div className="bg-zinc-800/30 border border-zinc-700/50 rounded-lg p-3">
-					<p className="text-sm text-zinc-400 mb-1">Brake</p>
-					<p className="text-lg font-semibold text-white">
+			<div className="mt-4 grid grid-cols-2 gap-3">
+				<div className="rounded-lg border border-zinc-700/50 bg-zinc-800/30 p-3">
+					<p className="mb-1 text-sm text-zinc-400">Brake</p>
+					<p className="font-semibold text-lg text-white">
 						{telemetryData.length > 0 &&
 						selectedIndex !== null &&
 						selectedIndex >= 0
@@ -213,9 +216,9 @@ export const TelemetryChart = ({
 							: "0.0"}
 					</p>
 				</div>
-				<div className="bg-zinc-800/30 border border-zinc-700/50 rounded-lg p-3">
-					<p className="text-sm text-zinc-400 mb-1">LapDistPct</p>
-					<p className="text-lg font-semibold text-white">
+				<div className="rounded-lg border border-zinc-700/50 bg-zinc-800/30 p-3">
+					<p className="mb-1 text-sm text-zinc-400">LapDistPct</p>
+					<p className="font-semibold text-lg text-white">
 						{telemetryData.length > 0 &&
 						selectedIndex !== null &&
 						selectedIndex >= 0
@@ -223,9 +226,9 @@ export const TelemetryChart = ({
 							: "0.0"}
 					</p>
 				</div>
-				<div className="bg-zinc-800/30 border border-zinc-700/50 rounded-lg p-3">
-					<p className="text-sm text-zinc-400 mb-1">Speed</p>
-					<p className="text-lg font-semibold text-white">
+				<div className="rounded-lg border border-zinc-700/50 bg-zinc-800/30 p-3">
+					<p className="mb-1 text-sm text-zinc-400">Speed</p>
+					<p className="font-semibold text-lg text-white">
 						{telemetryData.length > 0 &&
 						selectedIndex !== null &&
 						selectedIndex >= 0
@@ -233,9 +236,9 @@ export const TelemetryChart = ({
 							: "277.8"}
 					</p>
 				</div>
-				<div className="bg-zinc-800/30 border border-zinc-700/50 rounded-lg p-3">
-					<p className="text-sm text-zinc-400 mb-1">Throttle</p>
-					<p className="text-lg font-semibold text-white">
+				<div className="rounded-lg border border-zinc-700/50 bg-zinc-800/30 p-3">
+					<p className="mb-1 text-sm text-zinc-400">Throttle</p>
+					<p className="font-semibold text-lg text-white">
 						{telemetryData.length > 0 &&
 						selectedIndex !== null &&
 						selectedIndex >= 0

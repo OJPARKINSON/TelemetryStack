@@ -14,16 +14,16 @@ export async function GET() {
 				details: healthResult.details,
 			});
 		}
-			return NextResponse.json(
-				{
-					status: "error",
-					message: healthResult.message,
-					timestamp: new Date().toISOString(),
-					database: "QuestDB",
-					details: healthResult.details,
-				},
-				{ status: 503 },
-			);
+		return NextResponse.json(
+			{
+				status: "error",
+				message: healthResult.message,
+				timestamp: new Date().toISOString(),
+				database: "QuestDB",
+				details: healthResult.details,
+			},
+			{ status: 503 },
+		);
 	} catch (error) {
 		console.error("Health check failed:", error);
 		return NextResponse.json(

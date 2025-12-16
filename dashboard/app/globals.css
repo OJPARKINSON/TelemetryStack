@@ -86,5 +86,5 @@
 .ol-compass,
 .ol-zoom-in,
 .ol-zoom-out {
-	display: none !important;
+	display: none;
 }

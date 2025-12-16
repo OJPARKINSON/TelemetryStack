@@ -53,7 +53,7 @@ export function useTrackPosition(telemetryData: TelemetryDataPoint[]) {
 		// Check cache first
 		const cacheKey = Math.floor(selectedLapPct * 1000); // Round to 3 decimal places for caching
 		if (lookupCacheRef.current.has(cacheKey)) {
-			return lookupCacheRef.current.get(cacheKey)!;
+			return lookupCacheRef.current.get(cacheKey);
 		}
 
 		// Use binary search for faster lookup in sorted data

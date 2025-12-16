@@ -6,7 +6,7 @@ import { LineString, Point } from "ol/geom.js";
 import TileLayer from "ol/layer/Tile.js";
 import VectorLayer from "ol/layer/Vector.js";
 import OlMap from "ol/Map.js";
-import { fromLonLat, toLonLat } from "ol/proj.js";
+import { fromLonLat } from "ol/proj.js";
 import VectorSource from "ol/source/Vector.js";
 import XYZ from "ol/source/XYZ.js";
 import { Circle, Fill, Stroke, Style } from "ol/style.js";
@@ -135,7 +135,7 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 		markerSourceRef.current = markerSource;
 
 		const tileUrl = window.location.href.includes("dashboard")
-			? `/dashboard/api/tiles/dark/{z}/{x}/{y}`
+			? "/dashboard/api/tiles/dark/{z}/{x}/{y}"
 			: "/api/tiles/dark/{z}/{x}/{y}";
 
 		const baseLayer = new TileLayer({
@@ -426,13 +426,13 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 
 	if (!staticTrackData) {
 		return (
-			<div className="h-[800px] bg-zinc-800/50 rounded-lg flex items-center justify-center">
+			<div className="flex h-[800px] items-center justify-center rounded-lg bg-zinc-800/50">
 				<div className="text-center">
-					<div className="w-16 h-16 mx-auto bg-zinc-700/50 rounded-lg flex items-center justify-center mb-4">
-						<div className="w-8 h-8 border-2 border-zinc-600 rounded border-dashed"></div>
+					<div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-zinc-700/50">
+						<div className="h-8 w-8 rounded border-2 border-zinc-600 border-dashed" />
 					</div>
-					<p className="text-zinc-400 mb-2">No GPS data available</p>
-					<p className="text-zinc-500 text-sm">
+					<p className="mb-2 text-zinc-400">No GPS data available</p>
+					<p className="text-sm text-zinc-500">
 						This session may not contain GPS coordinates or they may be invalid.
 					</p>
 				</div>
@@ -441,15 +441,15 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 	}
 
 	return (
-		<div className="relative w-full h-[800px] rounded-lg overflow-hidden">
+		<div className="relative h-[800px] w-full overflow-hidden rounded-lg">
 			<div
 				ref={mapRef}
-				className="w-full h-full"
+				className="h-full w-full"
 				style={{ minHeight: "700px", minWidth: "100%" }}
 			/>
 
-			<div className="absolute top-4 left-4 right-4 z-10 pointer-events-none">
-				<div className="flex justify-between pointer-events-auto">
+			<div className="pointer-events-none absolute top-4 right-4 left-4 z-10">
+				<div className="pointer-events-auto flex justify-between">
 					<div>
 						<div className="flex items-center space-x-2">
 							<label htmlFor="metricSelect" className="text-sm text-zinc-400">
@@ -459,7 +459,7 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 								name="metricSelect"
 								value={selectedMetric || "Speed"}
 								onChange={(e) => setSelectedMetric(e.target.value)}
-								className="bg-zinc-800/90 border border-zinc-600 text-white px-3 py-1 rounded text-sm font-medium hover:bg-zinc-700/90 focus:outline-none focus:ring-2 focus:ring-blue-500"
+								className="rounded border border-zinc-600 bg-zinc-800/90 px-3 py-1 font-medium text-sm text-white hover:bg-zinc-700/90 focus:outline-none focus:ring-2 focus:ring-blue-500"
 							>
 								<option value="Speed">Speed</option>
 								<option value="Throttle">Throttle</option>
@@ -471,8 +471,8 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 						</div>
 					</div>
 
-					<div className="bg-zinc-800/90 border border-zinc-600 p-2 rounded-lg text-sm">
-						<div className="text-white font-medium mb-1">
+					<div className="rounded-lg border border-zinc-600 bg-zinc-800/90 p-2 text-sm">
+						<div className="mb-1 font-medium text-white">
 							{selectedMetric === "Speed" && "Speed (km/h)"}
 							{selectedMetric === "Throttle" && "Throttle (%)"}
 							{selectedMetric === "Brake" && "Brake (%)"}
@@ -484,23 +484,23 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 							<>
 								<div className="flex items-center space-x-2">
 									<div
-										className="w-3 h-3 rounded"
+										className="h-3 w-3 rounded"
 										style={{ backgroundColor: "#ef4444" }}
-									></div>
+									/>
 									<span className="text-zinc-300">Low Speed</span>
 								</div>
 								<div className="flex items-center space-x-2">
 									<div
-										className="w-3 h-3 rounded"
+										className="h-3 w-3 rounded"
 										style={{ backgroundColor: "#eab308" }}
-									></div>
+									/>
 									<span className="text-zinc-300">Medium Speed</span>
 								</div>
 								<div className="flex items-center space-x-2">
 									<div
-										className="w-3 h-3 rounded"
+										className="h-3 w-3 rounded"
 										style={{ backgroundColor: "#22c55e" }}
-									></div>
+									/>
 									<span className="text-zinc-300">High Speed</span>
 								</div>
 							</>
@@ -509,16 +509,16 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 							<>
 								<div className="flex items-center space-x-2">
 									<div
-										className="w-3 h-3 rounded"
+										className="h-3 w-3 rounded"
 										style={{ backgroundColor: "rgb(0, 150, 0)" }}
-									></div>
+									/>
 									<span className="text-zinc-300">0% Throttle</span>
 								</div>
 								<div className="flex items-center space-x-2">
 									<div
-										className="w-3 h-3 rounded"
+										className="h-3 w-3 rounded"
 										style={{ backgroundColor: "rgb(0, 255, 0)" }}
-									></div>
+									/>
 									<span className="text-zinc-300">100% Throttle</span>
 								</div>
 							</>
@@ -527,16 +527,16 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 							<>
 								<div className="flex items-center space-x-2">
 									<div
-										className="w-3 h-3 rounded"
+										className="h-3 w-3 rounded"
 										style={{ backgroundColor: "rgb(150, 0, 0)" }}
-									></div>
+									/>
 									<span className="text-zinc-300">0% Brake</span>
 								</div>
 								<div className="flex items-center space-x-2">
 									<div
-										className="w-3 h-3 rounded"
+										className="h-3 w-3 rounded"
 										style={{ backgroundColor: "rgb(255, 0, 0)" }}
-									></div>
+									/>
 									<span className="text-zinc-300">100% Brake</span>
 								</div>
 							</>
@@ -545,16 +545,16 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 							<>
 								<div className="flex items-center space-x-2">
 									<div
-										className="w-3 h-3 rounded"
+										className="h-3 w-3 rounded"
 										style={{ backgroundColor: "#ef4444" }}
-									></div>
+									/>
 									<span className="text-zinc-300">Low Gear</span>
 								</div>
 								<div className="flex items-center space-x-2">
 									<div
-										className="w-3 h-3 rounded"
+										className="h-3 w-3 rounded"
 										style={{ backgroundColor: "#22c55e" }}
-									></div>
+									/>
 									<span className="text-zinc-300">High Gear</span>
 								</div>
 							</>
@@ -563,16 +563,16 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 							<>
 								<div className="flex items-center space-x-2">
 									<div
-										className="w-3 h-3 rounded"
+										className="h-3 w-3 rounded"
 										style={{ backgroundColor: "#06b6d4" }}
-									></div>
+									/>
 									<span className="text-zinc-300">Low RPM</span>
 								</div>
 								<div className="flex items-center space-x-2">
 									<div
-										className="w-3 h-3 rounded"
+										className="h-3 w-3 rounded"
 										style={{ backgroundColor: "#ec4899" }}
-									></div>
+									/>
 									<span className="text-zinc-300">High RPM</span>
 								</div>
 							</>
@@ -581,16 +581,16 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 							<>
 								<div className="flex items-center space-x-2">
 									<div
-										className="w-3 h-3 rounded"
+										className="h-3 w-3 rounded"
 										style={{ backgroundColor: "#888888" }}
-									></div>
+									/>
 									<span className="text-zinc-300">Straight</span>
 								</div>
 								<div className="flex items-center space-x-2">
 									<div
-										className="w-3 h-3 rounded"
+										className="h-3 w-3 rounded"
 										style={{ backgroundColor: "#a855f7" }}
-									></div>
+									/>
 									<span className="text-zinc-300">Full Lock</span>
 								</div>
 							</>

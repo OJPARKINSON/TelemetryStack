@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-interface Session {
+export interface Session {
 	session_id: string;
 	last_updated: Date;
 	track_name: string;
@@ -55,22 +55,22 @@ export default function SessionSelector({ sessions }: SessionSelectorProps) {
 					<Link
 						key={session.session_id}
 						href={`/${session.session_id}?lap=1`}
-						className="bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-700/50 rounded-lg p-6 text-left transition-all duration-200 group"
+						className="group rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-6 text-left transition-all duration-200 hover:border-zinc-700/50"
 					>
 						<div className="flex items-center justify-between">
 							<div className="flex-1">
-								<div className="flex items-start justify-between mb-4">
+								<div className="mb-4 flex items-start justify-between">
 									<div>
-										<h3 className="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors">
+										<h3 className="font-semibold text-lg text-white transition-colors group-hover:text-blue-400">
 											{session.session_id}
 										</h3>
-										<p className="text-sm text-zinc-400 mt-1">
+										<p className="mt-1 text-sm text-zinc-400">
 											{session.track_name || "Unknown Track"}
 										</p>
 									</div>
 									<div className="text-right">
-										<div className="flex items-center space-x-2 mb-1">
-											<div className="h-2 w-2 rounded-full bg-green-400"></div>
+										<div className="mb-1 flex items-center space-x-2">
+											<div className="h-2 w-2 rounded-full bg-green-400" />
 											<span className="text-xs text-zinc-400">Ready</span>
 										</div>
 										<p className="text-xs text-zinc-500">
@@ -88,11 +88,11 @@ export default function SessionSelector({ sessions }: SessionSelectorProps) {
 											</span>
 										</div>
 									</div>
-									<div className="flex items-center text-zinc-400 group-hover:text-white transition-colors">
+									<div className="flex items-center text-zinc-400 transition-colors group-hover:text-white">
 										<span className="text-xs">Analyze session</span>
 										{/** biome-ignore lint/a11y/noSvgWithoutTitle: na */}
 										<svg
-											className="ml-2 h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity"
+											className="ml-2 h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100"
 											fill="none"
 											viewBox="0 0 24 24"
 											stroke="currentColor"
@@ -114,8 +114,8 @@ export default function SessionSelector({ sessions }: SessionSelectorProps) {
 
 			{/* Quick Filter */}
 			{Object.keys(sessionsByTrack).length > 1 && (
-				<div className="border-t border-zinc-800/50 pt-6">
-					<h3 className="text-sm font-medium text-zinc-300 mb-4">
+				<div className="border-zinc-800/50 border-t pt-6">
+					<h3 className="mb-4 font-medium text-sm text-zinc-300">
 						Filter by Track
 					</h3>
 					<div className="flex flex-wrap gap-2">
@@ -123,11 +123,11 @@ export default function SessionSelector({ sessions }: SessionSelectorProps) {
 							([trackName, trackSessions]) => (
 								<div
 									key={trackName}
-									className="bg-zinc-900/30 border border-zinc-800/50 rounded-lg px-3 py-2"
+									className="rounded-lg border border-zinc-800/50 bg-zinc-900/30 px-3 py-2"
 								>
 									<div className="flex items-center space-x-2">
 										<span className="text-sm text-white">{trackName}</span>
-										<span className="text-xs text-zinc-400 bg-zinc-800/50 px-2 py-0.5 rounded">
+										<span className="rounded bg-zinc-800/50 px-2 py-0.5 text-xs text-zinc-400">
 											{trackSessions.length}
 										</span>
 									</div>

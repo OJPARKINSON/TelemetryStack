@@ -25,7 +25,7 @@ const NEVER_CACHE_PATTERNS = [
 	/\/manifest/,
 ];
 
-self.addEventListener("install", (event) => {
+self.addEventListener("install", (_event) => {
 	// Skip waiting to activate immediately
 	self.skipWaiting();
 });
@@ -39,6 +39,7 @@ self.addEventListener("activate", (event) => {
 					if (cacheName !== CACHE_NAME && cacheName !== TILE_CACHE_NAME) {
 						return caches.delete(cacheName);
 					}
+					return false;
 				}),
 			);
 		}),

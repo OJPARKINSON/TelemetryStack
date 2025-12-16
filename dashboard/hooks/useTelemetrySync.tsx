@@ -89,7 +89,8 @@ export function useTelemetrySync(
 
 		previousSelectionRef.current = selectedIndex;
 		setIsProcessingSync(false);
-	}, [selectedIndex, telemetryData, onIndexChange]);
+		// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
+	}, [selectedIndex, onIndexChange, isProcessingSync, findCorrespondingPoint]);
 
 	return {
 		syncedIndex,

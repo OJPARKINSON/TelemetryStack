@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { getQuestDBHealth, getQuestDBStats, getSessions } from "../../../lib/questDb";
+import {
+	getQuestDBHealth,
+	getQuestDBStats,
+	getSessions,
+} from "../../../lib/questDb";
 
 export async function GET() {
 	const startTime = Date.now();
@@ -50,7 +54,7 @@ export async function GET() {
 		if (healthResult.healthy) {
 			return NextResponse.json(response);
 		}
-			return NextResponse.json(response, { status: 503 });
+		return NextResponse.json(response, { status: 503 });
 	} catch (error) {
 		console.error("❌ QuestDB status check failed:", error);
 

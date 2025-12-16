@@ -77,9 +77,9 @@ function parsePathCommands(pathString: string): PathCommand[] {
 		switch (command.toUpperCase()) {
 			case "M": // Move to
 				if (i + 2 < tokens.length) {
-					const x = parseFloat(tokens[i + 1]);
-					const y = parseFloat(tokens[i + 2]);
-					if (!isNaN(x) && !isNaN(y)) {
+					const x = Number.parseFloat(tokens[i + 1]);
+					const y = Number.parseFloat(tokens[i + 2]);
+					if (!Number.isNaN(x) && !Number.isNaN(y)) {
 						currentX = command === "M" ? x : currentX + x;
 						currentY = command === "M" ? y : currentY + y;
 						commands.push({ type: "M", x: currentX, y: currentY });
@@ -92,9 +92,9 @@ function parsePathCommands(pathString: string): PathCommand[] {
 
 			case "L": // Line to
 				if (i + 2 < tokens.length) {
-					const x = parseFloat(tokens[i + 1]);
-					const y = parseFloat(tokens[i + 2]);
-					if (!isNaN(x) && !isNaN(y)) {
+					const x = Number.parseFloat(tokens[i + 1]);
+					const y = Number.parseFloat(tokens[i + 2]);
+					if (!Number.isNaN(x) && !Number.isNaN(y)) {
 						currentX = command === "L" ? x : currentX + x;
 						currentY = command === "L" ? y : currentY + y;
 						commands.push({ type: "L", x: currentX, y: currentY });
@@ -107,20 +107,20 @@ function parsePathCommands(pathString: string): PathCommand[] {
 
 			case "C": // Cubic Bezier curve
 				if (i + 6 < tokens.length) {
-					const x1 = parseFloat(tokens[i + 1]);
-					const y1 = parseFloat(tokens[i + 2]);
-					const x2 = parseFloat(tokens[i + 3]);
-					const y2 = parseFloat(tokens[i + 4]);
-					const x = parseFloat(tokens[i + 5]);
-					const y = parseFloat(tokens[i + 6]);
+					const x1 = Number.parseFloat(tokens[i + 1]);
+					const y1 = Number.parseFloat(tokens[i + 2]);
+					const x2 = Number.parseFloat(tokens[i + 3]);
+					const y2 = Number.parseFloat(tokens[i + 4]);
+					const x = Number.parseFloat(tokens[i + 5]);
+					const y = Number.parseFloat(tokens[i + 6]);
 
 					if (
-						!isNaN(x1) &&
-						!isNaN(y1) &&
-						!isNaN(x2) &&
-						!isNaN(y2) &&
-						!isNaN(x) &&
-						!isNaN(y)
+						!Number.isNaN(x1) &&
+						!Number.isNaN(y1) &&
+						!Number.isNaN(x2) &&
+						!Number.isNaN(y2) &&
+						!Number.isNaN(x) &&
+						!Number.isNaN(y)
 					) {
 						if (command === "c") {
 							// Relative coordinates

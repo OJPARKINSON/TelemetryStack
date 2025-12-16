@@ -21,7 +21,7 @@ export default async function SessionPage({ params, searchParams }: PageProps) {
 	// Default to lap 1 if no lapId provided
 	const currentLapId = lapId ? Number.parseInt(lapId, 10) : 1;
 
-	if (isNaN(currentLapId)) {
+	if (Number.isNaN(currentLapId)) {
 		notFound();
 	}
 
@@ -75,11 +75,12 @@ export default async function SessionPage({ params, searchParams }: PageProps) {
 
 function DatabaseUnavailableError() {
 	return (
-		<div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-			<div className="text-center max-w-md mx-auto p-8">
-				<div className="w-16 h-16 mx-auto bg-red-500/20 rounded-full flex items-center justify-center mb-6">
-					<div className="w-8 h-8 text-red-400">
+		<div className="flex min-h-screen items-center justify-center bg-zinc-950">
+			<div className="mx-auto max-w-md p-8 text-center">
+				<div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/20">
+					<div className="h-8 w-8 text-red-400">
 						<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<title>Error</title>
 							<path
 								strokeLinecap="round"
 								strokeLinejoin="round"
@@ -89,25 +90,25 @@ function DatabaseUnavailableError() {
 						</svg>
 					</div>
 				</div>
-				<h1 className="text-2xl font-bold text-white mb-4">
+				<h1 className="mb-4 font-bold text-2xl text-white">
 					Database Unavailable
 				</h1>
-				<p className="text-zinc-400 mb-6">
+				<p className="mb-6 text-zinc-400">
 					The telemetry database is not running or accessible. Please start the
 					Docker Compose stack to access telemetry data.
 				</p>
-				<div className="bg-zinc-800/50 rounded-lg p-4 text-left">
-					<h3 className="text-sm font-semibold text-zinc-300 mb-2">
+				<div className="rounded-lg bg-zinc-800/50 p-4 text-left">
+					<h3 className="mb-2 font-semibold text-sm text-zinc-300">
 						To start the system:
 					</h3>
-					<code className="block text-xs text-zinc-400 bg-zinc-900 rounded px-2 py-1">
+					<code className="block rounded bg-zinc-900 px-2 py-1 text-xs text-zinc-400">
 						docker compose up -d
 					</code>
 				</div>
 				<div className="mt-6">
 					<Link
 						href="/dashboard"
-						className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+						className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
 					>
 						← Back to Dashboard
 					</Link>
@@ -119,35 +120,35 @@ function DatabaseUnavailableError() {
 
 function TelemetryLoadingSkeleton() {
 	return (
-		<div className="min-h-screen bg-zinc-950 flex">
-			<div className="w-64 bg-zinc-900/50 border-r border-zinc-800/50 flex flex-col">
+		<div className="flex min-h-screen bg-zinc-950">
+			<div className="flex w-64 flex-col border-zinc-800/50 border-r bg-zinc-900/50">
 				<div className="px-6 py-6">
 					<div className="animate-pulse">
 						<div className="flex items-center space-x-3">
-							<div className="w-8 h-8 bg-zinc-700 rounded-lg"></div>
+							<div className="h-8 w-8 rounded-lg bg-zinc-700" />
 							<div>
-								<div className="h-4 w-16 bg-zinc-700 rounded mb-1"></div>
-								<div className="h-3 w-12 bg-zinc-700 rounded"></div>
+								<div className="mb-1 h-4 w-16 rounded bg-zinc-700" />
+								<div className="h-3 w-12 rounded bg-zinc-700" />
 							</div>
 						</div>
 					</div>
 				</div>
 			</div>
 
-			<div className="flex-1 flex flex-col">
-				<div className="bg-zinc-950/50 border-b border-zinc-800/50 px-6 py-4">
-					<div className="animate-pulse h-4 w-48 bg-zinc-700 rounded"></div>
+			<div className="flex flex-1 flex-col">
+				<div className="border-zinc-800/50 border-b bg-zinc-950/50 px-6 py-4">
+					<div className="h-4 w-48 animate-pulse rounded bg-zinc-700" />
 				</div>
 				<div className="flex-1 p-6">
 					<div className="animate-pulse space-y-6">
 						<div className="grid grid-cols-3 gap-6">
-							<div className="bg-zinc-800/50 h-32 rounded-lg"></div>
-							<div className="bg-zinc-800/50 h-32 rounded-lg"></div>
-							<div className="bg-zinc-800/50 h-32 rounded-lg"></div>
+							<div className="h-32 rounded-lg bg-zinc-800/50" />
+							<div className="h-32 rounded-lg bg-zinc-800/50" />
+							<div className="h-32 rounded-lg bg-zinc-800/50" />
 						</div>
-						<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-							<div className="col-span-2 bg-zinc-800/50 h-96 rounded-lg"></div>
-							<div className="bg-zinc-800/50 h-96 rounded-lg"></div>
+						<div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+							<div className="col-span-2 h-96 rounded-lg bg-zinc-800/50" />
+							<div className="h-96 rounded-lg bg-zinc-800/50" />
 						</div>
 					</div>
 				</div>

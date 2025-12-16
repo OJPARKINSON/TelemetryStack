@@ -7,7 +7,10 @@ interface ClientWrapperProps {
 	fallback?: React.ReactNode;
 }
 
-export default function ClientWrapper({ children, fallback }: ClientWrapperProps) {
+export default function ClientWrapper({
+	children,
+	fallback,
+}: ClientWrapperProps) {
 	const [hasMounted, setHasMounted] = useState(false);
 
 	useEffect(() => {

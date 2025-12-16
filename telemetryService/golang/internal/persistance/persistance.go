@@ -73,7 +73,7 @@ func WriteBatch(sender qdb.LineSender, records []*messaging.Telemetry) error {
 
 func sanitise(value string) string {
 	if value == "" {
-		return "unkown"
+		return "unknown"
 	}
 
 	value = strings.ReplaceAll(value, ",", "_")

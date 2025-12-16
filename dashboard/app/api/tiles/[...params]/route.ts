@@ -1,4 +1,4 @@
-import { createHash } from "crypto";
+import { createHash } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
 
 const TILE_SOURCES = {
@@ -30,11 +30,11 @@ export async function GET(
 		}
 
 		// Validate numeric parameters
-		const zNum = parseInt(z);
-		const xNum = parseInt(x);
-		const yNum = parseInt(y);
+		const zNum = Number.parseInt(z, 10);
+		const xNum = Number.parseInt(x, 10);
+		const yNum = Number.parseInt(y, 10);
 
-		if (isNaN(zNum) || isNaN(xNum) || isNaN(yNum)) {
+		if (Number.isNaN(zNum) || Number.isNaN(xNum) || Number.isNaN(yNum)) {
 			return NextResponse.json(
 				{ error: "Invalid tile coordinates" },
 				{ status: 400 },

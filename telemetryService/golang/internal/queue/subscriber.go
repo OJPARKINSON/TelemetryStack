@@ -204,14 +204,13 @@ func (m *Subscriber) flushBatches(items []batchItem, channel *amqp.Channel) {
 	err := persistance.WriteBatch(sender, validRecords)
 	duration := time.Since(start)
 
-	// Update Prometheus metrics
 	metrics.BatchSizeRecords.Observe(float64(len(validRecords)))
 	metrics.DBWriteDuration.Observe(duration.Seconds())
 
 	if err == nil {
 		// Success - ACK all messages
 		metrics.RecordsWrittenTotal.Add(float64(len(validRecords)))
-		fmt.Printf("✅ Successfully wrote %d records, ACKing %d messages\n",
+		fmt.Printf("✅ Successfully wrote %d records, ACKing %d messages \n",
 			len(validRecords), len(items))
 		for _, item := range items {
 			channel.Ack(item.deliveryTag, false)

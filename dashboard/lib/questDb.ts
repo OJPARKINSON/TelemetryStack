@@ -1,4 +1,5 @@
 import { Client } from "pg";
+import type { Session } from "@/components/SessionSelector";
 import { processIRacingDataWithGPS, type TelemetryRes } from "./Fetch";
 
 interface QuestDBConfig {
@@ -46,7 +47,6 @@ class QuestDBClient {
 		maxRetries = 3,
 		baseDelay = 1000,
 	): Promise<T> {
-
 		let lastError: Error | null = null;
 
 		for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -159,9 +159,7 @@ class QuestDBClient {
 		}
 	}
 
-	async getSessions(): Promise<
-		Array<{ session_id: string; last_updated: Date }>
-	> {
+	async getSessions(): Promise<Session[]> {
 		try {
 			return await this.executeWithRetry(async (client) => {
 				const query = `
@@ -258,7 +256,7 @@ class QuestDBClient {
                         FROM TelemetryTicks
                     `);
 					totalRows = Number.parseInt(rowsResult.rows[0]?.row_count || "0", 10);
-				} catch (e) {
+				} catch (_e) {
 					// Table might not exist, that's okay
 					console.log("TelemetryTicks table not found or empty");
 				}

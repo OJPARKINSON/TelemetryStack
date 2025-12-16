@@ -10,9 +10,9 @@ export const metadata: Metadata = {
 };
 
 // Conditionally import Service Worker only in production
-const ServiceWorkerProvider = 
-	process.env.NODE_ENV === 'production' 
-		? require("../components/ServiceWorkerProvider").default 
+const ServiceWorkerProvider =
+	process.env.NODE_ENV === "production"
+		? require("../components/ServiceWorkerProvider").default
 		: () => null;
 
 export default function RootLayout({
@@ -23,7 +23,7 @@ export default function RootLayout({
 	return (
 		<html lang="en">
 			<body className={inter.className}>
-				{process.env.NODE_ENV === 'production' && <ServiceWorkerProvider />}
+				{process.env.NODE_ENV === "production" && <ServiceWorkerProvider />}
 				{children}
 			</body>
 		</html>

@@ -41,7 +41,7 @@
 		"@types/d3": "^7.4.3",
 		"@types/node": "^24",
 		"@types/pg": "^8.15.6",
-		"@types/react": "^19",
+		"@types/react": "^19.2.7",
 		"@types/react-dom": "^19",
 		"@types/three": "^0.180.0",
 		"cross-env": "^10.1.0",

@@ -175,7 +175,7 @@ const ProfessionalTelemetryCharts = React.memo(
 					lapDistance?: number;
 				};
 				return (
-					<div className="bg-zinc-800 border border-zinc-600 p-2 rounded shadow-lg">
+					<div className="rounded border border-zinc-600 bg-zinc-800 p-2 shadow-lg">
 						<p className="text-xs text-zinc-300">
 							Distance: {dataPoint.lapDistance?.toFixed(2)} km
 						</p>
@@ -214,14 +214,14 @@ const ProfessionalTelemetryCharts = React.memo(
 		return (
 			// biome-ignore lint/a11y/noStaticElementInteractions: na
 			<div className="flex flex-col space-y-3" onMouseLeave={onMouseLeave}>
-				<div className="text-sm font-medium text-white mb-2">
+				<div className="mb-2 font-medium text-sm text-white">
 					Telemetry Data
 				</div>
 
 				{chartConfigs.map((config) => (
-					<div key={config.dataKey} className="bg-zinc-900/30 rounded-lg p-3">
-						<div className="flex justify-between items-center mb-2">
-							<span className="text-xs font-medium text-zinc-300">
+					<div key={config.dataKey} className="rounded-lg bg-zinc-900/30 p-3">
+						<div className="mb-2 flex items-center justify-between">
+							<span className="font-medium text-xs text-zinc-300">
 								{config.title}
 							</span>
 							<span className="text-xs text-zinc-500">{config.unit}</span>
@@ -286,7 +286,7 @@ const ProfessionalTelemetryCharts = React.memo(
 				))}
 
 				{/* Distance markers */}
-				<div className="flex justify-between text-xs text-zinc-500 px-3 mt-2">
+				<div className="mt-2 flex justify-between px-3 text-xs text-zinc-500">
 					<span>0 km</span>
 					<span>1 km</span>
 					<span>2 km</span>

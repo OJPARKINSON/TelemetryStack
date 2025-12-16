@@ -1,9 +1,9 @@
-import { RefObject, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { TelemetryDataPoint } from "@/lib/types";
 
 export function useGPSTelemetryData(
 	telemetry: any[] | undefined,
-	trackName?: string,
+	_trackName?: string,
 ) {
 	const [processError, setProcessError] = useState<string | null>(null);
 	const [trackBounds, setTrackBounds] = useState<{
@@ -214,7 +214,7 @@ function detectTrackSections(data: any[]): any[] {
 }
 
 export async function fetchTrackBoundaries(
-	trackName: string,
+	_trackName: string,
 	bounds: {
 		minLat: number;
 		maxLat: number;

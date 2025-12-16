@@ -1,7 +1,6 @@
 // TrackService.ts - Dynamic approach following track shape
 import Feature from "ol/Feature";
 import { LineString, Point } from "ol/geom";
-import { transform } from "ol/proj";
 import type VectorSource from "ol/source/Vector";
 
 /**
@@ -139,11 +138,11 @@ function projectToTrackCoordinates(
 	const normalizedDistance = lapDistPct / 100;
 
 	// Track dimensions and center
-	const centerX = trackWidth / 2;
-	const centerY = trackHeight / 2;
+	const _centerX = trackWidth / 2;
+	const _centerY = trackHeight / 2;
 
 	// Calculate angle around the track (0 to 2π)
-	const angle = normalizedDistance * 2 * Math.PI;
+	const _angle = normalizedDistance * 2 * Math.PI;
 
 	// Start/finish line is at the bottom-right of the track
 	const startFinishX = 1115;
@@ -151,7 +150,8 @@ function projectToTrackCoordinates(
 
 	// Determine where on the track this point is
 	// Using a custom shape that follows Monza's actual layout
-	let x, y;
+	let x: number;
+	let y: number;
 
 	if (normalizedDistance < 0.1) {
 		// Start/finish straight
@@ -224,7 +224,7 @@ export function getTrackPoints(numPoints = 100): number[][] {
 
 export function mapLapDistanceToTrackPoint(
 	lapDistPct: number,
-	numPoints = 100,
+	_numPoints = 100,
 ): number[] {
 	const trackWidth = 1556;
 	const trackHeight = 783;

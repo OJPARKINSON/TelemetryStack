@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.0.0/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.3.6/schema.json",
 	"vcs": {
 		"enabled": false,
 		"clientKind": "git",
@@ -7,13 +7,7 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"includes": [
-			"**",
-			"!**/.next/**",
-			"!**/node_modules/**",
-			"!**/dist/**",
-			"!**/build/**"
-		]
+		"includes": ["**", "!**/.next", "!**/node_modules", "!**/dist", "!**/build"]
 	},
 	"formatter": {
 		"enabled": true,
@@ -27,7 +21,9 @@
 				"noUnusedVariables": "error",
 				"noUnusedImports": "error"
 			},
-			"nursery": "off",
+			"nursery": {
+				"useSortedClasses": "error"
+			},
 			"style": {
 				"noParameterAssign": "error",
 				"useAsConstAssertion": "error",
@@ -53,6 +49,11 @@
 			"source": {
 				"organizeImports": "on"
 			}
+		}
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
 		}
 	}
 }

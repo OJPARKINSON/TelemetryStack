@@ -47,7 +47,7 @@ export default function TelemetryPage({
 	const searchParams = useSearchParams();
 
 	const [selectedMetric, setSelectedMetric] = useState<string>("Speed");
-	const [isScrubbing, setIsScrubbing] = useState<boolean>(false);
+	const [_isScrubbing, setIsScrubbing] = useState<boolean>(false);
 	const [hoverIndex, setHoverIndex] = useState<number>(-1);
 
 	// Extract processed data from the server response - wrap in useMemo to fix dependency warning
@@ -158,17 +158,17 @@ export default function TelemetryPage({
 
 	if (processError) {
 		return (
-			<div className="min-h-screen bg-zinc-950 flex">
+			<div className="flex min-h-screen bg-zinc-950">
 				{/* Sidebar */}
-				<div className="w-64 bg-zinc-900/50 border-r border-zinc-800/50 flex flex-col">
+				<div className="flex w-64 flex-col border-zinc-800/50 border-r bg-zinc-900/50">
 					{/* Logo/Brand */}
 					<div className="px-6 py-6">
 						<div className="flex items-center space-x-3">
-							<div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-								<div className="w-4 h-4 bg-zinc-900 rounded"></div>
+							<div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white">
+								<div className="h-4 w-4 rounded bg-zinc-900" />
 							</div>
 							<div>
-								<h1 className="text-sm font-semibold text-white">iRacing</h1>
+								<h1 className="font-semibold text-sm text-white">iRacing</h1>
 								<p className="text-xs text-zinc-400">Telemetry</p>
 							</div>
 						</div>
@@ -176,9 +176,9 @@ export default function TelemetryPage({
 				</div>
 
 				{/* Main Content */}
-				<div className="flex-1 flex flex-col">
+				<div className="flex flex-1 flex-col">
 					{/* Header */}
-					<header className="bg-zinc-950/50 border-b border-zinc-800/50 px-6 py-4">
+					<header className="border-zinc-800/50 border-b bg-zinc-950/50 px-6 py-4">
 						<div className="flex items-center space-x-2 text-sm">
 							<span className="text-zinc-500">Dashboard</span>
 							<span className="text-zinc-500">/</span>
@@ -187,12 +187,12 @@ export default function TelemetryPage({
 					</header>
 
 					{/* Error Content */}
-					<main className="flex-1 p-6 flex items-center justify-center">
-						<div className="bg-red-950/50 border border-red-800/50 rounded-lg p-6 max-w-md text-center">
-							<div className="w-16 h-16 mx-auto bg-red-900/50 rounded-lg flex items-center justify-center mb-4">
-								<div className="w-8 h-8 border-2 border-red-400 rounded border-dashed"></div>
+					<main className="flex flex-1 items-center justify-center p-6">
+						<div className="max-w-md rounded-lg border border-red-800/50 bg-red-950/50 p-6 text-center">
+							<div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-red-900/50">
+								<div className="h-8 w-8 rounded border-2 border-red-400 border-dashed" />
 							</div>
-							<h3 className="text-lg font-medium text-red-300 mb-2">
+							<h3 className="mb-2 font-medium text-lg text-red-300">
 								Error Loading Telemetry Data
 							</h3>
 							<p className="text-red-200 text-sm">{processError}</p>
@@ -204,29 +204,29 @@ export default function TelemetryPage({
 	}
 
 	return (
-		<div className="min-h-screen bg-zinc-950 flex">
+		<div className="flex min-h-screen bg-zinc-950">
 			{/* Sidebar */}
-			<div className="w-64 bg-zinc-900/50 border-r border-zinc-800/50 flex flex-col">
+			<div className="flex w-64 flex-col border-zinc-800/50 border-r bg-zinc-900/50">
 				{/* Logo/Brand */}
 				<div className="px-6 py-6">
-					<Link href="/" className=" cursor-pointer">
+					<Link href="/" className="cursor-pointer">
 						<div className="flex items-center space-x-3">
-							<div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-								<div className="w-4 h-4 bg-zinc-900 rounded"></div>
+							<div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white">
+								<div className="h-4 w-4 rounded bg-zinc-900" />
 							</div>
 							<div>
-								<h1 className="text-sm font-semibold text-white">iRacing</h1>
+								<h1 className="font-semibold text-sm text-white">iRacing</h1>
 								<p className="text-xs text-zinc-400">Telemetry</p>
 							</div>
 						</div>
 					</Link>
 				</div>
 
-				<nav className="flex-1 px-4 space-y-1">
-					<div className="text-white px-3 py-2 rounded-md text-sm font-medium cursor-pointer flex justify-between items-center">
+				<nav className="flex-1 space-y-1 px-4">
+					<div className="flex cursor-pointer items-center justify-between rounded-md px-3 py-2 font-medium text-sm text-white">
 						Lap:
 						<select
-							className="bg-zinc-800/90 border border-zinc-600 text-white px-3 py-1 rounded text-sm font-medium hover:bg-zinc-700/90 focus:outline-none focus:ring-2 focus:ring-blue-500 h-fit"
+							className="h-fit rounded border border-zinc-600 bg-zinc-800/90 px-3 py-1 font-medium text-sm text-white hover:bg-zinc-700/90 focus:outline-none focus:ring-2 focus:ring-blue-500"
 							onChange={(e) => handleLapChange(e.currentTarget.value)}
 							value={(searchParams.get("lapId") || "")?.toString()}
 						>
@@ -237,44 +237,44 @@ export default function TelemetryPage({
 							))}
 						</select>
 					</div>
-					<div className="px-2 py-2 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+					<div className="px-2 py-2 font-medium text-xs text-zinc-500 uppercase tracking-wider">
 						Analysis
 					</div>
-					<div className="bg-zinc-800/50 text-white px-3 py-2 rounded-md text-sm font-medium">
+					<div className="rounded-md bg-zinc-800/50 px-3 py-2 font-medium text-sm text-white">
 						Session {sessionId}
 					</div>
-					<div className="text-zinc-400 hover:text-white hover:bg-zinc-800/50 px-3 py-2 rounded-md text-sm font-medium cursor-pointer">
+					<div className="cursor-pointer rounded-md px-3 py-2 font-medium text-sm text-zinc-400 hover:bg-zinc-800/50 hover:text-white">
 						Track Map
 					</div>
-					<div className="text-zinc-400 hover:text-white hover:bg-zinc-800/50 px-3 py-2 rounded-md text-sm font-medium cursor-pointer">
+					<div className="cursor-pointer rounded-md px-3 py-2 font-medium text-sm text-zinc-400 hover:bg-zinc-800/50 hover:text-white">
 						Telemetry
 					</div>
-					<div className="text-zinc-400 hover:text-white hover:bg-zinc-800/50 px-3 py-2 rounded-md text-sm font-medium cursor-pointer">
+					<div className="cursor-pointer rounded-md px-3 py-2 font-medium text-sm text-zinc-400 hover:bg-zinc-800/50 hover:text-white">
 						Performance
 					</div>
 				</nav>
 			</div>
 
-			<div className="flex-1 flex flex-col">
-				<main className="flex-1 p-6 space-y-6">
+			<div className="flex flex-1 flex-col">
+				<main className="flex-1 space-y-6 p-6">
 					{dataWithGPSCoordinates.length > 0 && (
-						<div className="bg-zinc-900/50 border border-zinc-800/50 rounded-lg p-4">
-							<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+						<div className="rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-4">
+							<div className="grid grid-cols-2 gap-4 md:grid-cols-4">
 								<div className="text-center">
-									<div className="text-xs text-zinc-500 mb-1">Track</div>
-									<div className="text-lg font-semibold text-white">
+									<div className="mb-1 text-xs text-zinc-500">Track</div>
+									<div className="font-semibold text-lg text-white">
 										{trackInfo?.trackName || "Unknown"}
 									</div>
 								</div>
 								<div className="text-center">
-									<div className="text-xs text-zinc-500 mb-1">GPS Points</div>
-									<div className="text-lg font-semibold text-green-400">
+									<div className="mb-1 text-xs text-zinc-500">GPS Points</div>
+									<div className="font-semibold text-green-400 text-lg">
 										{dataWithGPSCoordinates.length.toLocaleString()}
 									</div>
 								</div>
 								<div className="text-center">
-									<div className="text-xs text-zinc-500 mb-1">Max Speed</div>
-									<div className="text-lg font-semibold text-yellow-400">
+									<div className="mb-1 text-xs text-zinc-500">Max Speed</div>
+									<div className="font-semibold text-lg text-yellow-400">
 										{Math.max(
 											...dataWithGPSCoordinates.map((p) => p.Speed || 0),
 										).toFixed(0)}{" "}
@@ -282,8 +282,8 @@ export default function TelemetryPage({
 									</div>
 								</div>
 								<div className="text-center">
-									<div className="text-xs text-zinc-500 mb-1">Lap time</div>
-									<div className="text-lg font-semibold text-blue-400">
+									<div className="mb-1 text-xs text-zinc-500">Lap time</div>
+									<div className="font-semibold text-blue-400 text-lg">
 										{trackInfo?.lapTime
 											? formatTime(trackInfo?.lapTime)
 											: "0.00"}
@@ -293,8 +293,8 @@ export default function TelemetryPage({
 						</div>
 					)}
 
-					<div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-						<div className="col-span-1 lg:col-span-3 bg-zinc-900/50 border border-zinc-800/50 rounded-lg p-6">
+					<div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+						<div className="col-span-1 rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-6 lg:col-span-3">
 							{dataWithGPSCoordinates.length > 0 ? (
 								<OptimizedTrackMap
 									dataWithCoordinates={dataWithGPSCoordinates}
@@ -304,13 +304,13 @@ export default function TelemetryPage({
 									setSelectedMetric={setSelectedMetric}
 								/>
 							) : (
-								<div className="h-[500px] bg-zinc-800/50 rounded-lg flex items-center justify-center">
+								<div className="flex h-[500px] items-center justify-center rounded-lg bg-zinc-800/50">
 									<div className="text-center">
-										<div className="w-16 h-16 mx-auto bg-zinc-700/50 rounded-lg flex items-center justify-center mb-4">
-											<div className="w-8 h-8 border-2 border-zinc-600 rounded border-dashed"></div>
+										<div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-zinc-700/50">
+											<div className="h-8 w-8 rounded border-2 border-zinc-600 border-dashed" />
 										</div>
-										<p className="text-zinc-400 mb-2">No GPS data available</p>
-										<p className="text-zinc-500 text-sm">
+										<p className="mb-2 text-zinc-400">No GPS data available</p>
+										<p className="text-sm text-zinc-500">
 											This session may not contain GPS coordinates or they may
 											be invalid.
 										</p>
@@ -319,7 +319,7 @@ export default function TelemetryPage({
 							)}
 						</div>
 
-						<div className="col-span-1 lg:col-span-2 bg-zinc-900/50 border border-zinc-800/50 rounded-lg p-4">
+						<div className="col-span-1 rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-4 lg:col-span-2">
 							{memoizedTelemetryData.length > 0 ? (
 								<ProfessionalTelemetryCharts
 									telemetryData={memoizedTelemetryData}
@@ -329,15 +329,15 @@ export default function TelemetryPage({
 									onMouseLeave={handleChartMouseLeave}
 								/>
 							) : (
-								<div className="h-[600px] flex items-center justify-center">
+								<div className="flex h-[600px] items-center justify-center">
 									<div className="text-center">
-										<div className="w-16 h-16 mx-auto bg-zinc-700/50 rounded-lg flex items-center justify-center mb-4">
-											<div className="w-8 h-8 border-2 border-zinc-600 rounded border-dashed"></div>
+										<div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-zinc-700/50">
+											<div className="h-8 w-8 rounded border-2 border-zinc-600 border-dashed" />
 										</div>
-										<p className="text-zinc-400 mb-2">
+										<p className="mb-2 text-zinc-400">
 											No telemetry data available
 										</p>
-										<p className="text-zinc-500 text-sm">
+										<p className="text-sm text-zinc-500">
 											Loading telemetry charts...
 										</p>
 									</div>
@@ -377,33 +377,33 @@ function GPSAnalysisPanel({ data }: { data: any[] }) {
 	const corners = data.filter((point) => point.sectionType === "corner");
 
 	return (
-		<div className="bg-zinc-900/50 border border-zinc-800/50 rounded-lg p-6">
-			<h2 className="text-lg font-semibold text-white mb-6">
+		<div className="rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-6">
+			<h2 className="mb-6 font-semibold text-lg text-white">
 				GPS Track Analysis
 			</h2>
-			<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-				<div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-4">
-					<div className="text-sm text-zinc-400 mb-2">Total Distance</div>
-					<div className="text-2xl font-bold text-white">
+			<div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+				<div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+					<div className="mb-2 text-sm text-zinc-400">Total Distance</div>
+					<div className="font-bold text-2xl text-white">
 						{(totalDistance / 1000).toFixed(2)} km
 					</div>
 				</div>
-				<div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-4">
-					<div className="text-sm text-zinc-400 mb-2">Average Speed</div>
-					<div className="text-2xl font-bold text-green-400">
+				<div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+					<div className="mb-2 text-sm text-zinc-400">Average Speed</div>
+					<div className="font-bold text-2xl text-green-400">
 						{avgSpeed.toFixed(1)} km/h
 					</div>
 				</div>
-				<div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-4">
-					<div className="text-sm text-zinc-400 mb-2">Speed Range</div>
-					<div className="text-2xl font-bold text-yellow-400">
+				<div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+					<div className="mb-2 text-sm text-zinc-400">Speed Range</div>
+					<div className="font-bold text-2xl text-yellow-400">
 						{minSpeed.toFixed(0)} - {maxSpeed.toFixed(0)}
 					</div>
 					<div className="text-xs text-zinc-500">km/h</div>
 				</div>
-				<div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-4">
-					<div className="text-sm text-zinc-400 mb-2">Corner Points</div>
-					<div className="text-2xl font-bold text-purple-400">
+				<div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+					<div className="mb-2 text-sm text-zinc-400">Corner Points</div>
+					<div className="font-bold text-2xl text-purple-400">
 						{corners.length.toLocaleString()}
 					</div>
 					<div className="text-xs text-zinc-500">
@@ -418,12 +418,12 @@ function GPSAnalysisPanel({ data }: { data: any[] }) {
 // Performance optimization: Skeleton components for dynamic loading
 function TrackMapSkeleton() {
 	return (
-		<div className="h-[700px] bg-zinc-800/30 rounded-lg flex items-center justify-center animate-pulse">
+		<div className="flex h-[700px] animate-pulse items-center justify-center rounded-lg bg-zinc-800/30">
 			<div className="text-center">
-				<div className="w-16 h-16 mx-auto bg-zinc-700/50 rounded-lg flex items-center justify-center mb-4">
-					<div className="w-8 h-8 border-2 border-zinc-600 rounded border-dashed animate-spin"></div>
+				<div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-zinc-700/50">
+					<div className="h-8 w-8 animate-spin rounded border-2 border-zinc-600 border-dashed" />
 				</div>
-				<p className="text-zinc-400 text-sm">Loading track map...</p>
+				<p className="text-sm text-zinc-400">Loading track map...</p>
 			</div>
 		</div>
 	);
@@ -431,13 +431,13 @@ function TrackMapSkeleton() {
 
 function ChartsSkeleton() {
 	return (
-		<div className="h-[400px] bg-zinc-800/30 rounded-lg p-4 animate-pulse">
+		<div className="h-[400px] animate-pulse rounded-lg bg-zinc-800/30 p-4">
 			<div className="space-y-4">
-				<div className="h-4 bg-zinc-700/50 rounded w-1/3"></div>
+				<div className="h-4 w-1/3 rounded bg-zinc-700/50" />
 				<div className="space-y-2">
 					{[...Array(5)].map((_, i) => (
 						// biome-ignore lint/suspicious/noArrayIndexKey: na
-						<div key={i} className="h-16 bg-zinc-700/30 rounded"></div>
+						<div key={i} className="h-16 rounded bg-zinc-700/30" />
 					))}
 				</div>
 			</div>

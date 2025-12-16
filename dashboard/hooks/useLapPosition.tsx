@@ -3,7 +3,7 @@ import type { TelemetryDataPoint } from "@/lib/types";
 
 export function useLapPosition(
 	telemetryData: TelemetryDataPoint[],
-	targetLapDistPct?: number,
+	_targetLapDistPct?: number,
 ) {
 	const lastFoundIndex = useRef<number>(0);
 
