@@ -125,6 +125,7 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 			sessionTime,
 			fp.config,
 			fp.pool,
+			fp.workerID,
 		)
 
 		// Create telemetry processor with the correct SubSessionID

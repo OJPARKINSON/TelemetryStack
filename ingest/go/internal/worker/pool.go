@@ -59,13 +59,13 @@ type PoolMetrics struct {
 	ActiveWorkers         int
 	QueueDepth            int
 	WorkerMetrics         []WorkerMetrics
-	
+
 	// Data loss tracking
-	RabbitMQFailures      int
-	PersistedBatches      int
-	CircuitBreakerEvents  int
-	MemoryPressureEvents  int
-	DataLossRate          float64 // Percentage of data that was lost vs persisted
+	RabbitMQFailures     int
+	PersistedBatches     int
+	CircuitBreakerEvents int
+	MemoryPressureEvents int
+	DataLossRate         float64 // Percentage of data that was lost vs persisted
 }
 
 func NewWorkerPool(cfg *config.Config, logger *zap.Logger) *WorkerPool {
@@ -168,13 +168,13 @@ func (wp *WorkerPool) Stop() error {
 	close(wp.fileQueue)
 
 	// Give workers a chance to finish current files and flush data
-	time.Sleep(2 * time.Second)
+	time.Sleep(6 * time.Second)
 
 	// Now cancel the context for any remaining operations
 	wp.cancel()
-
-	// Wait for all workers to finish using errgroup
 	err := wp.eg.Wait()
+
+	time.Sleep(1 * time.Second)
 
 	if wp.rabbitPool != nil {
 		wp.rabbitPool.Close()
@@ -208,7 +208,7 @@ func (wp *WorkerPool) GetMetrics() PoolMetrics {
 	metrics.PersistedBatches = wp.totalPersistedBatches
 	metrics.CircuitBreakerEvents = wp.totalCircuitBreakerEvents
 	metrics.MemoryPressureEvents = wp.totalMemoryPressureEvents
-	
+
 	// Calculate data loss rate
 	totalBatches := metrics.TotalBatchesProcessed + wp.totalPersistedBatches
 	if totalBatches > 0 {
@@ -278,7 +278,7 @@ func (wp *WorkerPool) handleResult(result WorkResult) {
 	metrics.BatchesSentTotal.Add(float64(result.BatchCount))
 	metrics.FileProcessingDuration.Observe(result.Duration.Seconds())
 	metrics.QueueDepth.Set(float64(wp.metrics.QueueDepth))
-	
+
 	// Aggregate messaging metrics from result if available
 	if result.MessagingMetrics != nil {
 		wp.totalRabbitMQFailures += result.MessagingMetrics.FailedBatches

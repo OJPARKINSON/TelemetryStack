@@ -22,6 +22,7 @@ type ConnectionPool struct {
 	url         string
 	poolSize    int
 	current     atomic.Uint32 // Lock-free round-robin counter
+	closing     atomic.Bool
 }
 
 func NewConnectionPool(url string, poolSize int) (*ConnectionPool, error) {
@@ -63,6 +64,10 @@ func NewConnectionPool(url string, poolSize int) (*ConnectionPool, error) {
 }
 
 func (p *ConnectionPool) GetChannel() *amqp.Channel {
+	if p.closing.Load() {
+		return nil
+	}
+
 	if len(p.channels) == 0 {
 		return nil
 	}
@@ -81,9 +86,19 @@ func (p *ConnectionPool) GetChannel() *amqp.Channel {
 }
 
 func (p *ConnectionPool) Close() {
+	p.closing.Store(true)
+
+	time.Sleep(500 * time.Millisecond)
+
 	for i := 0; i < len(p.channels); i++ {
 		if p.channels[i] != nil {
 			p.channels[i].Close()
+		}
+	}
+
+	for i := 0; i < len(p.connections); i++ {
+		if p.connections[i] != nil {
+			p.connections[i].Close()
 		}
 	}
 }
@@ -145,7 +160,7 @@ type PublishMetrics struct {
 	ConsecutiveFailures int
 }
 
-func NewPubSub(sessionId string, sessionTime time.Time, cfg *config.Config, pool *ConnectionPool) *PubSub {
+func NewPubSub(sessionId string, sessionTime time.Time, cfg *config.Config, pool *ConnectionPool, workerId int) *PubSub {
 
 	ps := &PubSub{
 		pool:               pool,
@@ -168,6 +183,8 @@ func NewPubSub(sessionId string, sessionTime time.Time, cfg *config.Config, pool
 		// Async publishing - buffer up to 20 batches to prevent blocking
 		publishQueue: make(chan *publishRequest, 20),
 		publishDone:  make(chan struct{}),
+
+		workerID: workerId,
 	}
 
 	ps.recordBatch = make([]*Telemetry, 0, cfg.BatchSizeRecords)
@@ -222,14 +239,6 @@ func getIntValue(record map[string]interface{}, key string) uint32 {
 func (ps *PubSub) Exec(data []map[string]interface{}) error {
 	if len(data) == 0 {
 		return nil
-	}
-
-	if len(data) > 0 {
-		if wid, ok := data[0]["workerID"]; ok {
-			if widInt, ok := wid.(int); ok {
-				ps.workerID = widInt
-			}
-		}
 	}
 
 	for _, record := range data {
@@ -406,7 +415,7 @@ func (ps *PubSub) transformRecord(record map[string]interface{}) *Telemetry {
 // publishWorker runs in background goroutine to handle async publishing
 func (ps *PubSub) publishWorker() {
 	defer ps.publishWg.Done()
-	log.Printf("Worker %d: publishWorker goroutine started", ps.workerID)
+	log.Printf("Worker %d: publishWorker goroutine started for session %s", ps.workerID, ps.sessionID)
 
 	for {
 		select {

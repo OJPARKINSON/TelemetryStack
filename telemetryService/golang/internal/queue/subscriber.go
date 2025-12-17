@@ -37,7 +37,6 @@ func (m *Subscriber) Subscribe(config *config.Config) {
 	maxRetries := 10
 	baseDelay := 1 * time.Second
 
-	// Retry connection with exponential backoff
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		conn, err = amqp.Dial("amqp://admin:changeme@" + config.RabbitMQHost + ":5672")
 		if err == nil {
@@ -80,7 +79,8 @@ func (m *Subscriber) Subscribe(config *config.Config) {
 		err := proto.Unmarshal(event.Body, batch)
 		if err != nil {
 			fmt.Println("error unmarshalling: ", err)
-			event.Nack(false, false)
+			err := event.Nack(false, false)
+			fmt.Println("Failed to ack failed unmarshall: ", err)
 			continue
 		}
 
@@ -189,7 +189,11 @@ func (m *Subscriber) flushBatches(items []batchItem, channel *amqp.Channel) {
 
 	if len(validRecords) == 0 {
 		for _, item := range items {
-			channel.Ack(item.deliveryTag, false)
+			err := channel.Ack(item.deliveryTag, false)
+
+			if err != nil {
+				fmt.Println("failed to ack on flush batches", err)
+			}
 		}
 		return
 	}
@@ -213,7 +217,11 @@ func (m *Subscriber) flushBatches(items []batchItem, channel *amqp.Channel) {
 		fmt.Printf("✅ Successfully wrote %d records, ACKing %d messages \n",
 			len(validRecords), len(items))
 		for _, item := range items {
-			channel.Ack(item.deliveryTag, false)
+			err := channel.Ack(item.deliveryTag, false)
+
+			if err != nil {
+				fmt.Println("failed to ack on flush batches", err)
+			}
 		}
 	} else {
 		// Failure - NACK all messages for redelivery
@@ -222,6 +230,7 @@ func (m *Subscriber) flushBatches(items []batchItem, channel *amqp.Channel) {
 		fmt.Printf("   NACKing %d messages for redelivery\n", len(items))
 		for _, item := range items {
 			channel.Nack(item.deliveryTag, false, true) // requeue=true
+			fmt.Println("Failed to negatively acknowledge: ", err)
 		}
 	}
 }
