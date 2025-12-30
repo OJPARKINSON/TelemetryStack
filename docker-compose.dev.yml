@@ -31,7 +31,7 @@ services:
       - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
 
   rabbitmq:
-    image: rabbitmq:4.0-management
+    image: dhi.io/rabbitmq:4.1
     container_name: rabbitmq
     restart: unless-stopped
     ports:
@@ -159,10 +159,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.25'
-          memory: 2g
+          cpus: '2.25'
+          memory: 3g
         reservations:
-          cpus: '0.25'
+          cpus: '0.5'
           memory: 256m
 
 
@@ -211,7 +211,7 @@ services:
       - "com.centurylinklabs.watchtower.enable=true"
 
   grafana:
-    image: grafana/grafana:10.4.8
+    image: dhi.io/grafana:12.3
     container_name: grafana
     restart: unless-stopped
     volumes:

@@ -76,16 +76,40 @@ func sanitise(value string) string {
 		return "unknown"
 	}
 
-	value = strings.ReplaceAll(value, ",", "_")
-	value = strings.ReplaceAll(value, " ", "_")
-	value = strings.ReplaceAll(value, "=", "_")
-	value = strings.ReplaceAll(value, "\n", "_")
-	value = strings.ReplaceAll(value, "\r", "_")
-	value = strings.ReplaceAll(value, "\"", "_")
-	value = strings.ReplaceAll(value, "'", "_")
-	value = strings.ReplaceAll(value, "\\", "_")
+	// Fast path: check if sanitization needed
+	needsSanitization := false
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		if c == ',' || c == ' ' || c == '=' || c == '\n' ||
+			c == '\r' || c == '"' || c == '\'' || c == '\\' {
+			needsSanitization = true
+			break
+		}
+	}
 
-	return strings.TrimSpace(value)
+	if !needsSanitization {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == value {
+			return value // Zero allocations
+		}
+		return trimmed
+	}
+
+	// Single-pass with pre-allocated builder
+	var builder strings.Builder
+	builder.Grow(len(value))
+
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		switch c {
+		case ',', ' ', '=', '\n', '\r', '"', '\'', '\\':
+			builder.WriteByte('_')
+		default:
+			builder.WriteByte(c)
+		}
+	}
+
+	return strings.TrimSpace(builder.String())
 }
 
 func validateDouble(value float64) float64 {

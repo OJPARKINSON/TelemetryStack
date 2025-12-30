@@ -59,7 +59,7 @@ func (m *Subscriber) Subscribe(config *config.Config) {
 	failOnError(err, "Failed to open a channel")
 	defer channel.Close()
 
-	err = channel.Qos(1000, 0, false) // reducing prefetch for mem usage
+	err = channel.Qos(10000, 0, false) // reducing prefetch for mem usage
 	failOnError(err, "Failed to bind to queue")
 
 	errs := channel.QueueBind("telemetry_queue",
