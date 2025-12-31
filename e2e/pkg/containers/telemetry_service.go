@@ -11,7 +11,7 @@ import (
 
 func StartTelemetryService(T *testing.T, ctx context.Context) *testcontainers.DockerContainer {
 	df := testcontainers.FromDockerfile{
-		Context:    filepath.Join(".", "../telemetryService/golang/Dockerfile"),
+		Context:    filepath.Join("..", "telemetryService", "golang"),
 		Dockerfile: "Dockerfile",
 		Repo:       "IRacingService",
 		Tag:        "latest",
@@ -20,14 +20,15 @@ func StartTelemetryService(T *testing.T, ctx context.Context) *testcontainers.Do
 
 	container, err := testcontainers.Run(
 		ctx,
-		"questdb/questdb:latest",
+		"",
 		testcontainers.WithDockerfile(df),
 		testcontainers.WithExposedPorts("9092:9092"),
 		testcontainers.WithEnv(map[string]string{
-			"QUESTDB_URL":   "questdb:8812;username=admin;password=quest",
-			"QUESTDB_HOST":  "questdb",
-			"QUESTDB_PORT":  "9000",
-			"RABBITMQ_HOST": "rabbitmq",
+			"QUESTDB_URL":      "questdb:8812;username=admin;password=quest",
+			"QUESTDB_HOST":     "questdb",
+			"QUESTDB_PORT":     "9000",
+			"RABBITMQ_HOST":    "rabbitmq",
+			"SENDER_POOL_SIZE": "10",
 		}),
 		testcontainers.WithWaitStrategy(
 		// wait.ForHealthCheck(),

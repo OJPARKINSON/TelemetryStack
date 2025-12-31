@@ -14,6 +14,10 @@ func StartRabbitMQ(t *testing.T, ctx context.Context) *rabbitmq.RabbitMQContaine
 
 	container, err := rabbitmq.Run(ctx, "rabbitmq:4.2-management",
 		testcontainers.WithExposedPorts("5672:5672", "15672:15672", "15692:15692"),
+		testcontainers.WithMounts(
+			testcontainers.BindMount("/Users/op/Documents/IRacing-Display/config/definitions.json",
+				testcontainers.ContainerMountTarget("/etc/rabbitmq/definitions.json")),
+		),
 		testcontainers.WithEnv(map[string]string{
 			"RABBITMQ_DEFAULT_USER":                "guest",
 			"RABBITMQ_DEFAULT_PASS":                "changeme",
