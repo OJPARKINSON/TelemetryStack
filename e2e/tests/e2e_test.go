@@ -2,26 +2,42 @@ package tests
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/ojparkinson/IRacing-Display/e2e/pkg/containers"
 	"github.com/ojparkinson/IRacing-Display/e2e/pkg/publisher"
+	"github.com/ojparkinson/IRacing-Display/e2e/pkg/verification"
 )
 
 func TestBasicE2E(t *testing.T) {
 	ctx := context.Background()
 
-	questdb := containers.SpinUpQuestDB(t, ctx)
-	rabbitmq := containers.StartRabbitMQ(t, ctx)
-	telemetryService := containers.StartTelemetryService(t, ctx)
+	network, err := containers.CreateNetwork(ctx)
+	if err != nil {
+		t.Fatalf("Failed to create network: %v", err)
+	}
 
-	batches := publisher.GenerateBatches(1)
+	containers.SpinUpQuestDB(t, ctx, network)
+	rabbitmqC := containers.StartRabbitMQ(t, ctx, network)
+	containers.StartTelemetryService(t, ctx, network)
 
-	publisher.Publish(rabbitmq, batches, ctx)
+	host, _ := rabbitmqC.Host(ctx)
+	port, _ := rabbitmqC.MappedPort(ctx, "5672")
 
-	t.Cleanup(func() {
-		questdb.Terminate(ctx)
-		rabbitmq.Terminate(ctx)
-		telemetryService.Terminate(ctx)
-	})
+	batches := publisher.GenerateBatch(300, 10000)
+
+	rabbitmq, err := publisher.NewPublisher(fmt.Sprintf("amqp://admin:changeme@%s:%s", host, port.Port()))
+	if err != nil {
+		t.Fatalf("Failed to create publisher: %v", err)
+	}
+
+	rabbitmq.PublishBatch(rabbitmqC, batches, ctx)
+
+	time.Sleep(2 * time.Minute)
+
+	verification.RecordsStored()
+
+	// Cleanup is handled automatically by t.Cleanup() in each container function
 }

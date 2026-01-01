@@ -364,3 +364,5 @@ curl "http://localhost:9000/exec?query=SHOW%20COLUMNS%20FROM%20TelemetryTicks"
 - Adjust `maxUncommittedRows` for write performance vs. memory
 
 For detailed architecture information, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+protoc --go_out=. --go_opt=paths=source_relative telemetry.proto

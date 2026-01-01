@@ -1,59 +1,73 @@
 {
-  "rabbit_version": "4.0.0",
-  "rabbitmq_version": "4.0.0",
-  "product_name": "RabbitMQ",
-  "product_version": "4.0.0",
-  "vhosts": [
-    {
-      "name": "/"
-    }
-  ],
-  "topic_permissions": [],
-  "users": [
-    {
-        "name": "admin",
-        "password_hash": "FTwEjnDO5R8xMjBYrEULfrr5Y3sT8Ky1D1qoJwqMeUPKQjr2",
-        "tags": ["administrator"]
-    }
-  ],
-  "permissions": [{
-    "user": "admin",
-    "vhost": "/",
-    "configure": ".*",
-    "write": ".*",
-    "read": ".*"
-  }],
-  "parameters": [],
-  "global_parameters": [],
-  "policies": [],
-  "queues": [
-    {
-      "name": "telemetry_queue",
-      "vhost": "/",
-      "durable": true,
-      "auto_delete": false,
-      "arguments": {}
-    }
-  ],
-  "exchanges": [
-    {
-      "name": "telemetry_topic",
-      "vhost": "/",
-      "type": "topic",
-      "durable": true,
-      "auto_delete": false,
-      "internal": false,
-      "arguments": {}
-    }
-  ],
-  "bindings": [
-    {
-      "source": "telemetry_topic",
-      "vhost": "/",
-      "destination": "telemetry_queue",
-      "destination_type": "queue",
-      "routing_key": "telemetry.ticks",
-      "arguments": {}
-    }
-  ]
+	"rabbit_version": "4.0.0",
+	"rabbitmq_version": "4.0.0",
+	"product_name": "RabbitMQ",
+	"product_version": "4.0.0",
+	"vhosts": [
+		{
+			"name": "/"
+		}
+	],
+	"topic_permissions": [],
+	"users": [
+		{
+			"name": "admin",
+			"password_hash": "FTwEjnDO5R8xMjBYrEULfrr5Y3sT8Ky1D1qoJwqMeUPKQjr2",
+			"tags": ["administrator"]
+		},
+		{
+			"name": "guest",
+			"password": "guest",
+			"tags": ["administrator"]
+		}
+	],
+	"permissions": [
+		{
+			"user": "admin",
+			"vhost": "/",
+			"configure": ".*",
+			"write": ".*",
+			"read": ".*"
+		},
+		{
+			"user": "guest",
+			"vhost": "/",
+			"configure": ".*",
+			"write": ".*",
+			"read": ".*"
+		}
+	],
+	"parameters": [],
+	"global_parameters": [],
+	"policies": [],
+	"queues": [
+		{
+			"name": "telemetry_queue",
+			"vhost": "/",
+			"durable": true,
+			"auto_delete": false,
+			"arguments": {}
+		}
+	],
+	"exchanges": [
+		{
+			"name": "telemetry_topic",
+			"vhost": "/",
+			"type": "topic",
+			"durable": true,
+			"auto_delete": false,
+			"internal": false,
+			"arguments": {}
+		}
+	],
+	"bindings": [
+		{
+			"source": "telemetry_topic",
+			"vhost": "/",
+			"destination": "telemetry_queue",
+			"destination_type": "queue",
+			"routing_key": "telemetry.ticks",
+			"arguments": {}
+		}
+	]
 }

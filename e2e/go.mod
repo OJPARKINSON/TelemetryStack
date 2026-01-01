@@ -6,8 +6,9 @@ require google.golang.org/protobuf v1.36.11
 
 require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.4 // indirect
-	github.com/ojparkinson/telemetryService v0.0.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.19.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.38.0 // indirect
+	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
 	google.golang.org/grpc v1.78.0 // indirect
 )
 

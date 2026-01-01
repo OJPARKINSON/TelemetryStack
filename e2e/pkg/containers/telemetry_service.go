@@ -2,16 +2,17 @@ package containers
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
 	"testing"
 
 	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/network"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-func StartTelemetryService(T *testing.T, ctx context.Context) *testcontainers.DockerContainer {
+func StartTelemetryService(t *testing.T, ctx context.Context, nw *testcontainers.DockerNetwork) *testcontainers.DockerContainer {
 	df := testcontainers.FromDockerfile{
-		Context:    filepath.Join("..", "telemetryService", "golang"),
+		Context:    filepath.Join("..", "..", "telemetryService", "golang"),
 		Dockerfile: "Dockerfile",
 		Repo:       "IRacingService",
 		Tag:        "latest",
@@ -31,14 +32,19 @@ func StartTelemetryService(T *testing.T, ctx context.Context) *testcontainers.Do
 			"SENDER_POOL_SIZE": "10",
 		}),
 		testcontainers.WithWaitStrategy(
-		// wait.ForHealthCheck(),
-		// wait.ForListeningPort("8812/tcp"),
-		// wait.ForLog("Ready to accept connections"),
+			wait.ForLog("Starting to consume messages from RabbitMQ"),
 		),
+		network.WithNetwork([]string{"telemetry-service"}, nw),
 	)
 	if err != nil {
-		fmt.Println("Error running questDB server, ", err)
+		t.Fatalf("Error running telemetry service: %v", err)
 	}
+
+	t.Cleanup(func() {
+		if err := container.Terminate(ctx); err != nil {
+			t.Logf("Failed to terminate telemetry service container: %v", err)
+		}
+	})
 
 	return container
 }

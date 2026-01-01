@@ -2,14 +2,14 @@ package containers
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/network"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-func SpinUpToxiProxy(t *testing.T, ctx context.Context) *testcontainers.DockerContainer {
+func SpinUpToxiProxy(t *testing.T, ctx context.Context, nw *testcontainers.DockerNetwork) *testcontainers.DockerContainer {
 	container, err := testcontainers.Run(
 		ctx,
 		"ghcr.io/shopify/toxiproxy:latest",
@@ -17,12 +17,18 @@ func SpinUpToxiProxy(t *testing.T, ctx context.Context) *testcontainers.DockerCo
 		testcontainers.WithEnv(map[string]string{}),
 		testcontainers.WithWaitStrategy(
 			wait.ForListeningPort("8474"),
-			// wait.ForLog("Ready to accept connections"),
 		),
+		network.WithNetwork([]string{"toxiproxy"}, nw),
 	)
 	if err != nil {
-		fmt.Println("Error running questDB server, ", err)
+		t.Fatalf("Error running Toxiproxy: %v", err)
 	}
+
+	t.Cleanup(func() {
+		if err := container.Terminate(ctx); err != nil {
+			t.Logf("Failed to terminate Toxiproxy container: %v", err)
+		}
+	})
 
 	return container
 }
