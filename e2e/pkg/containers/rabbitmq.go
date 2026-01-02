@@ -26,6 +26,7 @@ func StartRabbitMQ(t *testing.T, ctx context.Context, nw *testcontainers.DockerN
 
 	container, err := testcontainers.Run(ctx, "rabbitmq:4.1",
 		testcontainers.WithExposedPorts("5672/tcp", "15672/tcp", "15692/tcp"),
+		testcontainers.WithName("e2e-rabbitmq"),
 		testcontainers.WithMounts(
 			testcontainers.BindMount(definitionsPath,
 				testcontainers.ContainerMountTarget("/etc/rabbitmq/definitions.json")),

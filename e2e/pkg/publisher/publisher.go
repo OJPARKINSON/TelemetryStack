@@ -15,9 +15,11 @@ type Publisher struct {
 	channel *amqp.Channel
 }
 
-func NewPublisher(rabbitMqUrl string) (*Publisher, error) {
-	fmt.Println("Dialing")
-	conn, err := amqp.Dial(rabbitMqUrl)
+func NewPublisher(rabbitmq *testcontainers.DockerContainer, ctx context.Context) (*Publisher, error) {
+	host, _ := rabbitmq.Host(ctx)
+	port, _ := rabbitmq.MappedPort(ctx, "5672")
+
+	conn, err := amqp.Dial(fmt.Sprintf("amqp://admin:changeme@%s:%s", host, port.Port()))
 	if err != nil {
 		return nil, err
 	}

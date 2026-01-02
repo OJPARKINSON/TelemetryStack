@@ -24,6 +24,7 @@ func StartTelemetryService(t *testing.T, ctx context.Context, nw *testcontainers
 		"",
 		testcontainers.WithDockerfile(df),
 		testcontainers.WithExposedPorts("9092:9092"),
+		testcontainers.WithName("e2e-telemetryService"),
 		testcontainers.WithEnv(map[string]string{
 			"QUESTDB_URL":      "questdb:8812;username=admin;password=quest",
 			"QUESTDB_HOST":     "questdb",

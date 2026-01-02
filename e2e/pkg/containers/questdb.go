@@ -13,6 +13,7 @@ func SpinUpQuestDB(t *testing.T, ctx context.Context, nw *testcontainers.DockerN
 	container, err := testcontainers.Run(
 		ctx,
 		"questdb/questdb:latest",
+		testcontainers.WithName("e2e-questdb"),
 		testcontainers.WithExposedPorts("9000:9000", "8812:8812", "9009:9009", "9003:9003"),
 		testcontainers.WithEnv(map[string]string{
 			"JAVA_OPTS":                     "-Xmx2g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=100",
