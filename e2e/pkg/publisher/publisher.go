@@ -37,14 +37,12 @@ func NewPublisher(rabbitmq *testcontainers.DockerContainer, ctx context.Context)
 }
 
 func (p *Publisher) PublishBatch(rabbitmq *testcontainers.DockerContainer, batches []*TelemetryBatch, ctx context.Context) {
-	for i, batch := range batches {
+	for _, batch := range batches {
 
 		data, err := proto.Marshal(batch)
 		if err != nil {
 			fmt.Println("marshal ")
 		}
-
-		fmt.Printf("publishing batch, %d \n", i)
 
 		err2 := p.channel.PublishWithContext(ctx, "telemetry_topic", "telemetry.ticks", false, false,
 			amqp.Publishing{
