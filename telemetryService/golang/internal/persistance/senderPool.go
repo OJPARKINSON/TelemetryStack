@@ -35,10 +35,10 @@ func NewSenderPool(config *config.Config) (*SenderPool, error) {
 		for attempt := 0; attempt < maxRetries; attempt++ {
 			sender, err = qdb.NewLineSender(
 				context.Background(),
-				qdb.WithHttp(),
-				qdb.WithAddress(fmt.Sprintf("%s:%d", config.QuestDbHost, config.QuestDBPort)),
-				qdb.WithAutoFlushRows(10000),
-				qdb.WithRequestTimeout(60*time.Second),
+				qdb.WithTcp(),
+				qdb.WithAddress(fmt.Sprintf("%s:9009", config.QuestDbHost)),
+				// qdb.WithAutoFlushRows(10000),
+				// qdb.WithRequestTimeout(60*time.Second),
 			)
 
 			if err == nil {

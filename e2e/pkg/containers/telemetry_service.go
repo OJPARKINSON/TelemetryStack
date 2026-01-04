@@ -31,7 +31,7 @@ func StartTelemetryService(t *testing.T, ctx context.Context, nw *testcontainers
 			"QUESTDB_HOST":     "questdb",
 			"QUESTDB_PORT":     "9000",
 			"RABBITMQ_HOST":    "rabbitmq",
-			"SENDER_POOL_SIZE": "10",
+			"SENDER_POOL_SIZE": "30",
 		}),
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("Starting to consume messages from RabbitMQ"),

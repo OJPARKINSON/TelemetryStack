@@ -25,6 +25,18 @@ func NewSubscriber(pool *persistance.SenderPool) *Subscriber {
 	}
 }
 
+type workItem struct {
+	batchItems  []batchItem
+	deliverTags []uint64
+	resultChan  chan<- workResult
+}
+
+type workResult struct {
+	deliverTags []uint64
+	success     bool
+	err         error
+}
+
 type batchItem struct {
 	batch       *messaging.TelemetryBatch
 	deliveryTag uint64
@@ -101,11 +113,18 @@ func (m *Subscriber) processBatches(batchChan chan batchItem, channel *amqp.Chan
 		targetBatchSize    = 30              // Accumulate 20 RabbitMQ messages
 		maxRecordsPerBatch = 750000          // Max 25K telemetry records
 		batchTimeout       = 2 * time.Second // Or timeout after 5s
+		numWorkers         = 8               // Auto-tune based on CPU
 	)
+
+	workChan := make(chan workItem, numWorkers*2)
+	resultChan := make(chan workResult, numWorkers*2)
+
+	m.startWorkerPool(workChan, numWorkers)
+
+	go m.resultHandler(resultChan, channel)
 
 	var (
 		batchBuffer  []batchItem
-		pendingItem  *batchItem
 		timer        *time.Timer
 		totalRecords = 0
 	)
@@ -113,11 +132,24 @@ func (m *Subscriber) processBatches(batchChan chan batchItem, channel *amqp.Chan
 
 	for {
 		var timeoutChan <-chan time.Time
-		if len(batchBuffer) > 0 || pendingItem != nil {
+		if len(batchBuffer) > 0 {
 			if timer == nil {
 				timer = time.NewTimer(batchTimeout)
 			}
 			timeoutChan = timer.C
+		}
+
+		sendToWorkers := func(items []batchItem) {
+			deliveryTags := make([]uint64, len(items))
+			for i, item := range items {
+				deliveryTags[i] = item.deliveryTag
+			}
+
+			workChan <- workItem{
+				batchItems:  items,
+				deliverTags: deliveryTags, // Fixed typo
+				resultChan:  resultChan,
+			}
 		}
 
 		select {
@@ -126,39 +158,26 @@ func (m *Subscriber) processBatches(batchChan chan batchItem, channel *amqp.Chan
 				timer.Stop()
 			}
 			if len(batchBuffer) > 0 {
-				m.flushBatches(batchBuffer, channel)
+				sendToWorkers(batchBuffer)
 			}
+			close(workChan) // Signal workers to finish
 			return
 
 		case item := <-batchChan:
-			// Handle pending item from previous flush
-			if pendingItem != nil {
-				batchBuffer = append(batchBuffer, *pendingItem)
-				totalRecords += len(pendingItem.batch.Records)
-				pendingItem = nil
-			}
-
-			// Check if adding this would exceed record limit
 			newRecordCount := totalRecords + len(item.batch.Records)
 			if newRecordCount > maxRecordsPerBatch && len(batchBuffer) > 0 {
-				// Flush current buffer first
-				m.flushBatches(batchBuffer, channel)
+				sendToWorkers(batchBuffer)
 				batchBuffer = nil
 				totalRecords = 0
-
-				// Save this item for next batch
-				pendingItem = &item
 				timer.Reset(batchTimeout)
 				continue
 			}
 
-			// Add to buffer
 			batchBuffer = append(batchBuffer, item)
 			totalRecords += len(item.batch.Records)
 
-			// Flush if we hit target batch size
 			if len(batchBuffer) >= targetBatchSize {
-				m.flushBatches(batchBuffer, channel)
+				sendToWorkers(batchBuffer)
 				batchBuffer = nil
 				totalRecords = 0
 				timer.Reset(batchTimeout)
@@ -166,12 +185,13 @@ func (m *Subscriber) processBatches(batchChan chan batchItem, channel *amqp.Chan
 
 		case <-timeoutChan:
 			if len(batchBuffer) > 0 {
-				m.flushBatches(batchBuffer, channel)
+				sendToWorkers(batchBuffer)
 				batchBuffer = nil
 				totalRecords = 0
 			}
-			timer = nil // Will be recreated when needed
+			timer = nil
 		}
+
 		// case <-timer.C:
 		// 	// Timeout - flush whatever we have
 		// 	if len(batchBuffer) > 0 {
@@ -265,4 +285,57 @@ func failOnError(err error, msg string) {
 
 func IsValidRecord(record *messaging.Telemetry) bool {
 	return record.SessionId != "" || record.TrackName != ""
+}
+
+func (m *Subscriber) startWorkerPool(workChan <-chan workItem, numWorkers int) {
+	for i := 0; i < numWorkers; i++ {
+		go m.worker(i, workChan)
+	}
+}
+
+func (m *Subscriber) worker(id int, workChan <-chan workItem) {
+	for work := range workChan {
+		sender := m.senderPool.Get()
+
+		validRecords := CollectValidRecords(work.batchItems)
+
+		start := time.Now()
+		err := persistance.WriteBatch(sender, validRecords)
+		duration := time.Since(start)
+
+		m.senderPool.Return(sender)
+
+		work.resultChan <- workResult{
+			deliverTags: work.deliverTags,
+			success:     err == nil,
+			err:         err,
+		}
+
+		metrics.DBWriteDuration.Observe(duration.Seconds())
+		if err == nil {
+			metrics.RecordsWrittenTotal.Add(float64(len(validRecords)))
+		} else {
+			metrics.DBWriteErrors.Inc()
+		}
+	}
+}
+
+func (m *Subscriber) resultHandler(resultChan <-chan workResult, channel *amqp.Channel) {
+	for result := range resultChan {
+		if result.success {
+			for _, tag := range result.deliverTags {
+				if err := channel.Ack(tag, false); err != nil {
+					log.Printf("Failed to ACK tag %d: %v", tag, err)
+				}
+			}
+		} else {
+			log.Printf("Write failed: %v, NACKing %d messages", result.err, len(result.deliverTags))
+			for _, tag := range result.deliverTags {
+				if err := channel.Nack(tag, false, true); err != nil {
+					log.Printf("Failed to NACK tag %d: %v", tag, err)
+				}
+			}
+
+		}
+	}
 }

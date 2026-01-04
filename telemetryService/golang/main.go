@@ -35,9 +35,9 @@ func main() {
 
 	// Start Prometheus metrics server
 	go metrics.MetricsHandler()
+	log.Println("Starting to consume messages from RabbitMQ")
 
 	// Start message queue subscriber
 	messaging := queue.NewSubscriber(senderPool)
-	log.Println("Starting to consume messages from RabbitMQ")
 	messaging.Subscribe(config)
 }

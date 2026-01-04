@@ -138,6 +138,11 @@ func WaitForRecordCountWithMetrics(expectedCount int, timeout time.Duration) (*T
 			return nil, err
 		}
 
+		if firstMeasurement && count < 50000 { // Skip until meaningful data
+			firstMeasurement = false
+			continue
+		}
+
 		if !firstMeasurement {
 			deltaRecords := count - lastCount
 			deltaTime := now.Sub(lastTime).Seconds()

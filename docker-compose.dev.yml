@@ -159,11 +159,14 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.25'
-          memory: 4g
+          cpus: '6.0'       # Half of 12 cores
+          memory: 12g        # More headroom
         reservations:
-          cpus: '0.5'
-          memory: 256m
+          cpus: '2.0'
+          memory: 4g
+      environment:
+        GOMAXPROCS: "6"       # Limit Go scheduler
+        GOGC: "200"           # Less aggressive GC
 
 
   telemetry-dashboard:

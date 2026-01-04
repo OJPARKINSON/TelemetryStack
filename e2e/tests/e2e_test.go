@@ -24,7 +24,7 @@ func TestAllTicksAreStored(t *testing.T) {
 			numBatches:      20,
 			recordsPerBatch: 25000,
 			maxWaitTime:     1 * time.Minute,
-			short:           true,
+			short:           false,
 		},
 		{
 			name:            "1M_Records",
@@ -38,7 +38,7 @@ func TestAllTicksAreStored(t *testing.T) {
 			numBatches:      200,
 			recordsPerBatch: 25000,
 			maxWaitTime:     10 * time.Minute,
-			short:           false,
+			short:           true,
 		},
 	}
 

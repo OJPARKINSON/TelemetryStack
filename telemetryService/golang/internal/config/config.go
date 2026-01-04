@@ -14,7 +14,7 @@ type Config struct {
 }
 
 func NewConfig() *Config {
-	questdbHost := getEnv("QUESTDB_HOST", "localhost")
+	questdbHost := getEnv("QUESTDB_HOST", "questdb")
 	questdbPort := getEnvInt("QUESTDB_PORT", 9000)
 	rabbitMqHost := getEnv("RABBITMQ_HOST", "localhost")
 
