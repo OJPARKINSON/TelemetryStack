@@ -98,23 +98,33 @@ func (m *Subscriber) Subscribe(config *config.Config) {
 
 func (m *Subscriber) processBatches(batchChan chan batchItem, channel *amqp.Channel) {
 	const (
-		targetBatchSize    = 20              // Accumulate 20 RabbitMQ messages
-		maxRecordsPerBatch = 25000           // Max 25K telemetry records
-		batchTimeout       = 5 * time.Second // Or timeout after 5s
+		targetBatchSize    = 30              // Accumulate 20 RabbitMQ messages
+		maxRecordsPerBatch = 750000          // Max 25K telemetry records
+		batchTimeout       = 2 * time.Second // Or timeout after 5s
 	)
 
 	var (
 		batchBuffer  []batchItem
 		pendingItem  *batchItem
-		timer        = time.NewTimer(batchTimeout)
+		timer        *time.Timer
 		totalRecords = 0
 	)
 	defer timer.Stop()
 
 	for {
+		var timeoutChan <-chan time.Time
+		if len(batchBuffer) > 0 || pendingItem != nil {
+			if timer == nil {
+				timer = time.NewTimer(batchTimeout)
+			}
+			timeoutChan = timer.C
+		}
+
 		select {
 		case <-m.stopChan:
-			// Flush remaining batches on shutdown
+			if timer != nil {
+				timer.Stop()
+			}
 			if len(batchBuffer) > 0 {
 				m.flushBatches(batchBuffer, channel)
 			}
@@ -154,15 +164,23 @@ func (m *Subscriber) processBatches(batchChan chan batchItem, channel *amqp.Chan
 				timer.Reset(batchTimeout)
 			}
 
-		case <-timer.C:
-			// Timeout - flush whatever we have
+		case <-timeoutChan:
 			if len(batchBuffer) > 0 {
 				m.flushBatches(batchBuffer, channel)
 				batchBuffer = nil
 				totalRecords = 0
 			}
-			timer.Reset(batchTimeout)
+			timer = nil // Will be recreated when needed
 		}
+		// case <-timer.C:
+		// 	// Timeout - flush whatever we have
+		// 	if len(batchBuffer) > 0 {
+		// 		m.flushBatches(batchBuffer, channel)
+		// 		batchBuffer = nil
+		// 		totalRecords = 0
+		// 	}
+		// 	timer.Reset(batchTimeout)
+		// }
 	}
 }
 

@@ -1,9 +1,9 @@
 package verification
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -12,12 +12,15 @@ import (
 	"time"
 )
 
-type response struct {
+type recordsCountResponse struct {
 	Query     string          `json:"query"`
 	Columns   []column        `json:"columns"` // Should be array of column objects
 	Timestamp int64           `json:"timestamp"`
 	Dataset   [][]interface{} `json:"dataset"` // Mixed types in QuestDB responses
 	Count     int             `json:"count"`
+}
+type truncateResponse struct {
+	DDL string `json:"ddl"`
 }
 
 type column struct {
@@ -51,7 +54,7 @@ func GetRecordCount() (int, error) {
 		fmt.Println("error: failed ro read body, ", err)
 	}
 
-	response := response{}
+	response := recordsCountResponse{}
 
 	if err := json.Unmarshal(body, &response); err != nil {
 		return -1, fmt.Errorf("failed to unmarshal: %w, body: %s", err, string(body))
@@ -68,7 +71,53 @@ func GetRecordCount() (int, error) {
 	return actualCount, nil
 }
 
-func waitForRecordCountWithMetrics(ctx context.Context, expectedCount int, timeout time.Duration) (*ThroughputMetrics, error) {
+func TunicateTable() error {
+	u, err := url.Parse("http://localhost:9000")
+	if err != nil {
+		return fmt.Errorf("error parsing url, ", err)
+	}
+
+	u.Path += "exec"
+	params := url.Values{}
+	params.Add("query", `
+		TRUNCATE TABLE TelemetryTicks
+	`)
+	u.RawQuery = params.Encode()
+	url := fmt.Sprintf("%v", u)
+
+	res, err := http.Get(url)
+	if err != nil {
+		return fmt.Errorf("error making request to truncate table, ", err)
+	}
+
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		fmt.Println("error: failed ro read body, ", err)
+	}
+
+	response := truncateResponse{}
+
+	if err := json.Unmarshal(body, &response); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w, body: %s", err, string(body))
+	}
+
+	if response.DDL != "OK" {
+		log.Printf("empty dataset in response")
+	}
+
+	log.Printf("Table successfully truncated")
+
+	num, err := GetRecordCount()
+
+	fmt.Println("number, ", num)
+
+	return nil
+
+}
+
+func WaitForRecordCountWithMetrics(expectedCount int, timeout time.Duration) (*ThroughputMetrics, error) {
 	metrics := &ThroughputMetrics{
 		StartTime: time.Now(),
 		Samples:   []Sample{},
@@ -80,6 +129,7 @@ func waitForRecordCountWithMetrics(ctx context.Context, expectedCount int, timeo
 
 	lastCount := 0
 	lastTime := time.Now()
+	firstMeasurement := true // Add this flag
 
 	for {
 		now := time.Now()
@@ -88,21 +138,28 @@ func waitForRecordCountWithMetrics(ctx context.Context, expectedCount int, timeo
 			return nil, err
 		}
 
-		// Calculate instantaneous throughput
-		deltaRecords := count - lastCount
-		deltaTime := now.Sub(lastTime).Seconds()
-		instantThroughput := float64(deltaRecords) / deltaTime
+		if !firstMeasurement {
+			deltaRecords := count - lastCount
+			deltaTime := now.Sub(lastTime).Seconds()
 
-		// Record sample
-		metrics.Samples = append(metrics.Samples, Sample{
-			Timestamp:  now,
-			Count:      count,
-			Throughput: instantThroughput,
-		})
+			var instantThroughput float64
+			if deltaTime > 0.1 {
+				instantThroughput = float64(deltaRecords) / deltaTime
+			}
 
-		progress := float64(count) / float64(expectedCount) * 100
-		log.Printf("Progress: %d/%d (%.1f%%) | Throughput: %.0f rec/sec",
-			count, expectedCount, progress, instantThroughput)
+			metrics.Samples = append(metrics.Samples, Sample{
+				Timestamp:  now,
+				Count:      count,
+				Throughput: instantThroughput,
+			})
+
+			progress := float64(count) / float64(expectedCount) * 100
+			log.Printf("Progress: %d/%d (%.1f%%) | Throughput: %.0f rec/sec",
+				count, expectedCount, progress, instantThroughput)
+		} else {
+			firstMeasurement = false
+			log.Printf("Starting monitoring - initial count: %d", count)
+		}
 
 		if count >= expectedCount {
 			metrics.EndTime = now

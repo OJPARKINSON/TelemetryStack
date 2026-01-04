@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"runtime"
 	"strconv"
 )
 
@@ -15,13 +16,12 @@ type Config struct {
 func NewConfig() *Config {
 	questdbHost := getEnv("QUESTDB_HOST", "localhost")
 	questdbPort := getEnvInt("QUESTDB_PORT", 9000)
-	poolSize := getEnvInt("SENDER_POOL_SIZE", 10)
 	rabbitMqHost := getEnv("RABBITMQ_HOST", "localhost")
 
 	return &Config{
 		QuestDbHost:   questdbHost,
 		QuestDBPort:   questdbPort,
-		QuestPoolSize: poolSize,
+		QuestPoolSize: getSenderPool(),
 		RabbitMQHost:  rabbitMqHost,
 	}
 }
@@ -40,4 +40,14 @@ func getEnvInt(key string, defaultValue int) int {
 		}
 	}
 	return defaultValue
+}
+
+func getSenderPool() int {
+	if envValue := os.Getenv("SENDER_POOL_SIZE"); envValue != "" {
+		intEnv, _ := strconv.Atoi(envValue)
+		return intEnv
+	}
+
+	cpuCount := runtime.NumCPU()
+	return min(cpuCount*2+cpuCount/2, 50)
 }

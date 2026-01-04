@@ -16,6 +16,7 @@ func StartTelemetryService(t *testing.T, ctx context.Context, nw *testcontainers
 		Dockerfile: "Dockerfile",
 		Repo:       "IRacingService",
 		Tag:        "latest",
+		KeepImage:  true,
 		BuildArgs:  map[string]*string{},
 	}
 
