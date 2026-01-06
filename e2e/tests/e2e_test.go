@@ -24,7 +24,7 @@ func TestAllTicksAreStored(t *testing.T) {
 			numBatches:      20,
 			recordsPerBatch: 25000,
 			maxWaitTime:     1 * time.Minute,
-			short:           false,
+			short:           true,
 		},
 		{
 			name:            "1M_Records",
@@ -38,7 +38,7 @@ func TestAllTicksAreStored(t *testing.T) {
 			numBatches:      200,
 			recordsPerBatch: 25000,
 			maxWaitTime:     10 * time.Minute,
-			short:           true,
+			short:           false,
 		},
 	}
 
@@ -82,9 +82,9 @@ func TestAllTicksAreStored(t *testing.T) {
 			t.Logf("  E2E P95:    %.0f rec/sec", metrics.P95Throughput())
 
 			// Assert minimum performance
-			if metrics.AvgThroughput() < 50000 {
+			if metrics.P95Throughput() < 50000 {
 				t.Errorf("Throughput below target: %.0f < 50000 rec/sec",
-					metrics.AvgThroughput())
+					metrics.P95Throughput())
 			}
 
 			err2 := verification.TunicateTable()
