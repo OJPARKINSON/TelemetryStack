@@ -149,6 +149,8 @@ services:
       QUESTDB_HOST: questdb
       QUESTDB_PORT: 9000
       RABBITMQ_HOST: rabbitmq
+      GOMAXPROCS: "6"       # Limit Go scheduler
+      GOGC: "200"           # Less aggressive GC
     ports:
       - "9092:9092"  # Prometheus metrics
     depends_on:
@@ -164,10 +166,6 @@ services:
         reservations:
           cpus: '2.0'
           memory: 4g
-      environment:
-        GOMAXPROCS: "6"       # Limit Go scheduler
-        GOGC: "200"           # Less aggressive GC
-
 
   telemetry-dashboard:
     build:

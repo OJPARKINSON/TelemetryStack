@@ -12,8 +12,9 @@ import (
 
 func WriteBatch(sender qdb.LineSender, records []*messaging.Telemetry) error {
 	ctx := context.Background()
+	const flushInterval = 100000
 
-	for _, record := range records {
+	for i, record := range records {
 		sender.Table("TelemetryTicks").
 			Symbol("session_id", sanitise(record.SessionId)).
 			Symbol("track_name", sanitise(record.TrackName)).
@@ -60,14 +61,22 @@ func WriteBatch(sender qdb.LineSender, records []*messaging.Telemetry) error {
 			Float64Column("lRtempM", validateDouble(record.LRtempM)).
 			Float64Column("rRtempM", validateDouble(record.RRtempM)).
 			At(ctx, record.TickTime.AsTime())
+
+		// Flush every 10K records to keep memory and network packets reasonable
+		if (i+1)%flushInterval == 0 {
+			if err := sender.Flush(ctx); err != nil {
+				return fmt.Errorf("flush failed at record %d: %w", i, err)
+			}
+		}
 	}
 
+	// Final flush for any remaining records
 	err := sender.Flush(ctx)
 	if err != nil {
-		return fmt.Errorf("flush failed: %w", err)
+		return fmt.Errorf("final flush failed: %w", err)
 	}
 
-	fmt.Printf("wrote %d records to QuestDb\n", len(records))
+	// fmt.Printf("wrote %d records to QuestDb\n", len(records))
 	return nil
 }
 

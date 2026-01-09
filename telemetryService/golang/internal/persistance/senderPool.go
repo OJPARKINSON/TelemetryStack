@@ -31,14 +31,12 @@ func NewSenderPool(config *config.Config) (*SenderPool, error) {
 		var sender qdb.LineSender
 		var err error
 
-		// Retry sender creation with exponential backoff
 		for attempt := 0; attempt < maxRetries; attempt++ {
 			sender, err = qdb.NewLineSender(
 				context.Background(),
 				qdb.WithTcp(),
 				qdb.WithAddress(fmt.Sprintf("%s:9009", config.QuestDbHost)),
-				// qdb.WithAutoFlushRows(10000),
-				// qdb.WithRequestTimeout(60*time.Second),
+				qdb.WithInitBufferSize(2*1024*1024), // 2MB initial buffer (default: 128KB)
 			)
 
 			if err == nil {

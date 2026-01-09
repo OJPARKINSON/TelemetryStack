@@ -71,8 +71,8 @@ func (m *Subscriber) Subscribe(config *config.Config) {
 	failOnError(err, "Failed to open a channel")
 	defer channel.Close()
 
-	err = channel.Qos(20000, 0, false) // reducing prefetch for mem usage
-	failOnError(err, "Failed to bind to queue")
+	err = channel.Qos(100, 0, false) // 10 workers × 10 batches ahead = reasonable prefetch
+	failOnError(err, "Failed to set QoS prefetch")
 
 	errs := channel.QueueBind("telemetry_queue",
 		"telemetry.ticks",
@@ -84,6 +84,9 @@ func (m *Subscriber) Subscribe(config *config.Config) {
 
 	batchChan := make(chan batchItem, 100)
 
+	receivedCount := 0
+	lastReport := time.Now()
+
 	go m.processBatches(batchChan, channel)
 
 	for event := range msgs {
@@ -94,6 +97,17 @@ func (m *Subscriber) Subscribe(config *config.Config) {
 			err := event.Nack(false, false)
 			fmt.Println("Failed to ack failed unmarshall: ", err)
 			continue
+		}
+
+		// fmt.Printf("Received batch: session=%v, records=%d\n", batch.SessionId, len(batch.Records))
+		receivedCount++
+
+		if time.Since(lastReport) > 5*time.Second {
+			rate := float64(receivedCount) / time.Since(lastReport).Seconds()
+			fmt.Printf("📥 Receiving from RabbitMQ: %.0f batches/sec, batchChan depth: %d/%d\n",
+				rate, len(batchChan), cap(batchChan))
+			receivedCount = 0
+			lastReport = time.Now()
 		}
 
 		fmt.Printf("Received batch: session=%v, records=%d\n", batch.SessionId, len(batch.Records))
@@ -110,10 +124,10 @@ func (m *Subscriber) Subscribe(config *config.Config) {
 
 func (m *Subscriber) processBatches(batchChan chan batchItem, channel *amqp.Channel) {
 	const (
-		targetBatchSize    = 30              // Accumulate 20 RabbitMQ messages
-		maxRecordsPerBatch = 750000          // Max 25K telemetry records
-		batchTimeout       = 2 * time.Second // Or timeout after 5s
-		numWorkers         = 8               // Auto-tune based on CPU
+		targetBatchSize    = 10 // ← REDUCE from 40 (emergency fix)
+		maxRecordsPerBatch = 1000000
+		batchTimeout       = 500 * time.Millisecond // ← REDUCE from 1.5s
+		numWorkers         = 10
 	)
 
 	workChan := make(chan workItem, numWorkers*2)
@@ -123,10 +137,15 @@ func (m *Subscriber) processBatches(batchChan chan batchItem, channel *amqp.Chan
 
 	go m.resultHandler(resultChan, channel)
 
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
 	var (
 		batchBuffer  []batchItem
 		timer        *time.Timer
 		totalRecords = 0
+
+		batchesSent = 0
 	)
 	defer timer.Stop()
 
@@ -150,9 +169,20 @@ func (m *Subscriber) processBatches(batchChan chan batchItem, channel *amqp.Chan
 				deliverTags: deliveryTags, // Fixed typo
 				resultChan:  resultChan,
 			}
+
+			batchesSent++
 		}
 
 		select {
+		case <-ticker.C:
+			// Report queue depths every 5 seconds
+			log.Printf("📊 Queue Status: batchChan=%d/%d, workChan=%d/%d, resultChan=%d/%d, buffered=%d batches (%d records), sent=%d batches",
+				len(batchChan), cap(batchChan),
+				len(workChan), cap(workChan),
+				len(resultChan), cap(resultChan),
+				len(batchBuffer), totalRecords,
+				batchesSent)
+			batchesSent = 0
 		case <-m.stopChan:
 			if timer != nil {
 				timer.Stop()

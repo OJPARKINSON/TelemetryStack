@@ -24,14 +24,14 @@ func StartTelemetryService(t *testing.T, ctx context.Context, nw *testcontainers
 		ctx,
 		"",
 		testcontainers.WithDockerfile(df),
-		testcontainers.WithExposedPorts("9092:9092"),
+		testcontainers.WithExposedPorts("9092/tcp", "6060/tcp"),
 		testcontainers.WithName("e2e-telemetryService"),
 		testcontainers.WithEnv(map[string]string{
 			"QUESTDB_URL":      "questdb:8812;username=admin;password=quest",
 			"QUESTDB_HOST":     "questdb",
 			"QUESTDB_PORT":     "9000",
 			"RABBITMQ_HOST":    "rabbitmq",
-			"SENDER_POOL_SIZE": "30",
+			"SENDER_POOL_SIZE": "60",
 		}),
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("Starting to consume messages from RabbitMQ"),

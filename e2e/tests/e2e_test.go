@@ -53,7 +53,17 @@ func TestAllTicksAreStored(t *testing.T) {
 
 			containers.SpinUpQuestDB(t, ctx, network)
 			rabbitmqC := containers.StartRabbitMQ(t, ctx, network)
-			containers.StartTelemetryService(t, ctx, network)
+			telemetryService := containers.StartTelemetryService(t, ctx, network)
+
+			// Get pprof endpoint for profiling
+			pprofPort, err := telemetryService.MappedPort(ctx, "6060")
+			if err != nil {
+				t.Logf("Warning: Could not get pprof port: %v", err)
+			} else {
+				t.Logf("🔍 PPROF available at: http://localhost:%s/debug/pprof", pprofPort.Port())
+				t.Logf("   CPU profile: curl -o cpu.prof http://localhost:%s/debug/pprof/profile?seconds=30", pprofPort.Port())
+				t.Logf("   Heap profile: curl -o heap.prof http://localhost:%s/debug/pprof/heap", pprofPort.Port())
+			}
 
 			batches := publisher.GenerateBatch(tc.numBatches, tc.recordsPerBatch)
 
