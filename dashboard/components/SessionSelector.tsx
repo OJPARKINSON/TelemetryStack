@@ -54,7 +54,9 @@ export default function SessionSelector({ sessions }: SessionSelectorProps) {
 				{sessions.map((session) => (
 					<Link
 						key={session.session_id}
-						to={`/${session.session_id}?lap=1`}
+						to="/$sessionId"
+						params={{ sessionId: session.session_id }}
+						search={{ lapId: "1" }}
 						className="group rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-6 text-left transition-all duration-200 hover:border-zinc-700/50"
 					>
 						<div className="flex items-center justify-between">
@@ -74,7 +76,7 @@ export default function SessionSelector({ sessions }: SessionSelectorProps) {
 											<span className="text-xs text-zinc-400">Ready</span>
 										</div>
 										<p className="text-xs text-zinc-500">
-											{formatRelativeTime(session.last_updated)}
+											{formatRelativeTime(new Date(session.last_updated))}
 										</p>
 									</div>
 								</div>
@@ -84,7 +86,7 @@ export default function SessionSelector({ sessions }: SessionSelectorProps) {
 										<div>
 											<span className="text-zinc-400">Date: </span>
 											<span className="text-white">
-												{formatDate(session.last_updated)}
+												{formatDate(new Date(session.last_updated))}
 											</span>
 										</div>
 									</div>

@@ -1,7 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import React, {
 	useCallback,
-	useDeferredValue,
 	useEffect,
 	useMemo,
 	useRef,
@@ -36,7 +35,6 @@ export default function TelemetryPage({
 
 	const [selectedMetric, setSelectedMetric] = useState<string>("Speed");
 	const [_isScrubbing, setIsScrubbing] = useState<boolean>(false);
-	const [hoverIndex, setHoverIndex] = useState<number>(-1);
 
 	// Extract processed data from the server response - wrap in useMemo to fix dependency warning
 	const dataWithGPSCoordinates = useMemo(() => {
@@ -62,29 +60,14 @@ export default function TelemetryPage({
 		};
 	}, [dataWithGPSCoordinates, sessionId]);
 
-	// Memoize track point click handler
-	const handleTrackPointClick = useCallback(
-		(index: number) => {
-			handlePointSelection(index);
-			setIsScrubbing(true);
-			setTimeout(() => setIsScrubbing(false), 500);
-		},
-		[handlePointSelection],
-	);
-
 	// Debounced hover handling for smoother interactions
 	const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-	const handleChartHover = useCallback((index: number) => {
+	const handleChartHover = useCallback(() => {
 		// Clear any pending hover timeout
 		if (hoverTimeoutRef.current) {
 			clearTimeout(hoverTimeoutRef.current);
 		}
-
-		// More aggressive debouncing for heavy datasets
-		hoverTimeoutRef.current = setTimeout(() => {
-			setHoverIndex(index);
-		}, 16); // 16ms debounce (~60fps) for better performance with 39K points
 	}, []);
 
 	const handleChartClick = useCallback(
@@ -97,7 +80,6 @@ export default function TelemetryPage({
 			handlePointSelection(index);
 			setIsScrubbing(true);
 			setTimeout(() => setIsScrubbing(false), 300);
-			setHoverIndex(-1); // Clear hover state after selection
 		},
 		[handlePointSelection],
 	);
@@ -107,11 +89,6 @@ export default function TelemetryPage({
 		if (hoverTimeoutRef.current) {
 			clearTimeout(hoverTimeoutRef.current);
 		}
-
-		// Debounce mouse leave to prevent flickering
-		hoverTimeoutRef.current = setTimeout(() => {
-			setHoverIndex(-1);
-		}, 50); // Slightly longer delay for mouse leave
 	}, []);
 
 	// Cleanup timeouts on unmount
@@ -122,14 +99,6 @@ export default function TelemetryPage({
 			}
 		};
 	}, []);
-
-	// Defer hover index updates to prevent blocking the main thread
-	const deferredHoverIndex = useDeferredValue(hoverIndex);
-
-	// Get display index (hover takes precedence over selection for preview)
-	const displayIndex = useMemo(() => {
-		return deferredHoverIndex >= 0 ? deferredHoverIndex : selectedIndex;
-	}, [deferredHoverIndex, selectedIndex]);
 
 	// Memoize the telemetry data to prevent unnecessary recalculations
 	const memoizedTelemetryData = useMemo(() => {
@@ -232,7 +201,7 @@ export default function TelemetryPage({
 
 					<div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
 						<div className="col-span-1 rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-6 lg:col-span-3">
-							<Card className="h-full w-full p-0 overflow-hidden">
+							<Card className="h-full w-full overflow-hidden p-0">
 								{dataWithGPSCoordinates[0].Lon !== undefined && (
 									<Map
 										center={[

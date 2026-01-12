@@ -19,5 +19,6 @@
 	},
 	"search.exclude": {
 		"**/routeTree.gen.ts": true
-	}
+	},
+	"biome.configurationPath": "dashboard/biome.json"
 }

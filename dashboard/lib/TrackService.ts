@@ -7,7 +7,12 @@ import type VectorSource from "ol/source/Vector";
  * Creates a racing line feature based on telemetry data
  */
 export function createRacingLine(
-	telemetryData: any[],
+	telemetryData: Array<{
+		LapDistPct: number;
+		VelocityX: number;
+		VelocityY: number;
+		Speed: number;
+	}>,
 	source: VectorSource,
 ): Feature | null {
 	if (!telemetryData || telemetryData.length === 0) {

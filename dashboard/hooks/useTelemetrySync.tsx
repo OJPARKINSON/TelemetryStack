@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { TelemetryDataPoint } from "@/lib/types";
+import type { TelemetryDataPoint } from "../lib/types";
 
 /**
  * Hook to synchronize chart selection with track position
@@ -89,7 +89,7 @@ export function useTelemetrySync(
 
 		previousSelectionRef.current = selectedIndex;
 		setIsProcessingSync(false);
-		// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
+		// biome-ignore lint/correctness/useExhaustiveDependencies: yeah
 	}, [selectedIndex, onIndexChange, isProcessingSync, findCorrespondingPoint]);
 
 	return {

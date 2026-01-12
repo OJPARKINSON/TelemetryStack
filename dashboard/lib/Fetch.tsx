@@ -1,4 +1,3 @@
-import type { QueryResult } from "pg";
 import type { TelemetryDataPoint } from "./types";
 
 export const processIRacingDataWithGPS = (data: any) => {

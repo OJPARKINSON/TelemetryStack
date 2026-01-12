@@ -27,6 +27,7 @@ export function useSvgTrack() {
 
 				if (pathElement) {
 					setTrackPath(pathElement);
+					// biome-ignore lint/style/noNonNullAssertion: cool
 					svgContainerRef.current!.innerHTML = svgText;
 					setSvgLoaded(true);
 
