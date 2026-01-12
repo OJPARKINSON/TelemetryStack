@@ -1,8 +1,8 @@
 import type { QueryResult } from "pg";
 import type { TelemetryDataPoint } from "./types";
 
-export const processIRacingDataWithGPS = ({ rows }: QueryResult<any>) => {
-	const sortedData = [...rows].sort((a, b) => {
+export const processIRacingDataWithGPS = (data: any) => {
+	const sortedData = [...data].sort((a, b) => {
 		const timeA = a.session_time !== undefined ? a.session_time : 0;
 		const timeB = b.session_time !== undefined ? b.session_time : 0;
 		return timeA - timeB;

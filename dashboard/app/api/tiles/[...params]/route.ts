@@ -29,7 +29,7 @@ export async function GET(
 			return NextResponse.json({ error: "Invalid theme" }, { status: 400 });
 		}
 
-		// Validate numeric parameters
+		// Validate numeric parametersk
 		const zNum = Number.parseInt(z, 10);
 		const xNum = Number.parseInt(x, 10);
 		const yNum = Number.parseInt(y, 10);

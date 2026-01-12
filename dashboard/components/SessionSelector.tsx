@@ -1,10 +1,10 @@
-"use client";
-
-import Link from "next/link";
+import { Link } from "@tanstack/react-router";
 
 export interface Session {
+	last_updated: string;
+	max_lap_id: string;
 	session_id: string;
-	last_updated: Date;
+	session_name: string;
 	track_name: string;
 }
 
@@ -54,7 +54,7 @@ export default function SessionSelector({ sessions }: SessionSelectorProps) {
 				{sessions.map((session) => (
 					<Link
 						key={session.session_id}
-						href={`/${session.session_id}?lap=1`}
+						to={`/${session.session_id}?lap=1`}
 						className="group rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-6 text-left transition-all duration-200 hover:border-zinc-700/50"
 					>
 						<div className="flex items-center justify-between">

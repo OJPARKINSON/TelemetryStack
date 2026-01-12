@@ -43,9 +43,9 @@ export async function GET() {
 			database: stats,
 			sessions: sessionsResult,
 			environment: {
-				nodeEnv: process.env.NODE_ENV,
-				questdbHost: process.env.QUESTDB_HOST || "default",
-				questdbPort: process.env.QUESTDB_PORT || "default",
+				// nodeEnv: import.meta.env.MODE,
+				// questdbHost: process.env.QUESTDB_HOST || "default",
+				// questdbPort: process.env.QUESTDB_PORT || "default",
 			},
 		};
 

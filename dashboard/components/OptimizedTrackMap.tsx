@@ -23,7 +23,7 @@ interface OptimizedTrackMapProps {
 	onMetricChange?: (metric: string) => void;
 }
 
-const OptimizedTrackMap = memo(function OptimizedTrackMap({
+export const OptimizedTrackMap = memo(function OptimizedTrackMap({
 	dataWithCoordinates,
 	selectedPointIndex,
 	onPointClick,
@@ -601,5 +601,3 @@ const OptimizedTrackMap = memo(function OptimizedTrackMap({
 		</div>
 	);
 });
-
-export default OptimizedTrackMap;

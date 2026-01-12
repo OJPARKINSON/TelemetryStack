@@ -1,9 +1,5 @@
-"use client";
-
-import dynamic from "next/dynamic";
-import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
+import { Link, useNavigate } from "@tanstack/react-router";
+import React, {
 	useCallback,
 	useDeferredValue,
 	useEffect,
@@ -12,26 +8,20 @@ import {
 	useState,
 } from "react";
 import { InfoBox } from "../components/InfoBox";
+import { Card } from "../components/ui/card";
+// biome-ignore lint/suspicious/noShadowRestrictedNames: <explanation>
+import { Map, MapControls, MapRoute } from "../components/ui/map";
 import { useTrackPosition } from "../hooks/useTrackPosition";
 import type { TelemetryRes } from "../lib/Fetch";
 import type { TelemetryDataPoint } from "../lib/types";
 
-const OptimizedTrackMap = dynamic(() => import("./OptimizedTrackMap"), {
-	ssr: false,
-	loading: () => <TrackMapSkeleton />,
-});
-
-const ProfessionalTelemetryCharts = dynamic(
+const ProfessionalTelemetryCharts = React.lazy(
 	() => import("./ProfessionalTelemetryCharts"),
-	{
-		ssr: false,
-		loading: () => <ChartsSkeleton />,
-	},
 );
 
 interface TelemetryPageProps {
 	initialTelemetryData: TelemetryRes;
-	availableLaps: Array<{ lap_id: number }>;
+	availableLaps?: Array<number>;
 	sessionId: string;
 	currentLapId: number;
 }
@@ -42,9 +32,7 @@ export default function TelemetryPage({
 	sessionId,
 	currentLapId,
 }: TelemetryPageProps) {
-	const router = useRouter();
-	const pathname = usePathname();
-	const searchParams = useSearchParams();
+	const nav = useNavigate();
 
 	const [selectedMetric, setSelectedMetric] = useState<string>("Speed");
 	const [_isScrubbing, setIsScrubbing] = useState<boolean>(false);
@@ -54,8 +42,6 @@ export default function TelemetryPage({
 	const dataWithGPSCoordinates = useMemo(() => {
 		return initialTelemetryData?.dataWithGPSCoordinates || [];
 	}, [initialTelemetryData?.dataWithGPSCoordinates]);
-
-	const processError = initialTelemetryData?.processError || null;
 
 	const { selectedIndex, handlePointSelection } = useTrackPosition(
 		dataWithGPSCoordinates as TelemetryDataPoint[],
@@ -151,65 +137,16 @@ export default function TelemetryPage({
 	}, [dataWithGPSCoordinates]);
 
 	const handleLapChange = (newLapId: string) => {
-		const params = new URLSearchParams();
-		params.set("lapId", newLapId);
-		router.push(`${pathname}?${params.toString()}`);
+		nav({ to: ".", search: () => ({ lapId: newLapId }) });
 	};
 
-	if (processError) {
-		return (
-			<div className="flex min-h-screen bg-zinc-950">
-				{/* Sidebar */}
-				<div className="flex w-64 flex-col border-zinc-800/50 border-r bg-zinc-900/50">
-					{/* Logo/Brand */}
-					<div className="px-6 py-6">
-						<div className="flex items-center space-x-3">
-							<div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white">
-								<div className="h-4 w-4 rounded bg-zinc-900" />
-							</div>
-							<div>
-								<h1 className="font-semibold text-sm text-white">iRacing</h1>
-								<p className="text-xs text-zinc-400">Telemetry</p>
-							</div>
-						</div>
-					</div>
-				</div>
-
-				{/* Main Content */}
-				<div className="flex flex-1 flex-col">
-					{/* Header */}
-					<header className="border-zinc-800/50 border-b bg-zinc-950/50 px-6 py-4">
-						<div className="flex items-center space-x-2 text-sm">
-							<span className="text-zinc-500">Dashboard</span>
-							<span className="text-zinc-500">/</span>
-							<span className="text-zinc-500">Sessions</span>
-						</div>
-					</header>
-
-					{/* Error Content */}
-					<main className="flex flex-1 items-center justify-center p-6">
-						<div className="max-w-md rounded-lg border border-red-800/50 bg-red-950/50 p-6 text-center">
-							<div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-red-900/50">
-								<div className="h-8 w-8 rounded border-2 border-red-400 border-dashed" />
-							</div>
-							<h3 className="mb-2 font-medium text-lg text-red-300">
-								Error Loading Telemetry Data
-							</h3>
-							<p className="text-red-200 text-sm">{processError}</p>
-						</div>
-					</main>
-				</div>
-			</div>
-		);
-	}
-
 	return (
-		<div className="flex min-h-screen bg-zinc-950">
+		<div className="flex min-h-screen min-w-screen bg-zinc-950">
 			{/* Sidebar */}
 			<div className="flex w-64 flex-col border-zinc-800/50 border-r bg-zinc-900/50">
 				{/* Logo/Brand */}
 				<div className="px-6 py-6">
-					<Link href="/" className="cursor-pointer">
+					<Link to="/" className="cursor-pointer">
 						<div className="flex items-center space-x-3">
 							<div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white">
 								<div className="h-4 w-4 rounded bg-zinc-900" />
@@ -228,11 +165,11 @@ export default function TelemetryPage({
 						<select
 							className="h-fit rounded border border-zinc-600 bg-zinc-800/90 px-3 py-1 font-medium text-sm text-white hover:bg-zinc-700/90 focus:outline-none focus:ring-2 focus:ring-blue-500"
 							onChange={(e) => handleLapChange(e.currentTarget.value)}
-							value={(searchParams.get("lapId") || "")?.toString()}
+							value={(currentLapId || "")?.toString()}
 						>
-							{availableLaps.map(({ lap_id }) => (
-								<option key={lap_id.toString()} value={lap_id.toString()}>
-									{lap_id.toString()}
+							{availableLaps?.map((lap) => (
+								<option key={lap.toString()} value={lap.toString()}>
+									{lap.toString()}
 								</option>
 							))}
 						</select>
@@ -295,28 +232,54 @@ export default function TelemetryPage({
 
 					<div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
 						<div className="col-span-1 rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-6 lg:col-span-3">
-							{dataWithGPSCoordinates.length > 0 ? (
-								<OptimizedTrackMap
-									dataWithCoordinates={dataWithGPSCoordinates}
-									selectedPointIndex={displayIndex}
-									onPointClick={handleTrackPointClick}
-									selectedMetric={selectedMetric}
-									setSelectedMetric={setSelectedMetric}
-								/>
-							) : (
-								<div className="flex h-[500px] items-center justify-center rounded-lg bg-zinc-800/50">
-									<div className="text-center">
-										<div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-zinc-700/50">
-											<div className="h-8 w-8 rounded border-2 border-zinc-600 border-dashed" />
-										</div>
-										<p className="mb-2 text-zinc-400">No GPS data available</p>
-										<p className="text-sm text-zinc-500">
-											This session may not contain GPS coordinates or they may
-											be invalid.
-										</p>
-									</div>
-								</div>
-							)}
+							<Card className="h-full w-full p-0 overflow-hidden">
+								{dataWithGPSCoordinates[0].Lon !== undefined && (
+									<Map
+										center={[
+											dataWithGPSCoordinates[0].Lon,
+											dataWithGPSCoordinates[0].Lat,
+										]}
+										styles={{
+											light: {
+												version: 8,
+												sources: {
+													satellite: {
+														type: "raster",
+														tiles: [
+															"https://cartodb-basemaps-a.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png",
+														],
+														tileSize: 256,
+													},
+												},
+												layers: [
+													{
+														id: "satellite",
+														type: "raster",
+														source: "satellite",
+													},
+												],
+											},
+										}}
+										zoom={15}
+									>
+										<MapRoute
+											coordinates={dataWithGPSCoordinates.map((data) => [
+												data.Lon,
+												data.Lat,
+											])}
+											color="#3b82f6"
+											width={1}
+											opacity={0.8}
+										/>
+										<MapControls
+											showZoom
+											showCompass
+											showLocate
+											showFullscreen
+										/>
+									</Map>
+								)}
+							</Card>
 						</div>
 
 						<div className="col-span-1 rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-4 lg:col-span-2">
@@ -409,36 +372,6 @@ function GPSAnalysisPanel({ data }: { data: any[] }) {
 					<div className="text-xs text-zinc-500">
 						{((corners.length / data.length) * 100).toFixed(1)}% of lap
 					</div>
-				</div>
-			</div>
-		</div>
-	);
-}
-
-// Performance optimization: Skeleton components for dynamic loading
-function TrackMapSkeleton() {
-	return (
-		<div className="flex h-[700px] animate-pulse items-center justify-center rounded-lg bg-zinc-800/30">
-			<div className="text-center">
-				<div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-zinc-700/50">
-					<div className="h-8 w-8 animate-spin rounded border-2 border-zinc-600 border-dashed" />
-				</div>
-				<p className="text-sm text-zinc-400">Loading track map...</p>
-			</div>
-		</div>
-	);
-}
-
-function ChartsSkeleton() {
-	return (
-		<div className="h-[400px] animate-pulse rounded-lg bg-zinc-800/30 p-4">
-			<div className="space-y-4">
-				<div className="h-4 w-1/3 rounded bg-zinc-700/50" />
-				<div className="space-y-2">
-					{[...Array(5)].map((_, i) => (
-						// biome-ignore lint/suspicious/noArrayIndexKey: na
-						<div key={i} className="h-16 rounded bg-zinc-700/30" />
-					))}
 				</div>
 			</div>
 		</div>

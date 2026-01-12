@@ -1,22 +1,61 @@
-import Link from "next/link";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
-import ClientWrapper from "../../components/ClientWrapper";
+import useSWR from "swr";
 import TelemetryPage from "../../components/TelemetryPage";
-import { getLaps, getTelemetryData } from "../../lib/questDb";
+import { processIRacingDataWithGPS, type TelemetryRes } from "../../lib/Fetch";
 
-// Force dynamic rendering - prevent build-time execution
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const Route = createFileRoute("/$sessionId")({
+	component: SessionPage,
+	validateSearch: (
+		search: Record<string, unknown>,
+	): {
+		lapId: string;
+	} => ({
+		lapId: (search?.lapId as string) || "1",
+	}),
+});
 
-interface PageProps {
-	params: Promise<{ sessionId: string }>;
-	searchParams: Promise<{ lapId?: string }>;
-}
+const fetcher = (url: string) =>
+	fetch(url, {
+		mode: "no-cors",
+		method: "GET",
+		headers: { "Content-Type": "application/json", "Content-Encoding": "gzip" },
+	}).then(async (res) => {
+		console.log(res);
+		return processIRacingDataWithGPS(await res.json());
+	});
 
-export default async function SessionPage({ params, searchParams }: PageProps) {
-	const { sessionId } = await params;
-	const { lapId } = await searchParams;
+const lapsFetcher = (url: string) =>
+	fetch(url, {
+		mode: "no-cors",
+		method: "GET",
+		headers: { "Content-Type": "application/json", "Content-Encoding": "gzip" },
+	}).then((res) => {
+		console.log(res);
+		return res.json() as unknown as Array<number>;
+	});
+
+export default function SessionPage() {
+	const { sessionId } = Route.useParams();
+	const { lapId } = Route.useSearch();
+
+	const {
+		data: telemetryData,
+		error,
+		isLoading,
+	} = useSWR<TelemetryRes, Error>(
+		`/api/sessions/${sessionId}/laps/${lapId}`,
+		fetcher,
+	);
+
+	const {
+		data: availableLaps,
+		error: error2,
+		isLoading: isLoading2,
+	} = useSWR<Array<number>, Error>(
+		`/api/sessions/${sessionId}/laps`,
+		lapsFetcher,
+	);
 
 	// Default to lap 1 if no lapId provided
 	const currentLapId = lapId ? Number.parseInt(lapId, 10) : 1;
@@ -25,57 +64,23 @@ export default async function SessionPage({ params, searchParams }: PageProps) {
 		notFound();
 	}
 
-	// Fetch data on the server at RUNTIME (not build time)
-	try {
-		console.log(
-			`📊 Fetching data at RUNTIME for session: ${sessionId}, lap: ${currentLapId}`,
-		);
+	if (error) return <DatabaseUnavailableError />;
+	if (isLoading || telemetryData === undefined)
+		return <TelemetryLoadingSkeleton />;
 
-		const [telemetryData, availableLaps] = await Promise.all([
-			getTelemetryData(sessionId, currentLapId),
-			getLaps(sessionId),
-		]);
-
-		if (!telemetryData) {
-			return <DatabaseUnavailableError />;
-		}
-
-		console.log(
-			`✅ Successfully fetched telemetry data with ${telemetryData.dataWithGPSCoordinates?.length || 0} points`,
-		);
-
-		return (
-			<ClientWrapper fallback={<TelemetryLoadingSkeleton />}>
-				<Suspense fallback={<TelemetryLoadingSkeleton />}>
-					<TelemetryPage
-						initialTelemetryData={telemetryData}
-						availableLaps={availableLaps}
-						sessionId={sessionId}
-						currentLapId={currentLapId}
-					/>
-				</Suspense>
-			</ClientWrapper>
-		);
-	} catch (error) {
-		console.error("Error fetching telemetry data at runtime:", error);
-
-		// Check if it's a database connection error
-		if (
-			error instanceof Error &&
-			(error.message.includes("table does not exist") ||
-				error.message.includes("Connection refused") ||
-				error.message.includes("connect ECONNREFUSED"))
-		) {
-			return <DatabaseUnavailableError />;
-		}
-
-		notFound();
-	}
+	return (
+		<TelemetryPage
+			initialTelemetryData={telemetryData}
+			availableLaps={availableLaps}
+			sessionId={sessionId}
+			currentLapId={currentLapId}
+		/>
+	);
 }
 
 function DatabaseUnavailableError() {
 	return (
-		<div className="flex min-h-screen items-center justify-center bg-zinc-950">
+		<div>
 			<div className="mx-auto max-w-md p-8 text-center">
 				<div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/20">
 					<div className="h-8 w-8 text-red-400">
@@ -107,7 +112,7 @@ function DatabaseUnavailableError() {
 				</div>
 				<div className="mt-6">
 					<Link
-						href="/dashboard"
+						to=".."
 						className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
 					>
 						← Back to Dashboard

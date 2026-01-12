@@ -1,4 +1,4 @@
-import { Client } from "pg";
+// import { Client } from "pg";
 import type { Session } from "@/components/SessionSelector";
 import { processIRacingDataWithGPS, type TelemetryRes } from "./Fetch";
 
@@ -16,12 +16,12 @@ class QuestDBClient {
 	constructor() {
 		this.config = {
 			host:
-				process.env.QUESTDB_HOST ||
-				(process.env.NODE_ENV === "production" ? "questdb" : "127.0.0.1"),
-			port: Number.parseInt(process.env.QUESTDB_PORT || "8812", 10),
-			user: process.env.QUESTDB_USER || "admin",
-			password: process.env.QUESTDB_PASSWORD || "quest",
-			database: process.env.QUESTDB_DATABASE || "qdb",
+				import.meta.env.MODE ||
+				(import.meta.env.MODE === "production" ? "questdb" : "127.0.0.1"),
+			port: Number.parseInt(import.meta.env.VITE_QUESTDB_PORT || "8812", 10),
+			user: import.meta.env.VITE_QUESTDB_USER || "admin",
+			password: import.meta.env.VITE_QUESTDB_PASSWORD || "quest",
+			database: import.meta.env.VITE_QUESTDB_DATABASE || "qdb",
 		};
 	}
 

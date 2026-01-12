@@ -8,7 +8,7 @@ import {
 
 export default function ServiceWorkerProvider() {
 	useEffect(() => {
-		if (process.env.NODE_ENV === "development") {
+		if (import.meta.env.MODE === "development") {
 			// In development, actively unregister any existing Service Workers
 			unregisterServiceWorker();
 			console.log("Development mode: Service Worker disabled and unregistered");

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
 
 // Conditionally import Service Worker only in production
 const ServiceWorkerProvider =
-	process.env.NODE_ENV === "production"
+	import.meta.env.MODE === "production"
 		? require("../components/ServiceWorkerProvider").default
 		: () => null;
 
@@ -21,10 +22,12 @@ export default function RootLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<html lang="en">
+		<html lang="en" suppressHydrationWarning>
 			<body className={inter.className}>
-				{process.env.NODE_ENV === "production" && <ServiceWorkerProvider />}
-				{children}
+				{import.meta.env.MODE === "production" && <ServiceWorkerProvider />}
+				<ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+					{children}
+				</ThemeProvider>
 			</body>
 		</html>
 	);

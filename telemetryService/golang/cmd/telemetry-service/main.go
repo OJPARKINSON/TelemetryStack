@@ -4,7 +4,10 @@ import (
 	"log"
 	_ "net/http/pprof"
 	"os"
+	"os/signal"
+	"syscall"
 
+	"github.com/ojparkinson/telemetryService/internal/api"
 	"github.com/ojparkinson/telemetryService/internal/config"
 	"github.com/ojparkinson/telemetryService/internal/metrics"
 	"github.com/ojparkinson/telemetryService/internal/persistance"
@@ -25,6 +28,15 @@ func main() {
 	}
 	log.Println("Database schema initialized successfully")
 
+	apiServer := api.NewServer(":8010", &persistance.QueryExecutor{})
+
+	log.Println("creating server")
+	go func() {
+		if err := apiServer.Start(); err != nil {
+			log.Printf("API server error: %v", err)
+		}
+	}()
+
 	// Create sender pool
 	senderPool, err := persistance.NewSenderPool(config)
 	if err != nil {
@@ -40,5 +52,13 @@ func main() {
 
 	// Start message queue subscriber
 	messaging := queue.NewSubscriber(senderPool)
-	messaging.Subscribe(config)
+	go func() {
+		messaging.Subscribe(config)
+	}()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	<-sigChan
+	log.Println("Shutting down...")
 }
