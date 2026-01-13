@@ -137,7 +137,7 @@ func (m *Subscriber) processBatches(batchChan chan batchItem, channel *amqp.Chan
 
 	go m.resultHandler(resultChan, channel)
 
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	var (

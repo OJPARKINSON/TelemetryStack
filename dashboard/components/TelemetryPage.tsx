@@ -1,4 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
+import { Layers, X } from "lucide-react";
 import React, {
 	useCallback,
 	useEffect,
@@ -6,12 +7,13 @@ import React, {
 	useRef,
 	useState,
 } from "react";
+import useSWR from "swr";
 import { InfoBox } from "../components/InfoBox";
 import { Card } from "../components/ui/card";
 // biome-ignore lint/suspicious/noShadowRestrictedNames: <explanation>
-import { Map, MapControls, MapRoute } from "../components/ui/map";
+import { Map, MapControls, MapRoute, useMap } from "../components/ui/map";
 import { useTrackPosition } from "../hooks/useTrackPosition";
-import type { TelemetryRes } from "../lib/Fetch";
+import { fetcher, type TelemetryRes } from "../lib/Fetch";
 import type { TelemetryDataPoint } from "../lib/types";
 
 const ProfessionalTelemetryCharts = React.lazy(
@@ -32,6 +34,12 @@ export default function TelemetryPage({
 	currentLapId,
 }: TelemetryPageProps) {
 	const nav = useNavigate();
+	const { data } = useSWR<TelemetryRes, Error>(
+		`/api/sessions/${sessionId}/laps/2/geojson`,
+		fetcher,
+	);
+
+	console.log("data", data);
 
 	const [selectedMetric, setSelectedMetric] = useState<string>("Speed");
 	const [_isScrubbing, setIsScrubbing] = useState<boolean>(false);
@@ -183,7 +191,7 @@ export default function TelemetryPage({
 									<div className="font-semibold text-lg text-yellow-400">
 										{Math.max(
 											...dataWithGPSCoordinates.map((p) => p.Speed || 0),
-										).toFixed(0)}{" "}
+										).toFixed(0)}
 										km/h
 									</div>
 								</div>
@@ -238,8 +246,9 @@ export default function TelemetryPage({
 											])}
 											color="#3b82f6"
 											width={1}
-											opacity={0.8}
+											opacity={0.3}
 										/>
+										<RacingLine dataWithGPSCoordinates={data} />
 										<MapControls
 											showZoom
 											showCompass
@@ -293,6 +302,58 @@ export default function TelemetryPage({
 				</main>
 			</div>
 		</div>
+	);
+}
+
+function RacingLine({
+	dataWithGPSCoordinates,
+}: {
+	dataWithGPSCoordinates: any[];
+}) {
+	const { map, isLoaded } = useMap();
+
+	console.log("dataWithGPSCoordinates", dataWithGPSCoordinates);
+	if (!map || dataWithGPSCoordinates?.[0] === undefined) return;
+	if (!map.getSource("parks")) {
+		const cords = dataWithGPSCoordinates.features[0].geometry.coordinates;
+
+		console.log("cords", cords);
+		map.addSource("parks", {
+			type: "geojson",
+			data: {
+				type: "Feature",
+				geometry: {
+					type: "LineString",
+					coordinates: cords,
+				},
+				properties: {},
+			},
+		});
+	}
+	if (!map.getLayer("parks-fill")) {
+		map.addLayer({
+			id: "parks-fill",
+			type: "line",
+			source: "parks",
+			paint: {
+				"line-color": "red",
+				"line-width": 3,
+				"line-opacity": 1,
+			},
+			layout: {
+				visibility: "visible",
+			},
+		});
+	}
+	return (
+		<>
+			<div className="absolute top-3 left-3 z-10">
+				<button>
+					<X className="size-4 mr-1.5" />
+					Hide Parks
+				</button>
+			</div>
+		</>
 	);
 }
 

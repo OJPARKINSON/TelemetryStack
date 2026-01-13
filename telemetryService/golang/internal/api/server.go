@@ -50,6 +50,7 @@ func (s *Server) setupRoutes() http.Handler {
 	mux.HandleFunc("GET /api/sessions", s.handleGetSessions)
 	mux.HandleFunc("GET /api/sessions/{sessionId}/laps", s.handleGetLaps)
 	mux.HandleFunc("GET /api/sessions/{sessionId}/laps/{lapId}", s.handleGetTelemetry)
+	mux.HandleFunc("GET /api/sessions/{sessionId}/laps/{lapId}/geojson", s.handleGetTelemetryGeoJson)
 
 	// Add panic recovery middleware
 	return RecoveryMiddleware(mux)

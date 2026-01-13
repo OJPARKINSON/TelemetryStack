@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+
+	"github.com/ojparkinson/telemetryService/internal/geojson"
 )
 
 // /api/sessions
@@ -61,4 +63,25 @@ func (s *Server) handleGetTelemetry(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondGzipJSON(w, 200, lapData)
+}
+
+// /api/sessions/123456/laps/1/geojson
+func (s *Server) handleGetTelemetryGeoJson(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("sessionId")
+	lapID := r.PathValue("lapId")
+	if sessionID == "" || lapID == "" {
+		respondError(w, http.StatusBadRequest, "Invalid session ID")
+		return
+	}
+
+	lapData, err := s.queryExecutor.QueryLap(r.Context(), sessionID, lapID)
+	if err != nil {
+		log.Println(err)
+		respondError(w, http.StatusInternalServerError, "Failed to fetch lap data")
+		return
+	}
+
+	col, _ := geojson.ConvertToGeoJSON(lapData, geojson.ConversionOptions{})
+
+	respondGzipJSON(w, 200, col)
 }
