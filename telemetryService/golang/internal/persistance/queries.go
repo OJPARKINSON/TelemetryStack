@@ -3,6 +3,8 @@ package persistance
 import (
 	"context"
 	"fmt"
+
+	"github.com/ojparkinson/telemetryService/internal/messaging"
 )
 
 type QueryExecutor struct {
@@ -45,12 +47,22 @@ func (s *QueryExecutor) QueryLaps(ctx context.Context, sessionID string) ([]map[
 	return ExecuteSelectQuery(query)
 }
 
-func (s *QueryExecutor) QueryLap(ctx context.Context, sessionID string, lapID string) ([]map[string]interface{}, error) {
+func (s *QueryExecutor) QueryLap(ctx context.Context, sessionID string, lapID string) ([]messaging.Telemetry, error) {
 	query := fmt.Sprintf(`
 		SELECT * FROM TelemetryTicks
 		WHERE session_name = 'RACE' AND session_id = '%s' AND lap_id = '%s'
-		ORDER BY timestamp DESC
+		ORDER BY timestamp ASC
 	`, sessionID, lapID)
 
-	return ExecuteSelectQuery(query)
+	rows, err := ExecuteSelectQuery(query)
+	if err != nil {
+		return nil, err
+	}
+
+	points := make([]messaging.Telemetry, len(rows))
+	for i, row := range rows {
+		points[i] = mapToTelemetry(row)
+	}
+
+	return points, nil
 }

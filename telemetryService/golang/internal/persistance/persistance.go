@@ -138,3 +138,113 @@ func validateInt(value uint32) int64 {
 	}
 	return int64(value)
 }
+
+func mapToTelemetry(m map[string]interface{}) messaging.Telemetry {
+	return messaging.Telemetry{
+		LapId:       getString(m, "lap_id"),
+		SessionId:   getString(m, "session_id"),
+		SessionNum:  getString(m, "session_num"),
+		SessionType: getString(m, "session_type"),
+		SessionName: getString(m, "session_name"),
+		CarId:       getString(m, "car_id"),
+		TrackName:   getString(m, "track_name"),
+		TrackId:     getString(m, "track_id"),
+
+		Lat:        getFloat64(m, "lat"),
+		Lon:        getFloat64(m, "lon"),
+		Alt:        getFloat64(m, "alt"),
+		LapDistPct: getFloat64(m, "lap_dist_pct"),
+
+		Speed:     getFloat64(m, "speed"),
+		VelocityX: getFloat64(m, "velocity_x"),
+		VelocityY: getFloat64(m, "velocity_y"),
+		VelocityZ: getFloat64(m, "velocity_z"),
+
+		// Driver Inputs
+		Throttle:           getFloat64(m, "throttle"),
+		Brake:              getFloat64(m, "brake"),
+		SteeringWheelAngle: getFloat64(m, "steering_wheel_angle"),
+		Gear:               uint32(getInt(m, "gear")),
+
+		// Engine
+		Rpm:       getFloat64(m, "rpm"),
+		FuelLevel: getFloat64(m, "fuel_level"),
+
+		// Forces
+		LatAccel:  getFloat64(m, "lat_accel"),
+		LongAccel: getFloat64(m, "long_accel"),
+		VertAccel: getFloat64(m, "vert_accel"),
+
+		// Orientation
+		Pitch:    getFloat64(m, "pitch"),
+		Roll:     getFloat64(m, "roll"),
+		Yaw:      getFloat64(m, "yaw"),
+		YawNorth: getFloat64(m, "yaw_north"),
+
+		// Telemetry
+		Voltage:   getFloat64(m, "voltage"),
+		WaterTemp: getFloat64(m, "water_temp"),
+
+		// Tire Pressures
+		LFpressure: getFloat64(m, "lFpressure"),
+		RFpressure: getFloat64(m, "rFpressure"),
+		LRpressure: getFloat64(m, "lRpressure"),
+		RRpressure: getFloat64(m, "rRpressure"),
+
+		// Tire Temps
+		LFtempM: getFloat64(m, "lFtempM"),
+		RFtempM: getFloat64(m, "rFtempM"),
+		LRtempM: getFloat64(m, "lRtempM"),
+		RRtempM: getFloat64(m, "rRtempM"),
+
+		// Timing
+		SessionTime:       getFloat64(m, "session_time"),
+		LapCurrentLapTime: getFloat64(m, "lap_current_lap_time"),
+		LapLastLapTime:    getFloat64(m, "lapLastLapTime"),
+		LapDeltaToBestLap: getFloat64(m, "lapDeltaToBestLap"),
+		PlayerCarPosition: uint32(getInt(m, "player_car_position")),
+
+		// WorkerId not in DB - will be 0
+		// TickTime not mapped - use raw timestamp if needed
+	}
+}
+
+// Keep helper functions from before
+func getString(m map[string]interface{}, key string) string {
+	if v, ok := m[key]; ok && v != nil {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+func getFloat64(m map[string]interface{}, key string) float64 {
+	if v, ok := m[key]; ok && v != nil {
+		switch val := v.(type) {
+		case float64:
+			return val
+		case float32:
+			return float64(val)
+		case int:
+			return float64(val)
+		case int64:
+			return float64(val)
+		}
+	}
+	return 0.0
+}
+
+func getInt(m map[string]interface{}, key string) int {
+	if v, ok := m[key]; ok && v != nil {
+		switch val := v.(type) {
+		case int:
+			return val
+		case int64:
+			return int(val)
+		case float64:
+			return int(val)
+		}
+	}
+	return 0
+}

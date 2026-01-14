@@ -15,10 +15,10 @@ type Feature struct {
 
 type Geometry struct {
 	Type        string      `json:"type"`
-	Coordinates interface{} `json:"coordinates"`
+	Coordinates [][]float64 `json:"coordinates"`
 }
 
-type Position [2]float64
+type Position []float64
 
 // Conversion settings
 type ConversionOptions struct {

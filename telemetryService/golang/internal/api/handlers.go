@@ -69,19 +69,20 @@ func (s *Server) handleGetTelemetry(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetTelemetryGeoJson(w http.ResponseWriter, r *http.Request) {
 	sessionID := r.PathValue("sessionId")
 	lapID := r.PathValue("lapId")
-	if sessionID == "" || lapID == "" {
-		respondError(w, http.StatusBadRequest, "Invalid session ID")
-		return
-	}
+
+	options := geojson.ConversionOptions{}
 
 	lapData, err := s.queryExecutor.QueryLap(r.Context(), sessionID, lapID)
 	if err != nil {
-		log.Println(err)
 		respondError(w, http.StatusInternalServerError, "Failed to fetch lap data")
 		return
 	}
 
-	col, _ := geojson.ConvertToGeoJSON(lapData, geojson.ConversionOptions{})
+	geoJSON, err := geojson.ConvertToGeoJSON(lapData, options)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to convert to GeoJSON")
+		return
+	}
 
-	respondGzipJSON(w, 200, col)
+	respondGzipJSON(w, http.StatusOK, geoJSON)
 }

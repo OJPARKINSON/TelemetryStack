@@ -246,7 +246,7 @@ export default function TelemetryPage({
 											])}
 											color="#3b82f6"
 											width={1}
-											opacity={0.3}
+											opacity={0}
 										/>
 										<RacingLine dataWithGPSCoordinates={data} />
 										<MapControls
@@ -308,55 +308,58 @@ export default function TelemetryPage({
 function RacingLine({
 	dataWithGPSCoordinates,
 }: {
-	dataWithGPSCoordinates: any[];
+	dataWithGPSCoordinates: any;
 }) {
 	const { map, isLoaded } = useMap();
 
-	console.log("dataWithGPSCoordinates", dataWithGPSCoordinates);
-	if (!map || dataWithGPSCoordinates?.[0] === undefined) return;
-	if (!map.getSource("parks")) {
-		const cords = dataWithGPSCoordinates.features[0].geometry.coordinates;
+	if (!map || !dataWithGPSCoordinates?.features) return;
 
-		console.log("cords", cords);
-		map.addSource("parks", {
+	// Add source with the entire GeoJSON
+	if (!map.getSource("racing-line")) {
+		map.addSource("racing-line", {
 			type: "geojson",
 			data: {
-				type: "Feature",
-				geometry: {
-					type: "LineString",
-					coordinates: cords,
-				},
-				properties: {},
-			},
+				type: "FeatureCollection",
+				features: [
+					{
+						type: "Feature",
+						geometry: {
+							type: "LineString",
+							coordinates: [
+								[5.9714, 50.4372],
+								[5.9715, 50.4373],
+								[5.9716, 50.4374],
+							],
+						},
+						properties: {
+							color: "#FF0000",
+						},
+					},
+				],
+			}, // ← Pass the whole FeatureCollection
 		});
 	}
-	if (!map.getLayer("parks-fill")) {
+
+	// Add layer with color from properties
+	if (!map.getLayer("racing-line-layer")) {
 		map.addLayer({
-			id: "parks-fill",
+			id: "racing-line-layer",
 			type: "line",
-			source: "parks",
+			source: "racing-line",
 			paint: {
-				"line-color": "red",
-				"line-width": 3,
+				"line-color": ["get", "color"], // ← Use color from properties
+				"line-width": 1000,
 				"line-opacity": 1,
 			},
 			layout: {
-				visibility: "visible",
+				"line-cap": "round",
+				"line-join": "round",
 			},
 		});
 	}
-	return (
-		<>
-			<div className="absolute top-3 left-3 z-10">
-				<button>
-					<X className="size-4 mr-1.5" />
-					Hide Parks
-				</button>
-			</div>
-		</>
-	);
-}
 
+	return <></>;
+}
 function GPSAnalysisPanel({ data }: { data: any[] }) {
 	const totalDistance = data.reduce(
 		(sum, point) => sum + (point.distanceFromPrev || 0),

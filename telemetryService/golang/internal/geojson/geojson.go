@@ -1,64 +1,79 @@
 package geojson
 
 import (
-	"fmt"
 	"math"
+
+	"github.com/ojparkinson/telemetryService/internal/messaging"
 )
 
-func ConvertToGeoJSON(lapData []map[string]interface{}, options ConversionOptions) (*FeatureCollection, error) {
-
-	// currentSpeedGroup := 0.6
-	coords := make([]Position, 0, len(lapData))
+func ConvertToGeoJSON(lapData []messaging.Telemetry, options ConversionOptions) (*FeatureCollection, error) {
+	minSpeed := math.MaxFloat32
+	maxSpeed := 0.0
 	for _, lap := range lapData {
-		lon, _ := extractFloat64(lap, "lon")
-		lat, _ := extractFloat64(lap, "lat")
+		speed := lap.Speed
+		if speed < minSpeed {
+			minSpeed = speed
+		}
 
-		coords = append(coords, Position{lon, lat})
+		if speed > maxSpeed {
+			maxSpeed = speed
+		}
 	}
 
-	feature := Feature{
-		Type: "Feature",
-		Geometry: Geometry{
-			Type:        "lineString",
-			Coordinates: coords,
-		},
-		Properties: map[string]interface{}{
-			"color": "#FF0000",
-		},
+	type ColourPosition struct {
+		Positions [][]float64
+		colour    string
+	}
+
+	coords := make([]ColourPosition, 0)
+	for _, lap := range lapData {
+
+		normalisedSpeed := (lap.Speed - minSpeed) / (maxSpeed - minSpeed)
+
+		var colour string
+		switch true {
+		case normalisedSpeed < 0.3:
+			colour = "#ef4444"
+		case normalisedSpeed < 0.6:
+			colour = "#f97316"
+		case normalisedSpeed < 0.8:
+			colour = "#eab308"
+		default:
+			colour = "#22c55e"
+		}
+
+		if len(coords) > 0 && colour == coords[len(coords)-1].colour {
+			coords[len(coords)-1].Positions = append(coords[len(coords)-1].Positions, []float64{lap.Lon, lap.Lat})
+		} else {
+			coords = append(coords, ColourPosition{
+				Positions: [][]float64{{lap.Lon, lap.Lat}},
+				colour:    colour,
+			})
+		}
+	}
+
+	features := make([]Feature, 0, len(coords))
+
+	for _, coord := range coords {
+		if len(coord.Positions) > 0 {
+			features = append(features, Feature{
+				Type: "Feature",
+				Geometry: Geometry{
+					Type:        "LineString",
+					Coordinates: coord.Positions,
+				},
+				Properties: map[string]interface{}{
+					"color": coord.colour,
+				},
+			})
+		}
 	}
 
 	featureCollection := &FeatureCollection{
-		Type:     "Feature",
-		Features: []Feature{feature},
+		Type:     "FeatureCollection",
+		Features: features,
 		Metadata: map[string]interface{}{},
 	}
 
 	return featureCollection, nil
-}
-
-func extractFloat64(row map[string]interface{}, key string) (float64, error) {
-	val, ok := row[key]
-	if !ok {
-		return 0, fmt.Errorf("key %s not found", key)
-	}
-
-	switch v := val.(type) {
-	case float64:
-		return validateFloat64(v), nil
-	case float32:
-		return validateFloat64(float64(v)), nil
-	case int:
-		return float64(v), nil
-	case int64:
-		return float64(v), nil
-	default:
-		return 0, fmt.Errorf("cannot convert %T to float64", val)
-	}
-}
-
-func validateFloat64(value float64) float64 {
-	if math.IsNaN(value) || math.IsInf(value, 0) {
-		return 0.0
-	}
-	return value
 }
