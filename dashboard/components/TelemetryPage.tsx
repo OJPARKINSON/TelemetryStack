@@ -318,25 +318,7 @@ function RacingLine({
 	if (!map.getSource("racing-line")) {
 		map.addSource("racing-line", {
 			type: "geojson",
-			data: {
-				type: "FeatureCollection",
-				features: [
-					{
-						type: "Feature",
-						geometry: {
-							type: "LineString",
-							coordinates: [
-								[5.9714, 50.4372],
-								[5.9715, 50.4373],
-								[5.9716, 50.4374],
-							],
-						},
-						properties: {
-							color: "#FF0000",
-						},
-					},
-				],
-			}, // ← Pass the whole FeatureCollection
+			data: dataWithGPSCoordinates,
 		});
 	}
 
@@ -348,7 +330,7 @@ function RacingLine({
 			source: "racing-line",
 			paint: {
 				"line-color": ["get", "color"], // ← Use color from properties
-				"line-width": 1000,
+				"line-width": 4,
 				"line-opacity": 1,
 			},
 			layout: {
