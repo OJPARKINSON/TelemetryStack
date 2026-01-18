@@ -58,8 +58,6 @@ export const InfoBox = memo(function InfoBox({
 
 export const TelemetryChart = ({
 	selectedMetric,
-	setSelectedMetric,
-	availableMetrics,
 	telemetryData,
 	selectedIndex,
 	onIndexChange,

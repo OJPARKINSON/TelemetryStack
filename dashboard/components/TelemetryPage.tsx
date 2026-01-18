@@ -1,5 +1,4 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Layers, X } from "lucide-react";
 import React, {
 	useCallback,
 	useEffect,
@@ -39,12 +38,9 @@ export default function TelemetryPage({
 		fetcher,
 	);
 
-	console.log("data", data);
-
 	const [selectedMetric, setSelectedMetric] = useState<string>("Speed");
 	const [_isScrubbing, setIsScrubbing] = useState<boolean>(false);
 
-	// Extract processed data from the server response - wrap in useMemo to fix dependency warning
 	const dataWithGPSCoordinates = useMemo(() => {
 		return initialTelemetryData?.dataWithGPSCoordinates || [];
 	}, [initialTelemetryData?.dataWithGPSCoordinates]);
@@ -53,7 +49,6 @@ export default function TelemetryPage({
 		dataWithGPSCoordinates as TelemetryDataPoint[],
 	);
 
-	// Derive track information from data
 	const trackInfo = useMemo(() => {
 		if (dataWithGPSCoordinates.length === 0) return null;
 
@@ -68,11 +63,9 @@ export default function TelemetryPage({
 		};
 	}, [dataWithGPSCoordinates, sessionId]);
 
-	// Debounced hover handling for smoother interactions
 	const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
 	const handleChartHover = useCallback(() => {
-		// Clear any pending hover timeout
 		if (hoverTimeoutRef.current) {
 			clearTimeout(hoverTimeoutRef.current);
 		}
@@ -214,7 +207,8 @@ export default function TelemetryPage({
 									<Map
 										center={[
 											dataWithGPSCoordinates[0].Lon,
-											dataWithGPSCoordinates[0].Lat,
+											dataWithGPSCoordinates[dataWithGPSCoordinates.length / 2]
+												.Lat,
 										]}
 										styles={{
 											light: {
@@ -245,7 +239,7 @@ export default function TelemetryPage({
 												data.Lat,
 											])}
 											color="#3b82f6"
-											width={1}
+											width={0.5}
 											opacity={0}
 										/>
 										<RacingLine dataWithGPSCoordinates={data} />
@@ -270,7 +264,7 @@ export default function TelemetryPage({
 									onMouseLeave={handleChartMouseLeave}
 								/>
 							) : (
-								<div className="flex h-[600px] items-center justify-center">
+								<div className="flex h-150 items-center justify-center">
 									<div className="text-center">
 										<div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-zinc-700/50">
 											<div className="h-8 w-8 rounded border-2 border-zinc-600 border-dashed" />
@@ -310,7 +304,7 @@ function RacingLine({
 }: {
 	dataWithGPSCoordinates: any;
 }) {
-	const { map, isLoaded } = useMap();
+	const { map } = useMap();
 
 	if (!map || !dataWithGPSCoordinates?.features) return;
 

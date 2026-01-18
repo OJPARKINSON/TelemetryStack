@@ -34,10 +34,16 @@ func ConvertToGeoJSON(lapData []messaging.Telemetry, options ConversionOptions) 
 		switch true {
 		case normalisedSpeed < 0.3:
 			colour = "#ef4444"
+		case normalisedSpeed < 0.5:
+			colour = "#f46839"
 		case normalisedSpeed < 0.6:
-			colour = "#f97316"
+			colour = "#ef9744"
+		case normalisedSpeed < 0.7:
+			colour = "#f9b916"
 		case normalisedSpeed < 0.8:
-			colour = "#eab308"
+			colour = "#d0ea08"
+		case normalisedSpeed < 0.8:
+			colour = "#9fea08"
 		default:
 			colour = "#22c55e"
 		}

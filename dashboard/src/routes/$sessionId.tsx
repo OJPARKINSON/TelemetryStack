@@ -48,11 +48,7 @@ export default function SessionPage() {
 		fetcher,
 	);
 
-	const {
-		data: availableLaps,
-		error: error2,
-		isLoading: isLoading2,
-	} = useSWR<Array<number>, Error>(
+	const { data: availableLaps } = useSWR<Array<number>, Error>(
 		`/api/sessions/${sessionId}/laps`,
 		lapsFetcher,
 	);

@@ -169,7 +169,7 @@ const ProfessionalTelemetryCharts = React.memo(
 		);
 
 		// Memoize tooltip component
-		const CustomTooltip = useCallback(({ active, payload, label }: any) => {
+		const CustomTooltip = useCallback(({ active, payload }: any) => {
 			if (active && payload && payload.length) {
 				const dataPoint = payload[0].payload as TelemetryDataPoint & {
 					lapDistance?: number;
