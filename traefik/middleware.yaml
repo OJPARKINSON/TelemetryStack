@@ -5,8 +5,6 @@ http:
     security-headers:
       headers:
         customFrameOptionsValue: "SAMEORIGIN"
-        customRequestHeaders:
-          X-Forwarded-Proto: "https"
         customResponseHeaders:
           X-Robots-Tag: "none,noarchive,nosnippet,notranslate,noimageindex"
           X-Frame-Options: "SAMEORIGIN"
@@ -83,3 +81,24 @@ http:
           - local-allowlist
           - security-headers
           - rate-limit
+
+    # Path Prefix Stripping Middlewares
+    rabbitmq-stripprefix:
+      stripPrefix:
+        prefixes:
+          - "/rabbitmq"
+
+    questdb-stripprefix:
+      stripPrefix:
+        prefixes:
+          - "/questdb"
+
+    dashboard-stripprefix:
+      stripPrefix:
+        prefixes:
+          - "/dashboard"
+
+    prometheus-stripprefix:
+      stripPrefix:
+        prefixes:
+          - "/prometheus"

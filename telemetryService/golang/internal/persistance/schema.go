@@ -74,7 +74,7 @@ func (s *Schema) CreateTableHTTP() error {
             WITH maxUncommittedRows=1000000
             DEDUP UPSERT KEYS(timestamp, session_id);
 	`
-	_, err := ExecuteSelectQuery(sql)
+	_, err := ExecuteSelectQuery(sql, s.config)
 	return err
 }
 
@@ -86,7 +86,7 @@ func (s *Schema) AddIndexes() error {
 	}
 
 	for _, idx := range indexes {
-		if _, err := ExecuteSelectQuery(idx); err != nil {
+		if _, err := ExecuteSelectQuery(idx, s.config); err != nil {
 			return fmt.Errorf("failed to create index: %w", err)
 		}
 	}
@@ -94,15 +94,15 @@ func (s *Schema) AddIndexes() error {
 	return nil
 }
 
-func ExecuteSelectQuery(query string) ([]map[string]interface{}, error) {
+func ExecuteSelectQuery(query string, config *config.Config) ([]map[string]interface{}, error) {
 	maxRetries := 3
 	baseDelay := 500 * time.Millisecond
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		resp, err := http.Get(
 			fmt.Sprintf("http://%s:%d/exec?query=%s",
-				"localhost", // s.config.QuestDbHost,
-				9000,        // s.config.QuestDBPort,
+				config.QuestDbHost,
+				config.QuestDBPort,
 				url.QueryEscape(query)),
 		)
 

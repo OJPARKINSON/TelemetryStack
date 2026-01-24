@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: traefik:v3.5
+    image: traefik:latest
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -37,11 +37,11 @@ services:
     labels:
       - "traefik.enable=true"
       # Dashboard accessible via both domains with enhanced security
-      - "traefik.http.routers.dashboard-local.rule=(Host(`${LOCAL_DOMAIN:-localhost}`) || Host(`localhost`)) && (PathPrefix(`/api`) || PathPrefix(`/net-dash`))"
-      - "traefik.http.routers.dashboard-local.entrypoints=web,websecure"
+      - "traefik.http.routers.dashboard-local.rule=(Host(`${LOCAL_DOMAIN:-localhost}`) || Host(`localhost`)) && PathPrefix(`/net-dash`)"
+      - "traefik.http.routers.dashboard-local.entrypoints=web"
       - "traefik.http.routers.dashboard-local.service=api@internal"
       - "traefik.http.routers.dashboard-local.middlewares=dashboard-auth,secure-dashboard@file"
-      - "traefik.http.routers.dashboard-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/net-dash`))"
+      - "traefik.http.routers.dashboard-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/net-dash`)"
       - "traefik.http.routers.dashboard-tailscale.entrypoints=websecure"
       - "traefik.http.routers.dashboard-tailscale.service=api@internal"
       - "traefik.http.routers.dashboard-tailscale.tls=true"
@@ -87,15 +87,13 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.rabbitmq-local.rule=(Host(`${LOCAL_DOMAIN}`) || Host(`localhost`)) && PathPrefix(`/rabbitmq`)"
-      - "traefik.http.routers.rabbitmq-local.entrypoints=web,websecure"
-      - "traefik.http.routers.rabbitmq-local.middlewares=rabbitmq-stripprefix,secure-management@file"
+      - "traefik.http.routers.rabbitmq-local.entrypoints=web"
+      - "traefik.http.routers.rabbitmq-local.middlewares=rabbitmq-stripprefix@file,secure-management@file"
       - "traefik.http.routers.rabbitmq-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/rabbitmq`)"
       - "traefik.http.routers.rabbitmq-tailscale.entrypoints=websecure"
       - "traefik.http.routers.rabbitmq-tailscale.tls=true"
       - "traefik.http.routers.rabbitmq-tailscale.tls.certresolver=tailscale"
-      - "traefik.http.routers.rabbitmq-tailscale.middlewares=rabbitmq-stripprefix,secure-management@file"
-      - "traefik.http.middlewares.rabbitmq-stripprefix.stripprefix.prefixes=/rabbitmq"
-      - "traefik.http.services.rabbitmq.loadbalancer.server.port=5672"
+      - "traefik.http.routers.rabbitmq-tailscale.middlewares=rabbitmq-stripprefix@file,secure-management@file"
       - "traefik.http.services.rabbitmq.loadbalancer.server.port=15672"
 
   questdb:
@@ -109,35 +107,38 @@ services:
       - "9003:9003"
     volumes:
       - questdb-data:/var/lib/questdb
+      - ./config/questdb.conf:/root/.questdb/conf/server.conf:ro
     environment:
-      JAVA_OPTS: "-Xmx2g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=100"
+      JAVA_OPTS: "-Xmx2g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:G1ReservePercent=20"
+      QDB_SHARED_WORKER_COUNT: "2"
       QDB_HTTP_ENABLED: "true"
-      QDB_PG_ENABLED: "true"
+      QDB_PG_ENABLED: "false"
       QDB_METRICS_ENABLED: "true"
       QDB_LINE_TCP_ENABLED: "true"
       QDB_CAIRO_WAL_ENABLED_DEFAULT: "true"
+      QDB_CAIRO_COMMIT_LAG: "120000"
+      QDB_CAIRO_MAX_UNCOMMITTED_ROWS: "50000"
     networks:
       - telemetry-network
     deploy:
       resources:
         limits:
-          cpus: '2.0'
+          cpus: '1.5'
           memory: 3g
         reservations:
-          cpus: '1.0'
-          memory: 1g
+          cpus: '0.25'
+          memory: 512m
     labels:
       - "traefik.enable=true"
       # QuestDB API routes (no web UI, direct API access)
       - "traefik.http.routers.questdb-local.rule=(Host(`${LOCAL_DOMAIN}`) || Host(`localhost`)) && PathPrefix(`/questdb`)"
-      - "traefik.http.routers.questdb-local.entrypoints=web,websecure"
-      - "traefik.http.routers.questdb-local.middlewares=questdb-stripprefix"
+      - "traefik.http.routers.questdb-local.entrypoints=web"
+      - "traefik.http.routers.questdb-local.middlewares=questdb-stripprefix@file"
       - "traefik.http.routers.questdb-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/questdb`)"
       - "traefik.http.routers.questdb-tailscale.entrypoints=websecure"
       - "traefik.http.routers.questdb-tailscale.tls=true"
       - "traefik.http.routers.questdb-tailscale.tls.certresolver=tailscale"
-      - "traefik.http.routers.questdb-tailscale.middlewares=questdb-stripprefix"
-      - "traefik.http.middlewares.questdb-stripprefix.stripprefix.prefixes=/questdb"
+      - "traefik.http.routers.questdb-tailscale.middlewares=questdb-stripprefix@file"
       - "traefik.http.services.questdb.loadbalancer.server.port=9000"
 
   telemetry-service:
@@ -168,40 +169,20 @@ services:
         reservations:
           cpus: '0.25'
           memory: 1g
-
-  # telemetry-service:
-  #   build:
-  #     context: ./telemetryService/telemetryService
-  #     dockerfile: Dockerfile.Worker
-  #   container_name: telemetry-service
-  #   restart: unless-stopped
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #   networks:
-  #     - telemetry-network
-  #   environment:
-  #     QUESTDB_HTTP_HOST: ${QUESTDB_HOST:-questdb}
-  #     QUESTDB_HTTP_PORT: ${QUESTDB_HTTP_PORT:-9000}
-
-  #     RABBITMQ_URL: ${RABBITMQ_URL}
-
-  #     DOTNET_ENVIRONMENT: Production
-  #     ASPNETCORE_URLS: http://+:5000
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '1.25' # 1 core for telemetry processing
-  #         memory: 8g # Much more memory for high-volume telemetry processing
-  #       reservations:
-  #         cpus: '0.25' # Minimum guaranteed resources
-  #         memory: 1g
-  #   healthcheck:
-  #     test: [ "CMD-SHELL", "ps aux | grep '[d]otnet TelemetryService.Worker.dll' || exit 1" ]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      # API routes for local access
+      - "traefik.http.routers.telemetry-api-local.rule=(Host(`${LOCAL_DOMAIN:-localhost}`) || Host(`localhost`)) && PathPrefix(`/api`)"
+      - "traefik.http.routers.telemetry-api-local.entrypoints=web"
+      - "traefik.http.routers.telemetry-api-local.middlewares=api-security@file"
+      # API routes for Tailscale access
+      - "traefik.http.routers.telemetry-api-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.telemetry-api-tailscale.entrypoints=websecure"
+      - "traefik.http.routers.telemetry-api-tailscale.tls=true"
+      - "traefik.http.routers.telemetry-api-tailscale.tls.certresolver=tailscale"
+      - "traefik.http.routers.telemetry-api-tailscale.middlewares=api-security@file"
+      # Service configuration
+      - "traefik.http.services.telemetry-service.loadbalancer.server.port=8010"
 
   telemetry-dashboard:
     build:
@@ -209,17 +190,6 @@ services:
       dockerfile: Dockerfile
     container_name: telemetry-dashboard
     restart: unless-stopped
-    environment:
-      QUESTDB_HOST: ${QUESTDB_HOST:-questdb}
-      QUESTDB_PORT: ${QUESTDB_PG_PORT:-8812}
-      QUESTDB_DATABASE: ${QUESTDB_DATABASE:-qdb}
-      QUESTDB_USER: ${QUESTDB_USER:-admin}
-      QUESTDB_PASSWORD: ${QUESTDB_PASSWORD:-quest}
-
-      NODE_OPTIONS: "--max-old-space-size=768 --max-semi-space-size=128"
-
-      NEXT_PUBLIC_APP_URL: http://${LOCAL_DOMAIN:-localhost}/dashboard
-      NEXT_PUBLIC_BACKEND_URL: http://${LOCAL_DOMAIN:-localhost}/dashboard/api
     networks:
       - telemetry-network
     deploy:
@@ -227,36 +197,21 @@ services:
         limits:
           cpus: '1.0'
           memory: 1g
-    healthcheck:
-      test: [ "CMD-SHELL", "wget --quiet --tries=1 --spider http://0.0.0.0:3000/dashboard || exit 1" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+    environment:
+      API_URL: ${API_URL}
     labels:
       - "traefik.enable=true"
-      # Dashboard main routes
+      # Dashboard routes
       - "traefik.http.routers.telemetry-dashboard-local.rule=(Host(`${LOCAL_DOMAIN:-localhost}`) || Host(`localhost`)) && PathPrefix(`/dashboard`)"
-      - "traefik.http.routers.telemetry-dashboard-local.entrypoints=web,websecure"
-      - "traefik.http.routers.telemetry-dashboard-local.middlewares=default-security@file"
+      - "traefik.http.routers.telemetry-dashboard-local.entrypoints=web"
+      - "traefik.http.routers.telemetry-dashboard-local.middlewares=dashboard-stripprefix@file,default-security@file"
       - "traefik.http.routers.telemetry-dashboard-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/dashboard`)"
       - "traefik.http.routers.telemetry-dashboard-tailscale.entrypoints=websecure"
       - "traefik.http.routers.telemetry-dashboard-tailscale.tls=true"
       - "traefik.http.routers.telemetry-dashboard-tailscale.tls.certresolver=tailscale"
-      - "traefik.http.routers.telemetry-dashboard-tailscale.middlewares=default-security@file"
-      # Static assets routes (higher priority)
-      - "traefik.http.routers.dashboard-static-local.rule=(Host(`${LOCAL_DOMAIN:-localhost}`) || Host(`localhost`)) && PathPrefix(`/_next/static`)"
-      - "traefik.http.routers.dashboard-static-local.entrypoints=web,websecure"
-      - "traefik.http.routers.dashboard-static-local.priority=200"
-      - "traefik.http.routers.dashboard-static-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/_next/static`)"
-      - "traefik.http.routers.dashboard-static-tailscale.entrypoints=websecure"
-      - "traefik.http.routers.dashboard-static-tailscale.tls=true"
-      - "traefik.http.routers.dashboard-static-tailscale.tls.certresolver=tailscale"
-      - "traefik.http.routers.dashboard-static-tailscale.priority=200"
-      # Middlewares and services
-      - "traefik.http.middlewares.dashboard-stripprefix.stripprefix.prefixes=/dashboard"
-      - "traefik.http.services.telemetry-dashboard.loadbalancer.server.port=3000"
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "traefik.http.routers.telemetry-dashboard-tailscale.middlewares=dashboard-stripprefix@file,default-security@file"
+      # Service configuration
+      - "traefik.http.services.telemetry-dashboard.loadbalancer.server.port=80"
 
   grafana:
     image: grafana/grafana:10.4.8
@@ -293,7 +248,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.grafana-local.rule=(Host(`${LOCAL_DOMAIN:-localhost}`) || Host(`localhost`)) && PathPrefix(`/grafana`)"
-      - "traefik.http.routers.grafana-local.entrypoints=web,websecure"
+      - "traefik.http.routers.grafana-local.entrypoints=web"
       - "traefik.http.routers.grafana-local.middlewares=secure-management@file"
       - "traefik.http.routers.grafana-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/grafana`)"
       - "traefik.http.routers.grafana-tailscale.entrypoints=websecure"
@@ -332,14 +287,13 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.prometheus-local.rule=(Host(`${LOCAL_DOMAIN:-localhost}`) || Host(`localhost`)) && PathPrefix(`/prometheus`)"
-      - "traefik.http.routers.prometheus-local.entrypoints=web,websecure"
-      - "traefik.http.routers.prometheus-local.middlewares=prometheus-stripprefix,secure-management@file"
+      - "traefik.http.routers.prometheus-local.entrypoints=web"
+      - "traefik.http.routers.prometheus-local.middlewares=prometheus-stripprefix@file,secure-management@file"
       - "traefik.http.routers.prometheus-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/prometheus`)"
       - "traefik.http.routers.prometheus-tailscale.entrypoints=websecure"
       - "traefik.http.routers.prometheus-tailscale.tls=true"
       - "traefik.http.routers.prometheus-tailscale.tls.certresolver=tailscale"
-      - "traefik.http.routers.prometheus-tailscale.middlewares=prometheus-stripprefix,secure-management@file"
-      - "traefik.http.middlewares.prometheus-stripprefix.stripprefix.prefixes=/prometheus"
+      - "traefik.http.routers.prometheus-tailscale.middlewares=prometheus-stripprefix@file,secure-management@file"
       - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
 
   # Simplified monitoring stack

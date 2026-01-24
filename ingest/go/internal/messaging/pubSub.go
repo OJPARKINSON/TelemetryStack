@@ -430,7 +430,6 @@ func (ps *PubSub) publishWorker() {
 			}
 			req.errCh <- err
 		case <-ps.publishDone:
-			// Drain remaining messages before shutting down
 			for len(ps.publishQueue) > 0 {
 				req := <-ps.publishQueue
 				err := ps.doPublish(req.batch, req.data)

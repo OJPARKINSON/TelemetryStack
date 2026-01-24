@@ -8,6 +8,7 @@ const router = createRouter({
 	routeTree,
 	defaultPreload: "intent",
 	scrollRestoration: true,
+	basepath: "/dashboard",
 });
 
 // Register things for typesafety

@@ -23,6 +23,7 @@ providers:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
     watch: true
+    httpClientTimeout: 0
   
   file:
     directory: /etc/traefik

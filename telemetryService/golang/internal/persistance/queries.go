@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ojparkinson/telemetryService/internal/config"
 	"github.com/ojparkinson/telemetryService/internal/messaging"
 )
 
 type QueryExecutor struct {
+	Config *config.Config
 }
 
 func (s *QueryExecutor) QuerySession(ctx context.Context, sessionID string) ([]map[string]interface{}, error) {
@@ -20,7 +22,7 @@ func (s *QueryExecutor) QuerySession(ctx context.Context, sessionID string) ([]m
 		GROUP BY session_id, track_name, session_name
 		ORDER BY last_updated DESC
 	`
-	return ExecuteSelectQuery(query)
+	return ExecuteSelectQuery(query, s.Config)
 }
 
 func (s *QueryExecutor) QuerySessions(ctx context.Context) ([]map[string]interface{}, error) {
@@ -33,7 +35,7 @@ func (s *QueryExecutor) QuerySessions(ctx context.Context) ([]map[string]interfa
 		GROUP BY session_id, track_name, session_name
 		ORDER BY last_updated DESC
 	`
-	return ExecuteSelectQuery(query)
+	return ExecuteSelectQuery(query, s.Config)
 }
 
 func (s *QueryExecutor) QueryLaps(ctx context.Context, sessionID string) ([]map[string]interface{}, error) {
@@ -44,7 +46,7 @@ func (s *QueryExecutor) QueryLaps(ctx context.Context, sessionID string) ([]map[
 		ORDER BY lap_id ASC
 	`, sessionID)
 
-	return ExecuteSelectQuery(query)
+	return ExecuteSelectQuery(query, s.Config)
 }
 
 func (s *QueryExecutor) QueryLap(ctx context.Context, sessionID string, lapID string) ([]messaging.Telemetry, error) {
@@ -54,7 +56,7 @@ func (s *QueryExecutor) QueryLap(ctx context.Context, sessionID string, lapID st
 		ORDER BY timestamp ASC
 	`, sessionID, lapID)
 
-	rows, err := ExecuteSelectQuery(query)
+	rows, err := ExecuteSelectQuery(query, s.Config)
 	if err != nil {
 		return nil, err
 	}

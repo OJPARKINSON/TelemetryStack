@@ -5,6 +5,7 @@ import { defineConfig } from "vite";
 
 // https://vitejs.dev/config/
 export default defineConfig({
+	base: '/dashboard',
 	plugins: [
 		tailwindcss(),
 		tanstackRouter({ target: "react", autoCodeSplitting: true }),
@@ -14,7 +15,7 @@ export default defineConfig({
 		cors: false,
 		proxy: {
 			"/api": {
-				target: "http://localhost:8010/",
+				target: process.env.API_URL ?? "http://localhost:8010/",
 				changeOrigin: true,
 				secure: false,
 			},

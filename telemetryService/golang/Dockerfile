@@ -20,6 +20,6 @@
 
   USER nonroot:nonroot
 
-  EXPOSE 9092
+  EXPOSE 8010
 
   ENTRYPOINT ["/telemetry-service"]
