@@ -10,7 +10,13 @@ import useSWR from "swr";
 import { InfoBox } from "../components/InfoBox";
 import { Card } from "../components/ui/card";
 // biome-ignore lint/suspicious/noShadowRestrictedNames: <explanation>
-import { Map, MapControls, MapRoute, useMap } from "../components/ui/map";
+import {
+	Map as MAPS,
+	MapControls,
+	MapPopup,
+	MapRoute,
+	useMap,
+} from "../components/ui/map";
 import { useTrackPosition } from "../hooks/useTrackPosition";
 import { fetcher, type TelemetryRes } from "../lib/Fetch";
 import type { TelemetryDataPoint } from "../lib/types";
@@ -63,21 +69,38 @@ export default function TelemetryPage({
 		};
 	}, [dataWithGPSCoordinates, sessionId]);
 
-	const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	// Throttle hover updates for better performance
+	const lastHoverUpdateRef = useRef<number>(0);
+	const hoverFrameRef = useRef<number | null>(null);
 
-	const handleChartHover = useCallback(() => {
-		if (hoverTimeoutRef.current) {
-			clearTimeout(hoverTimeoutRef.current);
-		}
-	}, []);
+	const handleChartHover = useCallback(
+		(index: number) => {
+			// Cancel any pending frame
+			if (hoverFrameRef.current) {
+				cancelAnimationFrame(hoverFrameRef.current);
+			}
+
+			// Throttle to ~60fps (16ms) for smooth updates without overwhelming the system
+			const now = performance.now();
+			const timeSinceLastUpdate = now - lastHoverUpdateRef.current;
+
+			if (timeSinceLastUpdate >= 16) {
+				handlePointSelection(index);
+				lastHoverUpdateRef.current = now;
+			} else {
+				// Schedule the update for the next frame
+				hoverFrameRef.current = requestAnimationFrame(() => {
+					handlePointSelection(index);
+					lastHoverUpdateRef.current = performance.now();
+				});
+			}
+		},
+		[handlePointSelection],
+	);
 
 	const handleChartClick = useCallback(
 		(index: number) => {
-			// Clear any pending hover timeouts on click
-			if (hoverTimeoutRef.current) {
-				clearTimeout(hoverTimeoutRef.current);
-			}
-
+			// Update selection on click
 			handlePointSelection(index);
 			setIsScrubbing(true);
 			setTimeout(() => setIsScrubbing(false), 300);
@@ -86,17 +109,17 @@ export default function TelemetryPage({
 	);
 
 	const handleChartMouseLeave = useCallback(() => {
-		// Clear any pending hover timeouts
-		if (hoverTimeoutRef.current) {
-			clearTimeout(hoverTimeoutRef.current);
+		// Cancel any pending hover frame on mouse leave
+		if (hoverFrameRef.current) {
+			cancelAnimationFrame(hoverFrameRef.current);
 		}
 	}, []);
 
-	// Cleanup timeouts on unmount
+	// Cleanup animation frames on unmount
 	useEffect(() => {
 		return () => {
-			if (hoverTimeoutRef.current) {
-				clearTimeout(hoverTimeoutRef.current);
+			if (hoverFrameRef.current) {
+				cancelAnimationFrame(hoverFrameRef.current);
 			}
 		};
 	}, []);
@@ -106,6 +129,21 @@ export default function TelemetryPage({
 		return dataWithGPSCoordinates as TelemetryDataPoint[];
 	}, [dataWithGPSCoordinates]);
 
+	// Memoize the selected point data to prevent popup recalculations
+	const selectedPointData = useMemo(() => {
+		if (!dataWithGPSCoordinates[selectedIndex]) return null;
+		const point = dataWithGPSCoordinates[selectedIndex];
+		return {
+			lon: point.Lon,
+			lat: point.Lat,
+			speed: point.Speed?.toFixed(1),
+			throttle: point.Throttle?.toFixed(0),
+			brake: point.Brake?.toFixed(0),
+			gear: point.Gear,
+			rpm: point.RPM?.toFixed(0),
+		};
+	}, [dataWithGPSCoordinates, selectedIndex]);
+
 	const handleLapChange = (newLapId: string) => {
 		nav({ to: ".", search: () => ({ lapId: newLapId }) });
 	};
@@ -113,14 +151,14 @@ export default function TelemetryPage({
 	return (
 		<div className="flex min-h-screen min-w-screen bg-zinc-950">
 			{/* Sidebar */}
-			<div className="flex w-64 flex-col border-zinc-800/50 border-r bg-zinc-900/50">
+			<div className="flex w-32 flex-col border-zinc-800/50 border-r bg-zinc-900/50">
 				{/* Logo/Brand */}
 				<div className="px-6 py-6">
 					<Link to="/" className="cursor-pointer">
+						<div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white">
+							<div className="h-4 w-4 rounded bg-zinc-900" />
+						</div>
 						<div className="flex items-center space-x-3">
-							<div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white">
-								<div className="h-4 w-4 rounded bg-zinc-900" />
-							</div>
 							<div>
 								<h1 className="font-semibold text-sm text-white">iRacing</h1>
 								<p className="text-xs text-zinc-400">Telemetry</p>
@@ -163,24 +201,24 @@ export default function TelemetryPage({
 			</div>
 
 			<div className="flex flex-1 flex-col">
-				<main className="flex-1 space-y-6 p-6">
+				<main className="flex-1 space-y-6 pt-0 p-6">
 					{dataWithGPSCoordinates.length > 0 && (
 						<div className="rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-4">
-							<div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+							<div className="grid grid-cols-2 md:grid-cols-4">
 								<div className="text-center">
-									<div className="mb-1 text-xs text-zinc-500">Track</div>
+									<div className="text-xs text-zinc-500">Track</div>
 									<div className="font-semibold text-lg text-white">
 										{trackInfo?.trackName || "Unknown"}
 									</div>
 								</div>
 								<div className="text-center">
-									<div className="mb-1 text-xs text-zinc-500">GPS Points</div>
+									<div className="text-xs text-zinc-500">GPS Points</div>
 									<div className="font-semibold text-green-400 text-lg">
 										{dataWithGPSCoordinates.length.toLocaleString()}
 									</div>
 								</div>
 								<div className="text-center">
-									<div className="mb-1 text-xs text-zinc-500">Max Speed</div>
+									<div className="text-xs text-zinc-500">Max Speed</div>
 									<div className="font-semibold text-lg text-yellow-400">
 										{Math.max(
 											...dataWithGPSCoordinates.map((p) => p.Speed || 0),
@@ -189,7 +227,7 @@ export default function TelemetryPage({
 									</div>
 								</div>
 								<div className="text-center">
-									<div className="mb-1 text-xs text-zinc-500">Lap time</div>
+									<div className="text-xs text-zinc-500">Lap time</div>
 									<div className="font-semibold text-blue-400 text-lg">
 										{trackInfo?.lapTime
 											? formatTime(trackInfo?.lapTime)
@@ -202,13 +240,12 @@ export default function TelemetryPage({
 
 					<div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
 						<div className="col-span-1 rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-6 lg:col-span-3">
-							<Card className="h-full w-full overflow-hidden p-0">
+							<Card className="h-[42vw] w-full overflow-hidden p-0">
 								{dataWithGPSCoordinates[0].Lon !== undefined && (
-									<Map
+									<MAPS
 										center={[
-											dataWithGPSCoordinates[0].Lon,
-											dataWithGPSCoordinates[dataWithGPSCoordinates.length / 2]
-												.Lat,
+											dataWithGPSCoordinates[0]?.Lon,
+											dataWithGPSCoordinates[0]?.Lat,
 										]}
 										styles={{
 											light: {
@@ -242,14 +279,37 @@ export default function TelemetryPage({
 											width={0.5}
 											opacity={0}
 										/>
-										<RacingLine dataWithGPSCoordinates={data} />
+										<MemoizedRacingLine dataWithGPSCoordinates={data} />
 										<MapControls
 											showZoom
 											showCompass
 											showLocate
 											showFullscreen
 										/>
-									</Map>
+										{selectedPointData && (
+											<MapPopup
+												longitude={selectedPointData.lon}
+												latitude={selectedPointData.lat}
+												onClose={() => {}}
+												closeButton={false}
+												focusAfterOpen={false}
+												closeOnClick={false}
+												className="w-62"
+											>
+												<div className="text-xs">
+													<div className="mb-1 font-semibold text-black">
+														Speed: {selectedPointData.speed} km/h
+													</div>
+													<div className="space-y-0.5 text-black">
+														<div>Throttle: {selectedPointData.throttle}%</div>
+														<div>Brake: {selectedPointData.brake}%</div>
+														<div>Gear: {selectedPointData.gear}</div>
+														<div>RPM: {selectedPointData.rpm}</div>
+													</div>
+												</div>
+											</MapPopup>
+										)}
+									</MAPS>
 								)}
 							</Card>
 						</div>
@@ -305,37 +365,55 @@ function RacingLine({
 	dataWithGPSCoordinates: any;
 }) {
 	const { map } = useMap();
+	const hasAddedLayerRef = useRef(false);
 
-	if (!map || !dataWithGPSCoordinates?.features) return;
+	// Initial setup - runs ONCE
+	useEffect(() => {
+		if (!map || !dataWithGPSCoordinates?.features || hasAddedLayerRef.current) {
+			return;
+		}
 
-	// Add source with the entire GeoJSON
-	if (!map.getSource("racing-line")) {
-		map.addSource("racing-line", {
-			type: "geojson",
-			data: dataWithGPSCoordinates,
-		});
-	}
+		if (!map.getSource("racing-line")) {
+			map.addSource("racing-line", {
+				type: "geojson",
+				data: dataWithGPSCoordinates,
+			});
+		}
 
-	// Add layer with color from properties
-	if (!map.getLayer("racing-line-layer")) {
-		map.addLayer({
-			id: "racing-line-layer",
-			type: "line",
-			source: "racing-line",
-			paint: {
-				"line-color": ["get", "color"], // ← Use color from properties
-				"line-width": 4,
-				"line-opacity": 1,
-			},
-			layout: {
-				"line-cap": "round",
-				"line-join": "round",
-			},
-		});
-	}
+		if (!map.getLayer("racing-line-layer")) {
+			map.addLayer({
+				id: "racing-line-layer",
+				type: "line",
+				source: "racing-line",
+				paint: {
+					"line-color": ["get", "color"], // ← Use color from properties
+					"line-width": 4,
+					"line-opacity": 1,
+				},
+				layout: {
+					"line-cap": "round",
+					"line-join": "round",
+				},
+			});
+			hasAddedLayerRef.current = true;
+		}
+	}, [map, dataWithGPSCoordinates]);
 
-	return <></>;
+	// Update data when it changes
+	useEffect(() => {
+		if (!map || !dataWithGPSCoordinates?.features) return;
+
+		const source = map.getSource("racing-line") as any;
+		if (source?.setData) {
+			source.setData(dataWithGPSCoordinates);
+		}
+	}, [map, dataWithGPSCoordinates]);
+
+	return null;
 }
+
+// Wrap in React.memo to prevent unnecessary re-renders
+const MemoizedRacingLine = React.memo(RacingLine);
 function GPSAnalysisPanel({ data }: { data: any[] }) {
 	const totalDistance = data.reduce(
 		(sum, point) => sum + (point.distanceFromPrev || 0),

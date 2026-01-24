@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useMemo, useRef } from "react";
 import {
 	CartesianGrid,
 	Line,
@@ -58,18 +58,8 @@ const ProfessionalTelemetryCharts = React.memo(
 			return { sampledData, originalToSampledIndex };
 		}, [telemetryData]);
 
-		// Throttle hover events for better performance
-		const throttledHoverRef = useRef<number | null>(null);
+		// Track last hover index to prevent duplicate calls
 		const lastHoverIndex = useRef<number>(-1);
-
-		// Cleanup throttled events on unmount
-		useEffect(() => {
-			return () => {
-				if (throttledHoverRef.current) {
-					cancelAnimationFrame(throttledHoverRef.current);
-				}
-			};
-		}, []);
 
 		const handleMouseMove = useCallback(
 			(data: any) => {
@@ -84,14 +74,9 @@ const ProfessionalTelemetryCharts = React.memo(
 					// Skip if same index to prevent unnecessary updates
 					if (lastHoverIndex.current === originalIndex) return;
 
-					// Throttle hover events to 30fps (33ms) for better performance
-					if (throttledHoverRef.current) {
-						cancelAnimationFrame(throttledHoverRef.current);
-					}
-					throttledHoverRef.current = requestAnimationFrame(() => {
-						lastHoverIndex.current = originalIndex;
-						onHover(originalIndex);
-					});
+					lastHoverIndex.current = originalIndex;
+					// Parent component handles throttling, so call immediately
+					onHover(originalIndex);
 				}
 			},
 			[onHover, chartData.sampledData],
@@ -214,13 +199,13 @@ const ProfessionalTelemetryCharts = React.memo(
 		return (
 			// biome-ignore lint/a11y/noStaticElementInteractions: na
 			<div className="flex flex-col space-y-3" onMouseLeave={onMouseLeave}>
-				<div className="mb-2 font-medium text-sm text-white">
+				<div className="mb-1 font-medium text-sm text-white">
 					Telemetry Data
 				</div>
 
 				{chartConfigs.map((config) => (
-					<div key={config.dataKey} className="rounded-lg bg-zinc-900/30 p-3">
-						<div className="mb-2 flex items-center justify-between">
+					<div key={config.dataKey} className="rounded-lg bg-zinc-900/30 px-3">
+						<div className="flex items-center justify-between">
 							<span className="font-medium text-xs text-zinc-300">
 								{config.title}
 							</span>

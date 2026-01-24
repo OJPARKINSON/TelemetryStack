@@ -5,8 +5,10 @@ import type { TelemetryDataPoint } from "../lib/types";
  * Custom hook to manage track position synchronization with chart
  */
 export function useTrackPosition(telemetryData: TelemetryDataPoint[]) {
-	const [selectedIndex, setSelectedIndex] = useState<number>(0);
-	const [selectedLapPct, setSelectedLapPct] = useState<number>(0);
+	const [selectedPosition, setSelectedPosition] = useState<{
+		index: number;
+		lapPct: number;
+	}>({ index: 0, lapPct: 0 });
 
 	// Cache for expensive lookups
 	const lookupCacheRef = useRef<Map<number, TelemetryDataPoint>>(new Map());
@@ -33,9 +35,11 @@ export function useTrackPosition(telemetryData: TelemetryDataPoint[]) {
 			}
 
 			const clickedPoint = telemetryData[index];
-			setSelectedIndex(index);
-
-			setSelectedLapPct(clickedPoint.LapDistPct);
+			// Single state update - prevents render thrashing
+			setSelectedPosition({
+				index,
+				lapPct: clickedPoint.LapDistPct,
+			});
 		},
 		[telemetryData],
 	);
@@ -51,7 +55,7 @@ export function useTrackPosition(telemetryData: TelemetryDataPoint[]) {
 		}
 
 		// Check cache first
-		const cacheKey = Math.floor(selectedLapPct * 1000); // Round to 3 decimal places for caching
+		const cacheKey = Math.floor(selectedPosition.lapPct * 1000); // Round to 3 decimal places for caching
 		if (lookupCacheRef.current.has(cacheKey)) {
 			return lookupCacheRef.current.get(cacheKey);
 		}
@@ -60,12 +64,14 @@ export function useTrackPosition(telemetryData: TelemetryDataPoint[]) {
 		let left = 0;
 		let right = sortedData.length - 1;
 		let bestPoint = sortedData[0];
-		let minDistance = Math.abs(sortedData[0].LapDistPct - selectedLapPct);
+		let minDistance = Math.abs(
+			sortedData[0].LapDistPct - selectedPosition.lapPct,
+		);
 
 		while (left <= right) {
 			const mid = Math.floor((left + right) / 2);
 			const point = sortedData[mid];
-			const distance = Math.abs(point.LapDistPct - selectedLapPct);
+			const distance = Math.abs(point.LapDistPct - selectedPosition.lapPct);
 			const wrappedDistance = Math.min(distance, 100 - distance);
 
 			if (wrappedDistance < minDistance) {
@@ -73,7 +79,7 @@ export function useTrackPosition(telemetryData: TelemetryDataPoint[]) {
 				bestPoint = point;
 			}
 
-			if (point.LapDistPct < selectedLapPct) {
+			if (point.LapDistPct < selectedPosition.lapPct) {
 				left = mid + 1;
 			} else {
 				right = mid - 1;
@@ -90,11 +96,11 @@ export function useTrackPosition(telemetryData: TelemetryDataPoint[]) {
 		}
 
 		return bestPoint;
-	}, [sortedData, selectedLapPct]);
+	}, [sortedData, selectedPosition.lapPct]);
 
 	return {
-		selectedIndex,
-		selectedLapPct,
+		selectedIndex: selectedPosition.index,
+		selectedLapPct: selectedPosition.lapPct,
 		handlePointSelection,
 		getTrackDisplayPoint,
 	};
