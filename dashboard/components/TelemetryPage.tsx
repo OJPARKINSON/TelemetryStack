@@ -151,7 +151,7 @@ export default function TelemetryPage({
 	return (
 		<div className="flex min-h-screen min-w-screen bg-zinc-950">
 			{/* Sidebar */}
-			<div className="flex w-32 flex-col border-zinc-800/50 border-r bg-zinc-900/50">
+			<div className="flex w-48 flex-col border-zinc-800/50 border-r bg-zinc-900/50">
 				{/* Logo/Brand */}
 				<div className="px-6 py-6">
 					<Link to="/" className="cursor-pointer">
@@ -201,7 +201,7 @@ export default function TelemetryPage({
 			</div>
 
 			<div className="flex flex-1 flex-col">
-				<main className="flex-1 space-y-6 pt-0 p-6">
+				<main className="flex-1 space-y-6 p-6 pt-0">
 					{dataWithGPSCoordinates.length > 0 && (
 						<div className="rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-4">
 							<div className="grid grid-cols-2 md:grid-cols-4">
