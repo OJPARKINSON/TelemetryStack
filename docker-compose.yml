@@ -142,7 +142,7 @@ services:
       - "traefik.http.services.questdb.loadbalancer.server.port=9000"
 
   telemetry-service:
-    image: ghcr.io/ojparkinson/iracing-telemetryservice
+    image: ghcr.io/ojparkinson/iracing-telemetryservice:latest
     restart: unless-stopped
     ports:
       - "9092:9092"  # Prometheus metrics
@@ -182,7 +182,7 @@ services:
       - "traefik.http.services.telemetry-service.loadbalancer.server.port=8010"
 
   telemetry-dashboard:
-    image: ghcr.io/ojparkinson/iracing-display
+    image: ghcr.io/ojparkinson/iracing-display:latest
     restart: unless-stopped
     networks:
       - telemetry-network
