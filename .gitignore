@@ -68,7 +68,6 @@ acme.json
 *.blk
 *.db
 *.influxdb
-*.sum
 *.inf
 **/bin
 *.ibt
