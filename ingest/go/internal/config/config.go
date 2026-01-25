@@ -70,7 +70,7 @@ func LoadConfig() *Config {
 		RetryDelay:     getEnvAsDuration("RETRY_DELAY", 250*time.Millisecond),
 
 		DisableRabbitMQ: getEnvAsBool("DISABLE_RABBITMQ", false),
-		RabbitMQURL:     getEnv("RABBITMQ_URL", "amqp://admin:changeme@192.168.178.187:5672"),
+		RabbitMQURL:     getEnv("RABBITMQ_URL", "amqp://admin:changeme@localhost:5672"),
 
 		FileAgeThreshold:   getEnvAsDuration("FILE_AGE_THRESHOLD", 30*time.Second),
 		FileProcessTimeout: getEnvAsDuration("FILE_PROCESS_TIMEOUT", 10*time.Minute),

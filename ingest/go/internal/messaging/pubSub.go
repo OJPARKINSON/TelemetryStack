@@ -25,6 +25,11 @@ type ConnectionPool struct {
 	closing     atomic.Bool
 }
 
+var (
+	activePublishers  sync.WaitGroup
+	publisherShutdown atomic.Bool
+)
+
 func NewConnectionPool(url string, poolSize int) (*ConnectionPool, error) {
 	pool := &ConnectionPool{
 		connections: make([]*amqp.Connection, poolSize),
@@ -78,7 +83,11 @@ func (p *ConnectionPool) GetChannel() *amqp.Channel {
 
 	// Check if channel is still open
 	if ch == nil || ch.IsClosed() {
-		log.Printf("Channel %d is closed, attempting to recreate", idx)
+		if p.closing.Load() {
+			log.Printf("Channel %d is closed during pool shutdown", idx)
+		} else {
+			log.Printf("Channel %d is closed, attempting to recreate", idx)
+		}
 		return nil
 	}
 
@@ -86,9 +95,9 @@ func (p *ConnectionPool) GetChannel() *amqp.Channel {
 }
 
 func (p *ConnectionPool) Close() {
-	p.closing.Store(true)
-
 	time.Sleep(500 * time.Millisecond)
+
+	p.closing.Store(true)
 
 	for i := 0; i < len(p.channels); i++ {
 		if p.channels[i] != nil {
@@ -190,6 +199,7 @@ func NewPubSub(sessionId string, sessionTime time.Time, cfg *config.Config, pool
 	ps.recordBatch = make([]*Telemetry, 0, cfg.BatchSizeRecords)
 
 	// Start async publisher goroutine
+	activePublishers.Add(1)
 	ps.publishWg.Add(1)
 	go ps.publishWorker()
 
@@ -415,6 +425,7 @@ func (ps *PubSub) transformRecord(record map[string]interface{}) *Telemetry {
 // publishWorker runs in background goroutine to handle async publishing
 func (ps *PubSub) publishWorker() {
 	defer ps.publishWg.Done()
+	defer activePublishers.Done()
 	log.Printf("Worker %d: publishWorker goroutine started for session %s", ps.workerID, ps.sessionID)
 
 	for {
@@ -430,6 +441,7 @@ func (ps *PubSub) publishWorker() {
 			}
 			req.errCh <- err
 		case <-ps.publishDone:
+			log.Printf("Worker %d: Draining %d remaining batches from queue", ps.workerID, len(ps.publishQueue))
 			for len(ps.publishQueue) > 0 {
 				req := <-ps.publishQueue
 				err := ps.doPublish(req.batch, req.data)
@@ -446,7 +458,11 @@ func (ps *PubSub) publishWorker() {
 
 // doPublish performs the actual RabbitMQ publish operation
 func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte) error {
-	// Check circuit breaker - if open, skip RabbitMQ and go straight to persistence
+	maxRetries := 3
+	if ps.isShuttingDown.Load() {
+		maxRetries = 1
+	}
+
 	if ps.shouldSkipRabbitMQ() {
 		log.Printf("Worker %d: Circuit breaker open, persisting batch %s directly", ps.workerID, batch.BatchId)
 		if persistErr := ps.persistBatch(data, batch.BatchId); persistErr != nil {
@@ -455,15 +471,18 @@ func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte) error {
 		return nil
 	}
 
-	// During shutdown, only try once with no retries to avoid delays
-	maxRetries := 3
-	if ps.isShuttingDown.Load() {
-		maxRetries = 1
-	}
-
 	for retry := 0; retry < maxRetries; retry++ {
 		ch := ps.pool.GetChannel()
 		if ch == nil {
+			// During shutdown, channels should still be available until all publishers finish
+			if ps.isShuttingDown.Load() {
+				// This shouldn't happen anymore since we wait for all publishers
+				log.Printf("Worker %d: ERROR - channel unavailable during shutdown for batch %s",
+					ps.workerID, batch.BatchId)
+				return fmt.Errorf("channel unavailable during shutdown")
+			}
+
+			// Normal operation - retry
 			if retry < maxRetries-1 {
 				time.Sleep(time.Duration(retry+1) * 100 * time.Millisecond)
 				continue
@@ -655,4 +674,11 @@ func (ps *PubSub) GetDisplayMetrics() map[string]interface{} {
 		"circuit_breaker": ps.circuitBreakerOpen,
 		"failed_batches":  ps.failedBatchCount,
 	}
+}
+
+func WaitForAllPublishers() {
+	publisherShutdown.Store(true)
+	log.Println("Waiting for all publishers to finish draining...")
+	activePublishers.Wait() // Wait indefinitely until all done
+	log.Println("All publishers finished draining")
 }

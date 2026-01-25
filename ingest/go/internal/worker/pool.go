@@ -13,7 +13,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Helper to convert os.FileInfo to os.DirEntry for retry logic
 type dirEntryFromFileInfo struct {
 	os.FileInfo
 }
@@ -164,26 +163,31 @@ func (wp *WorkerPool) SubmitFile(item WorkItem) error {
 }
 
 func (wp *WorkerPool) Stop() error {
-	// First close the file queue to prevent new work
-	close(wp.fileQueue)
+	wp.logger.Info("Starting graceful shutdown")
 
-	// Give workers a chance to finish current files and flush data
+	close(wp.fileQueue)
+	wp.logger.Info("File queue closed, waiting for workers to finish current files")
+
 	time.Sleep(6 * time.Second)
 
 	// Now cancel the context for any remaining operations
 	wp.cancel()
 	err := wp.eg.Wait()
 
-	time.Sleep(1 * time.Second)
+	wp.logger.Info("All workers stopped, waiting for async publishers to drain queues")
+
+	// Wait indefinitely for all publishers - ensures no data loss
+	messaging.WaitForAllPublishers()
+	wp.logger.Info("All publishers finished draining")
 
 	if wp.rabbitPool != nil {
+		wp.logger.Info("Closing RabbitMQ connection pool")
 		wp.rabbitPool.Close()
 	}
 
 	close(wp.resultsChan)
 	close(wp.errorsChan)
 
-	// Stop progress display
 	if wp.progressDisplay != nil {
 		wp.progressDisplay.Stop()
 	}
