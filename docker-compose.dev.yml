@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: traefik:v3.5
+    image: traefik:latest
     restart: unless-stopped
     ports:
       - "8080:80"
@@ -31,7 +31,7 @@ services:
       - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
 
   rabbitmq:
-    image: dhi.io/rabbitmq:4.1
+    image: rabbitmq:4.0-management
     container_name: rabbitmq
     restart: unless-stopped
     ports:
@@ -79,12 +79,15 @@ services:
     volumes:
       - questdb-data:/var/lib/questdb
     environment:
-      JAVA_OPTS: "-Xmx2g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=100"
+      JAVA_OPTS: "-Xmx2g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:G1ReservePercent=20"
+      QDB_SHARED_WORKER_COUNT: "5"
       QDB_HTTP_ENABLED: "true"
-      QDB_PG_ENABLED: "true"
+      QDB_PG_ENABLED: "false"
       QDB_LINE_TCP_ENABLED: "true"
       QDB_METRICS_ENABLED: "true"
       QDB_CAIRO_WAL_ENABLED_DEFAULT: "true"
+      QDB_CAIRO_COMMIT_LAG: "120000"
+      QDB_CAIRO_MAX_UNCOMMITTED_ROWS: "50000"
     networks:
       - telemetry-network
     labels:
@@ -158,14 +161,6 @@ services:
         condition: service_healthy
       questdb:
         condition: service_started
-    deploy:
-      resources:
-        limits:
-          cpus: '6.0'       # Half of 12 cores
-          memory: 12g        # More headroom
-        reservations:
-          cpus: '2.0'
-          memory: 4g
 
   telemetry-dashboard:
     build:
@@ -176,6 +171,7 @@ services:
     ports:
       - "3000:3000" 
     environment:
+      API_URL: "http://localhost:8010/"
       QUESTDB_URL: postgresql://admin:quest@questdb:8812/qdb
       QUESTDB_HOST: questdb
       QUESTDB_PORT: 8812
