@@ -13,8 +13,11 @@ import { Card } from "../components/ui/card";
 import {
 	Map as MAPS,
 	MapControls,
-	MapPopup,
+	MapMarker,
 	MapRoute,
+	MarkerContent,
+	MarkerPopup,
+	MarkerTooltip,
 	useMap,
 } from "../components/ui/map";
 import { useTrackPosition } from "../hooks/useTrackPosition";
@@ -22,7 +25,7 @@ import { fetcher, type TelemetryRes } from "../lib/Fetch";
 import type { TelemetryDataPoint } from "../lib/types";
 
 const ProfessionalTelemetryCharts = React.lazy(
-	() => import("./ProfessionalTelemetryCharts"),
+	() => import("./TelemetryCharts"),
 );
 
 interface TelemetryPageProps {
@@ -287,27 +290,27 @@ export default function TelemetryPage({
 											showFullscreen
 										/>
 										{selectedPointData && (
-											<MapPopup
+											<MapMarker
+												key={selectedPointData.brake}
 												longitude={selectedPointData.lon}
 												latitude={selectedPointData.lat}
-												onClose={() => {}}
-												closeButton={false}
-												focusAfterOpen={false}
-												closeOnClick={false}
-												className="w-62"
 											>
-												<div className="text-xs">
-													<div className="mb-1 font-semibold text-black">
-														Speed: {selectedPointData.speed} km/h
+												<MarkerContent>
+													<div className="size-4 rounded-full border-2 border-white bg-primary shadow-lg" />
+												</MarkerContent>
+												<MarkerTooltip>{selectedPointData.brake}</MarkerTooltip>
+												<MarkerPopup>
+													<div className="space-y-1">
+														<p className="font-medium text-foreground">
+															{selectedPointData.brake}
+														</p>
+														<p className="text-muted-foreground text-xs">
+															{selectedPointData.lat.toFixed(4)},{" "}
+															{selectedPointData.lon.toFixed(4)}
+														</p>
 													</div>
-													<div className="space-y-0.5 text-black">
-														<div>Throttle: {selectedPointData.throttle}%</div>
-														<div>Brake: {selectedPointData.brake}%</div>
-														<div>Gear: {selectedPointData.gear}</div>
-														<div>RPM: {selectedPointData.rpm}</div>
-													</div>
-												</div>
-											</MapPopup>
+												</MarkerPopup>
+											</MapMarker>
 										)}
 									</MAPS>
 								)}
