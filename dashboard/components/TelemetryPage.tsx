@@ -9,18 +9,12 @@ import React, {
 import useSWR from "swr";
 import { InfoBox } from "../components/InfoBox";
 import { Card } from "../components/ui/card";
-// biome-ignore lint/suspicious/noShadowRestrictedNames: <explanation>
 import {
-	Map as MAPS,
 	MapControls,
-	MapMarker,
 	MapRoute,
-	MarkerContent,
-	MarkerPopup,
-	MarkerTooltip,
+	Map as MapUI,
 	useMap,
 } from "../components/ui/map";
-import { useTrackPosition } from "../hooks/useTrackPosition";
 import { fetcher, type TelemetryRes } from "../lib/Fetch";
 import type { TelemetryDataPoint } from "../lib/types";
 
@@ -48,15 +42,10 @@ export default function TelemetryPage({
 	);
 
 	const [selectedMetric, setSelectedMetric] = useState<string>("Speed");
-	const [_isScrubbing, setIsScrubbing] = useState<boolean>(false);
 
 	const dataWithGPSCoordinates = useMemo(() => {
 		return initialTelemetryData?.dataWithGPSCoordinates || [];
 	}, [initialTelemetryData?.dataWithGPSCoordinates]);
-
-	const { selectedIndex, handlePointSelection } = useTrackPosition(
-		dataWithGPSCoordinates as TelemetryDataPoint[],
-	);
 
 	const trackInfo = useMemo(() => {
 		if (dataWithGPSCoordinates.length === 0) return null;
@@ -72,44 +61,7 @@ export default function TelemetryPage({
 		};
 	}, [dataWithGPSCoordinates, sessionId]);
 
-	// Throttle hover updates for better performance
-	const lastHoverUpdateRef = useRef<number>(0);
 	const hoverFrameRef = useRef<number | null>(null);
-
-	const handleChartHover = useCallback(
-		(index: number) => {
-			// Cancel any pending frame
-			if (hoverFrameRef.current) {
-				cancelAnimationFrame(hoverFrameRef.current);
-			}
-
-			// Throttle to ~60fps (16ms) for smooth updates without overwhelming the system
-			const now = performance.now();
-			const timeSinceLastUpdate = now - lastHoverUpdateRef.current;
-
-			if (timeSinceLastUpdate >= 16) {
-				handlePointSelection(index);
-				lastHoverUpdateRef.current = now;
-			} else {
-				// Schedule the update for the next frame
-				hoverFrameRef.current = requestAnimationFrame(() => {
-					handlePointSelection(index);
-					lastHoverUpdateRef.current = performance.now();
-				});
-			}
-		},
-		[handlePointSelection],
-	);
-
-	const handleChartClick = useCallback(
-		(index: number) => {
-			// Update selection on click
-			handlePointSelection(index);
-			setIsScrubbing(true);
-			setTimeout(() => setIsScrubbing(false), 300);
-		},
-		[handlePointSelection],
-	);
 
 	const handleChartMouseLeave = useCallback(() => {
 		// Cancel any pending hover frame on mouse leave
@@ -131,21 +83,6 @@ export default function TelemetryPage({
 	const memoizedTelemetryData = useMemo(() => {
 		return dataWithGPSCoordinates as TelemetryDataPoint[];
 	}, [dataWithGPSCoordinates]);
-
-	// Memoize the selected point data to prevent popup recalculations
-	const selectedPointData = useMemo(() => {
-		if (!dataWithGPSCoordinates[selectedIndex]) return null;
-		const point = dataWithGPSCoordinates[selectedIndex];
-		return {
-			lon: point.Lon,
-			lat: point.Lat,
-			speed: point.Speed?.toFixed(1),
-			throttle: point.Throttle?.toFixed(0),
-			brake: point.Brake?.toFixed(0),
-			gear: point.Gear,
-			rpm: point.RPM?.toFixed(0),
-		};
-	}, [dataWithGPSCoordinates, selectedIndex]);
 
 	const handleLapChange = (newLapId: string) => {
 		nav({ to: ".", search: () => ({ lapId: newLapId }) });
@@ -245,7 +182,7 @@ export default function TelemetryPage({
 						<div className="col-span-1 rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-6 lg:col-span-3">
 							<Card className="h-[42vw] w-full overflow-hidden p-0">
 								{dataWithGPSCoordinates[0].Lon !== undefined && (
-									<MAPS
+									<MapUI
 										center={[
 											dataWithGPSCoordinates[0]?.Lon,
 											dataWithGPSCoordinates[0]?.Lat,
@@ -289,7 +226,7 @@ export default function TelemetryPage({
 											showLocate
 											showFullscreen
 										/>
-										{selectedPointData && (
+										{/* {selectedPointData && (
 											<MapMarker
 												key={selectedPointData.brake}
 												longitude={selectedPointData.lon}
@@ -298,21 +235,9 @@ export default function TelemetryPage({
 												<MarkerContent>
 													<div className="size-4 rounded-full border-2 border-white bg-primary shadow-lg" />
 												</MarkerContent>
-												<MarkerTooltip>{selectedPointData.brake}</MarkerTooltip>
-												<MarkerPopup>
-													<div className="space-y-1">
-														<p className="font-medium text-foreground">
-															{selectedPointData.brake}
-														</p>
-														<p className="text-muted-foreground text-xs">
-															{selectedPointData.lat.toFixed(4)},{" "}
-															{selectedPointData.lon.toFixed(4)}
-														</p>
-													</div>
-												</MarkerPopup>
 											</MapMarker>
-										)}
-									</MAPS>
+										)} */}
+									</MapUI>
 								)}
 							</Card>
 						</div>
@@ -321,9 +246,6 @@ export default function TelemetryPage({
 							{memoizedTelemetryData.length > 0 ? (
 								<ProfessionalTelemetryCharts
 									telemetryData={memoizedTelemetryData}
-									selectedIndex={selectedIndex}
-									onHover={handleChartHover}
-									onIndexChange={handleChartClick}
 									onMouseLeave={handleChartMouseLeave}
 								/>
 							) : (

@@ -15,58 +15,14 @@ export type chartConfig = {
 
 interface ProfessionalTelemetryChartsProps {
 	telemetryData: TelemetryDataPoint[];
-	selectedIndex: number;
-	onHover: (index: number) => void;
-	onIndexChange: (index: number) => void;
 	onMouseLeave?: () => void;
 }
 
 const ProfessionalTelemetryCharts = React.memo(
 	function ProfessionalTelemetryCharts({
 		telemetryData,
-		selectedIndex,
-		onHover,
-		onIndexChange,
 		onMouseLeave,
 	}: ProfessionalTelemetryChartsProps) {
-		// const handleMouseMove = useCallback(
-		// 	(data: any) => {
-		// 		if (
-		// 			data &&
-		// 			data.activeTooltipIndex !== undefined &&
-		// 			chartData.sampledData[data.activeTooltipIndex]
-		// 		) {
-		// 			const originalIndex =
-		// 				chartData.sampledData[data.activeTooltipIndex].originalIndex;
-
-		// 			// Skip if same index to prevent unnecessary updates
-		// 			if (lastHoverIndex.current === originalIndex) return;
-
-		// 			lastHoverIndex.current = originalIndex;
-		// 			// Parent component handles throttling, so call immediately
-		// 			onHover(originalIndex);
-		// 		}
-		// 	},
-		// 	[onHover, chartData.sampledData],
-		// );
-
-		// const handleChartClick = useCallback(
-		// 	(data: any) => {
-		// 		if (
-		// 			data &&
-		// 			data.activeTooltipIndex !== undefined &&
-		// 			chartData.sampledData[data.activeTooltipIndex]
-		// 		) {
-		// 			// Use original index from the sampled data
-		// 			const originalIndex =
-		// 				chartData.sampledData[data.activeTooltipIndex].originalIndex;
-		// 			onIndexChange(originalIndex);
-		// 		}
-		// 	},
-		// 	[onIndexChange, chartData.sampledData],
-		// );
-
-		// Memoize chart configurations to prevent recreations
 		const chartConfigs = useMemo<chartConfig[]>(
 			() => [
 				{
@@ -133,9 +89,7 @@ const ProfessionalTelemetryCharts = React.memo(
 						key={config.dataKey}
 						config={config}
 						chartData={telemetryData}
-						ReferenceLineX={
-							(telemetryData?.[selectedIndex]?.LapDistPct / 100) * 5.5
-						}
+						ReferenceLineX={(telemetryData?.[0]?.LapDistPct / 100) * 5.5}
 					/>
 				))}
 			</div>
