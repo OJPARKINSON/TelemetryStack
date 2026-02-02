@@ -1,4 +1,7 @@
-package main
+/*
+Copyright © 2026 NAME HERE <EMAIL ADDRESS>
+*/
+package cmd
 
 import (
 	"context"
@@ -6,7 +9,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -19,23 +21,38 @@ import (
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/config"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/processing"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/worker"
+	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
-var progress *worker.ProgressDisplay
-var logger *zap.Logger
+var (
+	fresh    bool
+	progress *worker.ProgressDisplay
+	logger   *zap.Logger
+)
 
-func main() {
+var processCmd = &cobra.Command{
+	Use:   "go",
+	Short: "Process the telemetry data in the background",
+	Long: `Watch the telemetry directory and in the background process new telemetry files
+	
+	To clean the cache of sent file run with --fresh to upload all data in the dir again`,
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Printf("Inside rootCmd Run with args: %v\n", args)
+		Process()
+	},
+}
+
+func init() {
+	processCmd.Flags().BoolVarP(&display, "display", "d", true, "terminal display of the ingest process")
+	processCmd.Flags().StringVarP(&telemetryPath, "telemetryPath", "p", "", "path to IRacing telemetry folder")
+
+	processCmd.Flags().BoolVarP(&fresh, "fresh", "f", false, "will clean the local store of files that have been processed and start from fresh")
+}
+
+func Process() {
 	var quiet = flag.Bool("quiet", false, "Disable progress display")
 	var verbose = flag.Bool("verbose", false, "Enable verbose logging")
-	var help = flag.Bool("help", false, "Show help")
-
-	flag.Parse()
-
-	if *help {
-		printHelp()
-		os.Exit(0)
-	}
 
 	startTime := time.Now()
 
@@ -177,30 +194,6 @@ func main() {
 			}
 		}
 	}
-}
-
-func printHelp() {
-	fmt.Println("IRacing Telemetry Ingest Service")
-	fmt.Println()
-	fmt.Println("Usage: ./ingest-app [options] <telemetry-folder-path>")
-	fmt.Println()
-	fmt.Println("Options:")
-	fmt.Println("  --quiet          Disable progress display")
-	fmt.Println("  --verbose        Enable verbose logging (default: silent except errors)")
-	fmt.Println("  --help           Show this help message")
-	fmt.Println()
-	fmt.Println("Environment Variables:")
-	fmt.Println("  IBT_DATA_DIR              Data directory path (default: ./ibt_files/)")
-	fmt.Println("  WORKER_COUNT              Number of parallel workers (default: CPU count + 25%)")
-	fmt.Println("  BATCH_SIZE_BYTES          Batch size in bytes (default: 32MB)")
-	fmt.Println("  BATCH_SIZE_RECORDS        Records per batch (default: 16000)")
-	fmt.Println("  DISABLE_RABBITMQ          Set to 'true' to disable RabbitMQ (default: false)")
-	fmt.Println("  RABBITMQ_URL              RabbitMQ connection URL")
-	fmt.Println("  ENABLE_PPROF              Enable pprof profiling server on :6060")
-	fmt.Println("  CPU_PROFILE               Write CPU profile to file")
-	fmt.Println("  MEM_PROFILE               Write memory profile to file")
-	fmt.Println("  GOMAXPROCS                Set GOMAXPROCS (default: auto)")
-	fmt.Println()
 }
 
 func discoverAndQueueFiles(ctx context.Context, pool *worker.WorkerPool, telemetryFolder string, cfg *config.Config, logger *zap.Logger) (int, error) {
