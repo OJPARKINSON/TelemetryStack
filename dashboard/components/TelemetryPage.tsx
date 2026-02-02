@@ -11,8 +11,10 @@ import { InfoBox } from "../components/InfoBox";
 import { Card } from "../components/ui/card";
 import {
 	MapControls,
+	MapMarker,
 	MapRoute,
 	Map as MapUI,
+	MarkerContent,
 	useMap,
 } from "../components/ui/map";
 import { fetcher, type TelemetryRes } from "../lib/Fetch";
@@ -35,7 +37,32 @@ export default function TelemetryPage({
 	sessionId,
 	currentLapId,
 }: TelemetryPageProps) {
+	const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+	const handleChartHover = useCallback((index: number | null) => {
+		// Cancel pending RAF
+		if (hoverFrameRef.current) {
+			cancelAnimationFrame(hoverFrameRef.current);
+		}
+
+		// Schedule update on next frame
+		hoverFrameRef.current = requestAnimationFrame(() => {
+			setHoveredIndex(index); // ← This updates the state
+		});
+	}, []);
+
 	const nav = useNavigate();
+
+	const HoverMarker = React.memo(
+		({ longitude, latitude }: { longitude: number; latitude: number }) => (
+			<MapMarker longitude={longitude} latitude={latitude}>
+				<MarkerContent>
+					<div className="size-4 rounded-full border-2 border-white bg-blue-500 shadow-lg" />
+				</MarkerContent>
+			</MapMarker>
+		),
+	);
+
 	const { data } = useSWR<TelemetryRes, Error>(
 		`/api/sessions/${sessionId}/laps/2/geojson`,
 		fetcher,
@@ -60,6 +87,20 @@ export default function TelemetryPage({
 			sessionNum: firstPoint?.SessionNum || sessionId,
 		};
 	}, [dataWithGPSCoordinates, sessionId]);
+
+	const hoverCoordinates = useMemo(() => {
+		if (
+			hoveredIndex === null ||
+			hoveredIndex < 0 ||
+			hoveredIndex >= dataWithGPSCoordinates.length
+		) {
+			return null;
+		}
+		return {
+			lon: dataWithGPSCoordinates[hoveredIndex].Lon,
+			lat: dataWithGPSCoordinates[hoveredIndex].Lat,
+		};
+	}, [dataWithGPSCoordinates, hoveredIndex]);
 
 	const hoverFrameRef = useRef<number | null>(null);
 
@@ -226,17 +267,12 @@ export default function TelemetryPage({
 											showLocate
 											showFullscreen
 										/>
-										{/* {selectedPointData && (
-											<MapMarker
-												key={selectedPointData.brake}
-												longitude={selectedPointData.lon}
-												latitude={selectedPointData.lat}
-											>
-												<MarkerContent>
-													<div className="size-4 rounded-full border-2 border-white bg-primary shadow-lg" />
-												</MarkerContent>
-											</MapMarker>
-										)} */}
+										{hoverCoordinates && (
+											<HoverMarker
+												longitude={hoverCoordinates.lon}
+												latitude={hoverCoordinates.lat}
+											/>
+										)}
 									</MapUI>
 								)}
 							</Card>
@@ -247,6 +283,7 @@ export default function TelemetryPage({
 								<ProfessionalTelemetryCharts
 									telemetryData={memoizedTelemetryData}
 									onMouseLeave={handleChartMouseLeave}
+									onHover={handleChartHover}
 								/>
 							) : (
 								<div className="flex h-150 items-center justify-center">

@@ -16,12 +16,14 @@ export type chartConfig = {
 interface ProfessionalTelemetryChartsProps {
 	telemetryData: TelemetryDataPoint[];
 	onMouseLeave?: () => void;
+	onHover?: (index: number | null) => void;
 }
 
 const ProfessionalTelemetryCharts = React.memo(
 	function ProfessionalTelemetryCharts({
 		telemetryData,
 		onMouseLeave,
+		onHover,
 	}: ProfessionalTelemetryChartsProps) {
 		const chartConfigs = useMemo<chartConfig[]>(
 			() => [
@@ -86,6 +88,7 @@ const ProfessionalTelemetryCharts = React.memo(
 
 				{chartConfigs.map((config) => (
 					<TelemetryChart
+						onHover={onHover}
 						key={config.dataKey}
 						config={config}
 						chartData={telemetryData}

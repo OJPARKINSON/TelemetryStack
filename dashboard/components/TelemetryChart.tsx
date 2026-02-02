@@ -16,12 +16,14 @@ interface TelemetryChartProps {
 	config: chartConfig;
 	chartData: TelemetryDataPoint[];
 	ReferenceLineX: number;
+	onHover?: (index: number | null) => void;
 }
 
 export const TelemetryChart = ({
 	config,
 	chartData,
 	ReferenceLineX,
+	onHover,
 }: TelemetryChartProps) => {
 	const CustomTooltip = useCallback(({ active, payload }: any) => {
 		if (active && payload && payload.length) {
@@ -54,10 +56,15 @@ export const TelemetryChart = ({
 				<ResponsiveContainer width="100%" height="100%">
 					<LineChart
 						data={chartData}
-						onMouseMove={() => {}}
 						onClick={() => {}}
 						margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
 						syncId="telemetry-charts"
+						onMouseMove={(e) => {
+							console.log("rger", e);
+							if (onHover) {
+								onHover(e.activeIndex as number);
+							}
+						}}
 					>
 						<CartesianGrid
 							strokeDasharray="3 3"

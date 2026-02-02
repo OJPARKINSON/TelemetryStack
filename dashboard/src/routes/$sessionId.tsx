@@ -21,7 +21,6 @@ const fetcher = (url: string) =>
 		method: "GET",
 		headers: { "Content-Type": "application/json", "Content-Encoding": "gzip" },
 	}).then(async (res) => {
-		console.log(res);
 		return processIRacingDataWithGPS(await res.json());
 	});
 
@@ -31,7 +30,6 @@ const lapsFetcher = (url: string) =>
 		method: "GET",
 		headers: { "Content-Type": "application/json", "Content-Encoding": "gzip" },
 	}).then((res) => {
-		console.log(res);
 		return res.json() as unknown as Array<number>;
 	});
 
