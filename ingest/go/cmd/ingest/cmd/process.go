@@ -39,7 +39,7 @@ var processCmd = &cobra.Command{
 	To clean the cache of sent file run with --fresh to upload all data in the dir again`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("Inside rootCmd Run with args: %v\n", args)
-		Process()
+		Process(args[0])
 	},
 }
 
@@ -50,7 +50,7 @@ func init() {
 	processCmd.Flags().BoolVarP(&fresh, "fresh", "f", false, "will clean the local store of files that have been processed and start from fresh")
 }
 
-func Process() {
+func Process(telemetryFolder string) {
 	var quiet = flag.Bool("quiet", false, "Disable progress display")
 	var verbose = flag.Bool("verbose", false, "Enable verbose logging")
 
@@ -118,15 +118,6 @@ func Process() {
 		<-signalCh
 		cancel()
 	}()
-
-	// Get telemetry folder from args or use configured default
-	var telemetryFolder string
-	args := flag.Args()
-	if len(args) >= 1 {
-		telemetryFolder = args[0]
-	} else {
-		telemetryFolder = cfg.DataDirectory
-	}
 
 	if !strings.HasSuffix(telemetryFolder, string(filepath.Separator)) {
 		telemetryFolder += string(filepath.Separator)
