@@ -32,7 +32,7 @@ var (
 )
 
 var processCmd = &cobra.Command{
-	Use:   "go",
+	Use:   "ingest",
 	Short: "Process the telemetry data in the background",
 	Long: `Watch the telemetry directory and in the background process new telemetry files
 	

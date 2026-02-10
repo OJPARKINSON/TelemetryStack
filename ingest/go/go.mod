@@ -19,7 +19,7 @@ require (
 )
 
 // // Use local fork instead of remote dependency
-// replace github.com/OJPARKINSON/ibt => ./ibt
+replace github.com/OJPARKINSON/ibt => ./ibt
 
 require (
 	github.com/VividCortex/ewma v1.2.0 // indirect

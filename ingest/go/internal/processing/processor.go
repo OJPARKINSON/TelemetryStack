@@ -23,6 +23,8 @@ type loaderProcessor struct {
 	mu             sync.Mutex
 	config         *config.Config
 
+	session *headers.Session
+
 	subSessionID   string // The unique SubSessionID for this group
 	sessionMap     map[int]sessionInfo
 	trackName      string
@@ -85,17 +87,22 @@ func (l *loaderProcessor) SetProgressCallback(callback ProgressCallback, filenam
 	}
 }
 
-func (l *loaderProcessor) ProcessStruct(tick *ibt.TelemetryTick, hasNext bool, session *headers.Session) error {
-	if !l.sessionInfoSet && session != nil && len(session.SessionInfo.Sessions) > 0 {
-		for _, sess := range session.SessionInfo.Sessions {
+func (l *loaderProcessor) Init(session *headers.Session) error {
+	l.session = session
+	return nil
+}
+
+func (l *loaderProcessor) ProcessStruct(tick *ibt.TelemetryTick, hasNext bool) error {
+	if !l.sessionInfoSet && l.session != nil && len(l.session.SessionInfo.Sessions) > 0 {
+		for _, sess := range l.session.SessionInfo.Sessions {
 			l.sessionMap[sess.SessionNum] = sessionInfo{
 				sessionNum:  sess.SessionNum,
 				sessionType: sess.SessionType,
 				sessionName: sess.SessionName,
 			}
 		}
-		l.trackName = session.WeekendInfo.TrackDisplayShortName
-		l.trackID = session.WeekendInfo.TrackID
+		l.trackName = l.session.WeekendInfo.TrackDisplayShortName
+		l.trackID = l.session.WeekendInfo.TrackID
 		l.sessionInfoSet = true
 	}
 

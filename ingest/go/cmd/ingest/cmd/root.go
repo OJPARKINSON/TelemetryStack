@@ -13,7 +13,7 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "",
+	Use:   "ingest",
 	Short: "IRacting telemetry ingest",
 	Long: `The telemetry ingest allows us to take data from our racing sim and IRacing session and visualise that.
 	In traditional motorsports that would give better insights to the race engineer who can build off the data to improve the driver and car.

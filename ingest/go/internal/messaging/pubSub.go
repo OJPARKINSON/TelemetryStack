@@ -135,11 +135,9 @@ type PubSub struct {
 	persistedBatches   int
 	maxPersistentBytes int64
 
-	// Circuit breaker for RabbitMQ failures
-	circuitBreakerOpen     bool
+	// RabbitMQ failures fallback
 	consecutiveFailures    int
 	lastFailureTime        time.Time
-	circuitBreakerTimeout  time.Duration
 	maxConsecutiveFailures int
 
 	// Async publishing
@@ -183,11 +181,8 @@ func NewPubSub(sessionId string, sessionTime time.Time, cfg *config.Config, pool
 		lastFlush:          time.Now(),
 		maxPersistentBytes: 500 * 1024 * 1024, // 500MB max persistent storage per worker
 
-		// Circuit breaker configuration
-		circuitBreakerOpen:     false,
 		consecutiveFailures:    0,
-		circuitBreakerTimeout:  30 * time.Second, // 30 seconds before retrying RabbitMQ
-		maxConsecutiveFailures: 3,                // Open circuit after 3 consecutive failures
+		maxConsecutiveFailures: 3, // Open circuit after 3 consecutive failures
 
 		// Async publishing - buffer up to 20 batches to prevent blocking
 		publishQueue: make(chan *publishRequest, 20),
@@ -259,46 +254,13 @@ func (ps *PubSub) Exec(data []map[string]interface{}) error {
 	return nil
 }
 
-// persistBatch saves a failed batch to disk for later retry
-func (ps *PubSub) persistBatch(batchData []byte, batchId string) error {
-	return fmt.Errorf("failed to send batch " + batchId)
-}
-
-// Circuit breaker methods
-func (ps *PubSub) shouldSkipRabbitMQ() bool {
-	if !ps.circuitBreakerOpen {
-		return false
-	}
-
-	// Check if circuit breaker timeout has passed
-	if time.Since(ps.lastFailureTime) > ps.circuitBreakerTimeout {
-		log.Printf("Worker %d: Circuit breaker timeout reached, attempting to reconnect to RabbitMQ", ps.workerID)
-		ps.circuitBreakerOpen = false
-		ps.consecutiveFailures = 0
-		return false
-	}
-
-	return true
-}
-
 func (ps *PubSub) recordRabbitMQFailure() {
 	ps.consecutiveFailures++
 	ps.lastFailureTime = time.Now()
 
-	if ps.consecutiveFailures >= ps.maxConsecutiveFailures {
-		if !ps.circuitBreakerOpen {
-			log.Printf("Worker %d: CIRCUIT BREAKER OPEN - Too many RabbitMQ failures (%d), switching to persistence-only mode for %v",
-				ps.workerID, ps.consecutiveFailures, ps.circuitBreakerTimeout)
-		}
-		ps.circuitBreakerOpen = true
-	}
 }
 
 func (ps *PubSub) recordRabbitMQSuccess() {
-	if ps.circuitBreakerOpen || ps.consecutiveFailures > 0 {
-		log.Printf("Worker %d: RabbitMQ connection recovered, circuit breaker closed", ps.workerID)
-	}
-	ps.circuitBreakerOpen = false
 	ps.consecutiveFailures = 0
 }
 
@@ -463,14 +425,6 @@ func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte) error {
 		maxRetries = 1
 	}
 
-	if ps.shouldSkipRabbitMQ() {
-		log.Printf("Worker %d: Circuit breaker open, persisting batch %s directly", ps.workerID, batch.BatchId)
-		if persistErr := ps.persistBatch(data, batch.BatchId); persistErr != nil {
-			return fmt.Errorf("circuit breaker open AND failed to persist batch: %v", persistErr)
-		}
-		return nil
-	}
-
 	for retry := 0; retry < maxRetries; retry++ {
 		ch := ps.pool.GetChannel()
 		if ch == nil {
@@ -528,12 +482,6 @@ func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte) error {
 	// If we reach here, RabbitMQ publish failed completely
 	// Record the failure for circuit breaker
 	ps.recordRabbitMQFailure()
-
-	// Persist the batch to disk for later recovery
-	if persistErr := ps.persistBatch(data, batch.BatchId); persistErr != nil {
-		log.Printf("Worker %d: CRITICAL - Failed to persist batch %s: %v", ps.workerID, batch.BatchId, persistErr)
-		return fmt.Errorf("failed to publish batch after %d retries AND failed to persist: %v\nAction: Check both RabbitMQ connectivity and disk space/permissions", maxRetries, persistErr)
-	}
 
 	log.Printf("Worker %d: Batch %s persisted to disk after RabbitMQ failure (consecutive failures: %d)",
 		ps.workerID, batch.BatchId, ps.consecutiveFailures)
@@ -658,7 +606,6 @@ func (ps *PubSub) GetMetrics() PublishMetrics {
 		LastFlush:           ps.lastFlush,
 		FailedBatches:       ps.failedBatchCount,
 		PersistedBatches:    ps.persistedBatches,
-		CircuitBreakerOpen:  ps.circuitBreakerOpen,
 		ConsecutiveFailures: ps.consecutiveFailures,
 	}
 }
@@ -668,11 +615,10 @@ func (ps *PubSub) GetDisplayMetrics() map[string]interface{} {
 	defer ps.mu.Unlock()
 
 	return map[string]interface{}{
-		"batches_sent":    ps.totalBatches,
-		"records_send":    ps.totalRecords,
-		"queue_size":      len(ps.publishQueue),
-		"circuit_breaker": ps.circuitBreakerOpen,
-		"failed_batches":  ps.failedBatchCount,
+		"batches_sent":   ps.totalBatches,
+		"records_send":   ps.totalRecords,
+		"queue_size":     len(ps.publishQueue),
+		"failed_batches": ps.failedBatchCount,
 	}
 }
 
