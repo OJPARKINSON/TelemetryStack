@@ -197,8 +197,8 @@ func (m *Subscriber) processBatches(batchChan chan batchItem, channel *amqp.Chan
 			newRecordCount := totalRecords + len(item.batch.Records)
 			if newRecordCount > maxRecordsPerBatch && len(batchBuffer) > 0 {
 				sendToWorkers(batchBuffer)
-				batchBuffer = nil
-				totalRecords = 0
+				batchBuffer = []batchItem{item}
+				totalRecords = len(item.batch.Records)
 				timer.Reset(batchTimeout)
 				continue
 			}
@@ -344,8 +344,10 @@ func (m *Subscriber) worker(id int, workChan <-chan workItem) {
 		metrics.DBWriteDuration.Observe(duration.Seconds())
 		if err == nil {
 			metrics.RecordsWrittenTotal.Add(float64(len(validRecords)))
+			log.Printf("Worker %d: wrote %d records in %v", id, len(validRecords), duration)
 		} else {
 			metrics.DBWriteErrors.Inc()
+			log.Printf("Worker %d: write failed for %d records in %v: %v", id, len(validRecords), duration, err)
 		}
 	}
 }

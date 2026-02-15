@@ -132,7 +132,9 @@ func (l *loaderProcessor) ProcessStruct(tick *ibt.TelemetryTick, hasNext bool) e
 		}
 	}
 
-	l.cache = append(l.cache, tick)
+	tickCopy := l.tickPool.Get().(*ibt.TelemetryTick)
+	*tickCopy = *tick
+	l.cache = append(l.cache, tickCopy)
 	l.totalProcessed++
 
 	return nil

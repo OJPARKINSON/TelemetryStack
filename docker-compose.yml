@@ -205,7 +205,7 @@ services:
       - "traefik.http.routers.telemetry-dashboard-tailscale.tls.certresolver=tailscale"
       - "traefik.http.routers.telemetry-dashboard-tailscale.middlewares=dashboard-stripprefix@file,default-security@file"
       # Service configuration
-      - "traefik.http.services.telemetry-dashboard.loadbalancer.server.port=80"
+      - "traefik.http.services.telemetry-dashboard.loadbalancer.server.port=8080"
 
   grafana:
     image: dhi.io/grafana:12.3
