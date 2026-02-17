@@ -235,3 +235,4 @@ ingest/go/kafka-data/*
 # Failed batch persistence (temporary recovery files)
 failed_batches/
 telemetryService/golang/benchmark_results/*
+dashboard/dist/**

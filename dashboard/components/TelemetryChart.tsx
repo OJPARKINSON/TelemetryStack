@@ -60,7 +60,6 @@ export const TelemetryChart = ({
 						margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
 						syncId="telemetry-charts"
 						onMouseMove={(e) => {
-							console.log("rger", e);
 							if (onHover) {
 								onHover(e.activeIndex as number);
 							}
