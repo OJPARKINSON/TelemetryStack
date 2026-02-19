@@ -1,1 +1,19 @@
+name = "iracing-api"
+main = "src/index.ts"
+compatibility_date = "2026-02-18"
 
+[[containers]]
+class_name = "IracingAPI"
+image = "./Dockerfile"
+max_instances = 1
+
+[[durable_objects.bindings]]
+class_name = "IracingAPI"
+name = "IRACING_API"
+
+[[migrations]]
+new_sqlite_classes = ["IracingAPI"]
+tag = "v1"
+
+[dev]
+container_engine = "unix:///var/folders/jd/_dwy1xxx1qn7jwgcxx53qxw80000gn/T/podman/podman-machine-default-api.sock"
