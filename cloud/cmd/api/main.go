@@ -8,9 +8,11 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/ojparkinson/IRacing-Display/cloud/internal/handlers"
 )
 
-func handler(w http.ResponseWriter, r *http.Request) {
+func testHandler(w http.ResponseWriter, r *http.Request) {
 	country := os.Getenv("CLOUDFLARE_COUNTRY_A2")
 	location := os.Getenv("CLOUDFLARE_LOCATION")
 	region := os.Getenv("CLOUDFLARE_REGION")
@@ -19,6 +21,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	var port string
+	var exists bool
+	if port, exists = os.LookupEnv("PORT"); !exists {
+		port = "8080"
+	}
+
 	c := make(chan os.Signal, 10)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	terminate := false
@@ -38,21 +46,19 @@ func main() {
 	}()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/_health", func(w http.ResponseWriter, r *http.Request) {
-		if terminate {
-			w.WriteHeader(400)
-			w.Write([]byte("draining"))
-			return
-		}
 
-		w.Write([]byte("ok"))
-	})
-	mux.HandleFunc("/test", handler)
+	h := &handlers.Handler{}
+
+	mux.HandleFunc("/test", testHandler)
+	mux.HandleFunc("/api/geojson", h.GetGeojson)
+	mux.HandleFunc("/api/sessions", h.GetSessions)
+	mux.HandleFunc("/api/session/{sessionId}", h.GetSession)
 
 	server := &http.Server{
-		Addr:    "0.0.0.0:8080",
+		Addr:    "0.0.0.0:" + port,
 		Handler: mux,
 	}
 
+	fmt.Println("server started on 0.0.0.0:" + port)
 	log.Fatal(server.ListenAndServe())
 }

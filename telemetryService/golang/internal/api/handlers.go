@@ -1,12 +1,16 @@
 package api
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
 	"log"
 	"net/http"
 	"slices"
 	"strconv"
 
 	"github.com/ojparkinson/telemetryService/internal/geojson"
+	"github.com/ojparkinson/telemetryService/internal/sync"
 )
 
 // /api/sessions
@@ -85,4 +89,27 @@ func (s *Server) handleGetTelemetryGeoJson(w http.ResponseWriter, r *http.Reques
 	}
 
 	respondGzipJSON(w, http.StatusOK, geoJSON)
+}
+
+// /api/sync/lap/{sessionId}/{lapId}
+func (s *Server) handleSyncLap(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("sessionId")
+	lapID := r.PathValue("lapId")
+
+	sessionData, err := s.queryExecutor.QueryGeneralLap(r.Context(), sessionID, lapID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to fetch lap data")
+		return
+	}
+
+	data, _ := json.Marshal(sessionData)
+
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	gz.Write(data)
+	gz.Close()
+
+	sync.SyncLap(sessionData)
+
+	w.WriteHeader(200)
 }

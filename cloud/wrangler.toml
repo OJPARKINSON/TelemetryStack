@@ -15,5 +15,19 @@ name = "IRACING_API"
 new_sqlite_classes = ["IracingAPI"]
 tag = "v1"
 
+[[d1_databases]]
+binding = "DB"
+database_name = "telemetry"
+database_id = "your-id-here"
+preview_database_id = "local"  # uses local sqlite in dev
+
+[[r2_buckets]]
+binding = "TICKS"
+bucket_name = "telemetry-ticks"
+preview_bucket_name = "telemetry-ticks-local"
+
+[observability]
+enabled = true
+
 [dev]
 container_engine = "unix:///var/folders/jd/_dwy1xxx1qn7jwgcxx53qxw80000gn/T/podman/podman-machine-default-api.sock"
