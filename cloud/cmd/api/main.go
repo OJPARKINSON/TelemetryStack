@@ -49,7 +49,7 @@ func main() {
 
 	h := &handlers.Handler{}
 
-	mux.HandleFunc("/test", testHandler)
+	mux.HandleFunc("/api/test", testHandler)
 	mux.HandleFunc("/api/geojson", h.GetGeojson)
 	mux.HandleFunc("/api/sessions", h.GetSessions)
 	mux.HandleFunc("/api/session/{sessionId}", h.GetSession)

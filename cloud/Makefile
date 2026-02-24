@@ -1,8 +1,20 @@
-.PHONY: dev fix-podman check-podman
+.PHONY: dev fix-podman check-podman build-server build-server-prod
+
+build-server:
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o ./bin/server ./cmd/api
+
+build-server-prod:
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ./bin/server ./cmd/api
 
 # Start wrangler dev, fixing podman runtime if needed
-dev: check-podman
+dev: build-server check-podman
 	pnpm dev
+
+build-frontend:
+	cd ../dashboard/ && pnpm run build
+
+deploy: build-frontend build-server-prod
+	pnpm run deploy
 
 # Check if podman VM has runc configured; fix automatically if not
 check-podman:
