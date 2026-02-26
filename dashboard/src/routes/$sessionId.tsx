@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { notFound } from "next/navigation";
 import useSWR from "swr";
 import TelemetryPage from "../../components/TelemetryPage";
 import { processIRacingDataWithGPS, type TelemetryRes } from "../../lib/Fetch";
@@ -54,9 +53,6 @@ export default function SessionPage() {
 	// Default to lap 1 if no lapId provided
 	const currentLapId = lapId ? Number.parseInt(lapId, 10) : 1;
 
-	if (Number.isNaN(currentLapId)) {
-		notFound();
-	}
 
 	if (error) return <DatabaseUnavailableError />;
 	if (isLoading || telemetryData === undefined)
