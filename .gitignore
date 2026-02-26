@@ -239,3 +239,4 @@ failed_batches/
 telemetryService/golang/benchmark_results/*
 dashboard/dist/**
 node_modules/
+learnings/
