@@ -113,3 +113,18 @@ func (s *Server) handleSyncLap(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(200)
 }
+
+// /api/ingest
+func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost && r.Header.Get("content-type") == "application/x-protobuf" {
+
+		// body, _ := io.ReadAll(r.Body)
+
+		// parse the protobuf and store it in the database
+
+		w.WriteHeader(200)
+	} else {
+
+		w.WriteHeader(400)
+	}
+}

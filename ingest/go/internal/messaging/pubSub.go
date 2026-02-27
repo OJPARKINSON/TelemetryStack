@@ -1,9 +1,11 @@
 package messaging
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -445,26 +447,31 @@ func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte) error {
 		}
 
 		// Reduce timeout from 10s to 1s for fast-fail
-		ctx, cancel := context.WithTimeout(ps.ctx, 1*time.Second)
+		// ctx, cancel := context.WithTimeout(ps.ctx, 10*time.Second)
 
-		err := ch.PublishWithContext(ctx, "telemetry_topic", "telemetry.ticks", false, false,
-			amqp.Publishing{
-				ContentType:  "application/x-protobuf",
-				Body:         data,
-				DeliveryMode: amqp.Transient,
-				Timestamp:    time.Now(),
-				MessageId:    batch.BatchId,
-				Headers: amqp.Table{
-					"worker_id":    ps.workerID,
-					"record_count": len(batch.Records),
-					"batch_size":   len(data),
-					"format":       "protobuf",
-				},
-			})
+		// err := ch.PublishWithContext(ctx, "telemetry_topic", "telemetry.ticks", false, false,
+		// 	amqp.Publishing{
+		// 		ContentType:  "application/x-protobuf",
+		// 		Body:         data,
+		// 		DeliveryMode: amqp.Transient,
+		// 		Timestamp:    time.Now(),
+		// 		MessageId:    batch.BatchId,
+		// 		Headers: amqp.Table{
+		// 			"worker_id":    ps.workerID,
+		// 			"record_count": len(batch.Records),
+		// 			"batch_size":   len(data),
+		// 			"format":       "protobuf",
+		// 		},
+		// 	})
 
-		cancel()
+		// cancel()
+
+		dataReader := bytes.NewReader(data)
+		res, err := http.Post("http://localhost:8010/api/ingest", "application/x-protobuf", dataReader)
 
 		if err == nil {
+			fmt.Println("ingest: ", res.StatusCode)
+
 			// Success! Record this and reset circuit breaker
 			ps.recordRabbitMQSuccess()
 			return nil
