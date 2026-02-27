@@ -47,6 +47,8 @@ func (s *Server) Shutdown(ctx context.Context) error {
 func (s *Server) setupRoutes() http.Handler {
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("POST /api/ingest", s.handleIngest)
+
 	mux.HandleFunc("GET /api/sessions", s.handleGetSessions)
 	mux.HandleFunc("GET /api/sessions/{sessionId}/laps", s.handleGetLaps)
 	mux.HandleFunc("GET /api/sessions/{sessionId}/laps/{lapId}", s.handleGetTelemetry)
