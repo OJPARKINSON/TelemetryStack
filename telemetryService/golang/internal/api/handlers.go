@@ -3,14 +3,21 @@ package api
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"slices"
 	"strconv"
 
 	"github.com/ojparkinson/telemetryService/internal/geojson"
+	"github.com/ojparkinson/telemetryService/internal/messaging"
+	"github.com/ojparkinson/telemetryService/internal/persistance"
 	"github.com/ojparkinson/telemetryService/internal/sync"
+	qdb "github.com/questdb/go-questdb-client/v4"
+	"google.golang.org/protobuf/proto"
 )
 
 // /api/sessions
@@ -112,4 +119,41 @@ func (s *Server) handleSyncLap(w http.ResponseWriter, r *http.Request) {
 	sync.SyncLap(sessionData)
 
 	w.WriteHeader(200)
+}
+
+// /api/ingest
+func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost && r.Header.Get("content-type") == "application/x-protobuf" {
+		ctx := context.TODO()
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(500)
+			return
+		}
+		batch := &messaging.TelemetryBatch{}
+		err = proto.Unmarshal(body, batch)
+		if err != nil {
+			w.WriteHeader(400)
+			return
+		}
+
+		sender, err := qdb.NewLineSender(
+			context.Background(),
+			qdb.WithHttp(),
+			qdb.WithAddress(fmt.Sprintf("%s:9000", s.config.QuestDbHost)),
+			qdb.WithInitBufferSize(2*1024*1024), // 2MB initial buffer (default: 128KB)
+		)
+		defer sender.Close(ctx)
+		if err != nil {
+			w.WriteHeader(500)
+			return
+		}
+
+		persistance.WriteBatch(sender, batch.Records)
+
+		w.WriteHeader(200)
+	} else {
+
+		w.WriteHeader(400)
+	}
 }

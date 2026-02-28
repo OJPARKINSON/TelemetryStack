@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime/debug"
 
+	"github.com/ojparkinson/telemetryService/internal/config"
 	"github.com/ojparkinson/telemetryService/internal/persistance"
 )
 
@@ -15,12 +16,14 @@ type Server struct {
 	httpServer    *http.Server
 	logger        *log.Logger
 	queryExecutor *persistance.QueryExecutor
+	config        *config.Config
 }
 
-func NewServer(addr string, queryExecutor *persistance.QueryExecutor) *Server {
+func NewServer(addr string, config *config.Config) *Server {
 	server := &Server{
-		queryExecutor: queryExecutor,
+		queryExecutor: &persistance.QueryExecutor{Config: config},
 		logger:        log.New(os.Stdout, "[API] ", log.LstdFlags),
+		config:        config,
 	}
 
 	server.httpServer = &http.Server{
@@ -46,6 +49,8 @@ func (s *Server) Shutdown(ctx context.Context) error {
 
 func (s *Server) setupRoutes() http.Handler {
 	mux := http.NewServeMux()
+
+	mux.HandleFunc("POST /api/ingest", s.handleIngest)
 
 	mux.HandleFunc("GET /api/sessions", s.handleGetSessions)
 	mux.HandleFunc("GET /api/sessions/{sessionId}/laps", s.handleGetLaps)
