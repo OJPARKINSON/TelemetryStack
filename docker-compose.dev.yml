@@ -156,6 +156,7 @@ services:
       GOGC: "200"           # Less aggressive GC
     ports:
       - "9092:9092"  # Prometheus metrics
+      - "8010:8010"  # Prometheus metrics
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -169,7 +170,7 @@ services:
     container_name: telemetry-dashboard
     restart: unless-stopped
     ports:
-      - "3000:3000" 
+      - "3000:8080"
     environment:
       API_URL: "http://localhost:8010/"
       QUESTDB_URL: postgresql://admin:quest@questdb:8812/qdb

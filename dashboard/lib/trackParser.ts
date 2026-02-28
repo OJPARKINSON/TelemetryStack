@@ -355,10 +355,10 @@ export function mapLapDistanceToTrackPoint(
 	if (trackPoints.length === 0) return [0, 0];
 
 	// Ensure the percentage is between 0 and 1
-	lapDistPct = Math.max(0, Math.min(1, lapDistPct));
+	const checkedLapDistPct = Math.max(0, Math.min(1, lapDistPct));
 
 	// Calculate the index in the points array
-	const pointIndex = lapDistPct * (trackPoints.length - 1);
+	const pointIndex = checkedLapDistPct * (trackPoints.length - 1);
 	const lowerIndex = Math.floor(pointIndex);
 	const upperIndex = Math.min(lowerIndex + 1, trackPoints.length - 1);
 

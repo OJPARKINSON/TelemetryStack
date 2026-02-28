@@ -68,3 +68,24 @@ func (s *QueryExecutor) QueryLap(ctx context.Context, sessionID string, lapID st
 
 	return points, nil
 }
+
+func (s *QueryExecutor) QueryGeneralLap(ctx context.Context, sessionID string, lapID string) ([]messaging.Telemetry, error) {
+	query := fmt.Sprintf(`
+		SELECT * FROM TelemetryTicks 
+        WHERE session_id = %s 
+        WHERE lap_id = %s 
+        ORDER BY timestamp ASC
+	`, sessionID, lapID)
+
+	rows, err := ExecuteSelectQuery(query, s.Config)
+	if err != nil {
+		return nil, err
+	}
+
+	points := make([]messaging.Telemetry, len(rows))
+	for i, row := range rows {
+		points[i] = mapToTelemetry(row)
+	}
+
+	return points, nil
+}
