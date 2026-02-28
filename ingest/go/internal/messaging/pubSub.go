@@ -13,18 +13,15 @@ import (
 	"time"
 
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/config"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type ConnectionPool struct {
-	connections []*amqp.Connection
-	channels    []*amqp.Channel
-	url         string
-	poolSize    int
-	current     atomic.Uint32 // Lock-free round-robin counter
-	closing     atomic.Bool
+	url      string
+	poolSize int
+	current  atomic.Uint32 // Lock-free round-robin counter
+	closing  atomic.Bool
 }
 
 var (
@@ -34,84 +31,17 @@ var (
 
 func NewConnectionPool(url string, poolSize int) (*ConnectionPool, error) {
 	pool := &ConnectionPool{
-		connections: make([]*amqp.Connection, poolSize),
-		channels:    make([]*amqp.Channel, poolSize),
-		url:         url,
-		poolSize:    poolSize,
-	}
-
-	for i := 0; i < poolSize; i++ {
-		conn, err := amqp.Dial(url)
-		if err != nil {
-			pool.Close()
-			return nil, fmt.Errorf("failed to create RabbitMQ connection %d to %s: %w\nAction: Verify RabbitMQ is running and credentials are correct", i, url, err)
-		}
-
-		ch, err := conn.Channel()
-		if err != nil {
-			conn.Close()
-			pool.Close()
-
-			return nil, fmt.Errorf("failed to create RabbitMQ channel %d: %w\nAction: Check RabbitMQ channel limits and service health", i, err)
-		}
-
-		err = ch.Qos(1000, 0, false)
-		if err != nil {
-			ch.Close()
-			conn.Close()
-			pool.Close()
-			return nil, fmt.Errorf("failed to set QoS for channel %d: %w\nAction: Check RabbitMQ configuration allows prefetch settings", i, err)
-		}
-
-		pool.connections[i] = conn
-		pool.channels[i] = ch
+		url:      url,
+		poolSize: poolSize,
 	}
 
 	return pool, nil
-}
-
-func (p *ConnectionPool) GetChannel() *amqp.Channel {
-	if p.closing.Load() {
-		return nil
-	}
-
-	if len(p.channels) == 0 {
-		return nil
-	}
-
-	// Lock-free round-robin using atomic operations
-	idx := p.current.Add(1) % uint32(p.poolSize)
-	ch := p.channels[idx]
-
-	// Check if channel is still open
-	if ch == nil || ch.IsClosed() {
-		if p.closing.Load() {
-			log.Printf("Channel %d is closed during pool shutdown", idx)
-		} else {
-			log.Printf("Channel %d is closed, attempting to recreate", idx)
-		}
-		return nil
-	}
-
-	return ch
 }
 
 func (p *ConnectionPool) Close() {
 	time.Sleep(500 * time.Millisecond)
 
 	p.closing.Store(true)
-
-	for i := 0; i < len(p.channels); i++ {
-		if p.channels[i] != nil {
-			p.channels[i].Close()
-		}
-	}
-
-	for i := 0; i < len(p.connections); i++ {
-		if p.connections[i] != nil {
-			p.connections[i].Close()
-		}
-	}
 }
 
 type PubSub struct {
@@ -422,69 +352,18 @@ func (ps *PubSub) publishWorker() {
 
 // doPublish performs the actual RabbitMQ publish operation
 func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte) error {
-	maxRetries := 3
-	if ps.isShuttingDown.Load() {
-		maxRetries = 1
+	dataReader := bytes.NewReader(data)
+	res, err := http.Post("http://localhost:8010/api/ingest", "application/x-protobuf", dataReader)
+	if err == nil {
+		fmt.Println("ingesting: ", res.StatusCode)
+
+		// Success! Record this and reset circuit breaker
+		ps.recordRabbitMQSuccess()
+		return nil
 	}
 
-	for retry := 0; retry < maxRetries; retry++ {
-		ch := ps.pool.GetChannel()
-		if ch == nil {
-			// During shutdown, channels should still be available until all publishers finish
-			if ps.isShuttingDown.Load() {
-				// This shouldn't happen anymore since we wait for all publishers
-				log.Printf("Worker %d: ERROR - channel unavailable during shutdown for batch %s",
-					ps.workerID, batch.BatchId)
-				return fmt.Errorf("channel unavailable during shutdown")
-			}
-
-			// Normal operation - retry
-			if retry < maxRetries-1 {
-				time.Sleep(time.Duration(retry+1) * 100 * time.Millisecond)
-				continue
-			}
-			return fmt.Errorf("failed to get RabbitMQ channel after %d retries\nAction: Check RabbitMQ service health and connection pool size", maxRetries)
-		}
-
-		// Reduce timeout from 10s to 1s for fast-fail
-		// ctx, cancel := context.WithTimeout(ps.ctx, 10*time.Second)
-
-		// err := ch.PublishWithContext(ctx, "telemetry_topic", "telemetry.ticks", false, false,
-		// 	amqp.Publishing{
-		// 		ContentType:  "application/x-protobuf",
-		// 		Body:         data,
-		// 		DeliveryMode: amqp.Transient,
-		// 		Timestamp:    time.Now(),
-		// 		MessageId:    batch.BatchId,
-		// 		Headers: amqp.Table{
-		// 			"worker_id":    ps.workerID,
-		// 			"record_count": len(batch.Records),
-		// 			"batch_size":   len(data),
-		// 			"format":       "protobuf",
-		// 		},
-		// 	})
-
-		// cancel()
-
-		dataReader := bytes.NewReader(data)
-		res, err := http.Post("http://localhost:8010/api/ingest", "application/x-protobuf", dataReader)
-
-		if err == nil {
-			fmt.Println("ingest: ", res.StatusCode)
-
-			// Success! Record this and reset circuit breaker
-			ps.recordRabbitMQSuccess()
-			return nil
-		}
-
-		log.Printf("Worker %d: Failed to publish batch (attempt %d/%d): %v",
-			ps.workerID, retry+1, maxRetries, err)
-
-		// Skip sleep during shutdown to speed up
-		if retry < maxRetries-1 && !ps.isShuttingDown.Load() {
-			time.Sleep(time.Duration(retry+1) * 250 * time.Millisecond)
-		}
-	}
+	log.Printf("Worker %d: Failed to publish batch : %v",
+		ps.workerID, err)
 
 	// If we reach here, RabbitMQ publish failed completely
 	// Record the failure for circuit breaker

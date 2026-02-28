@@ -11,7 +11,6 @@ import (
 	"github.com/ojparkinson/telemetryService/internal/config"
 	"github.com/ojparkinson/telemetryService/internal/metrics"
 	"github.com/ojparkinson/telemetryService/internal/persistance"
-	"github.com/ojparkinson/telemetryService/internal/queue"
 )
 
 func main() {
@@ -28,15 +27,6 @@ func main() {
 	}
 	log.Println("Database schema initialized successfully")
 
-	apiServer := api.NewServer(":8010", config)
-
-	log.Println("creating server")
-	go func() {
-		if err := apiServer.Start(); err != nil {
-			log.Printf("API server error: %v", err)
-		}
-	}()
-
 	// Create sender pool
 	senderPool, err := persistance.NewSenderPool(config)
 	if err != nil {
@@ -46,15 +36,18 @@ func main() {
 	}
 	log.Println("Sender pool created successfully")
 
+	apiServer := api.NewServer(":8010", config, senderPool)
+
+	log.Println("creating server")
+	go func() {
+		if err := apiServer.Start(); err != nil {
+			log.Printf("API server error: %v", err)
+		}
+	}()
+
 	// Start Prometheus metrics server
 	go metrics.MetricsHandler()
 	log.Println("Starting to consume messages from RabbitMQ")
-
-	// Start message queue subscriber
-	messaging := queue.NewSubscriber(senderPool)
-	go func() {
-		messaging.Subscribe(config)
-	}()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)

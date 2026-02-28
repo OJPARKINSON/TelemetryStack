@@ -30,43 +30,6 @@ services:
       - "traefik.http.routers.dashboard-local.middlewares=dashboard-auth,secure-dashboard@file"
       - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
 
-  rabbitmq:
-    image: rabbitmq:4.0-management
-    container_name: rabbitmq
-    restart: unless-stopped
-    ports:
-      - "5672:5672"
-      - "15672:15672" # Management UI
-      - "15692:15692" # Prometheus metrics
-    volumes:
-      - ./config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
-      - ./config/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
-      - ./config/definitions.json:/etc/rabbitmq/definitions.json:ro
-      - rabbitmq-data:/var/lib/rabbitmq
-    environment:
-      # Create default admin user automatically
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: changeme
-      # Enable management load definitions
-      RABBITMQ_MANAGEMENT_LOAD_DEFINITIONS: /etc/rabbitmq/definitions.json
-    networks:
-      - telemetry-network
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.rabbitmq-local.rule=Host(`${LOCAL_DOMAIN}`) && PathPrefix(`/rabbitmq`)"
-      - "traefik.http.routers.rabbitmq-local.entrypoints=websecure"
-      - "traefik.http.routers.rabbitmq-local.tls=true"
-      - "traefik.http.routers.rabbitmq-local.middlewares=rabbitmq-stripprefix,secure-management@file"
-      - "traefik.http.middlewares.rabbitmq-stripprefix.stripprefix.prefixes=/rabbitmq"
-      - "traefik.http.services.rabbitmq.loadbalancer.server.port=5672"
-      - "traefik.http.services.rabbitmq.loadbalancer.server.port=15672"
-
   questdb:
     image: questdb/questdb:latest
     container_name: questdb
@@ -100,45 +63,6 @@ services:
       - "traefik.http.middlewares.questdb-stripprefix.stripprefix.prefixes=/questdb"
       - "traefik.http.services.questdb.loadbalancer.server.port=9000"
 
-  # telemetry-service:
-  #   build:
-  #     context: ./telemetryService/telemetryService
-  #     dockerfile: Dockerfile.Worker
-  #   container_name: telemetry-service
-  #   restart: unless-stopped
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #   networks:
-  #     - telemetry-network
-  #   environment:
-  #     QUESTDB_URL: questdb:9009;username=admin;password=quest
-  #     QUESTDB_HTTP_HOST: questdb
-  #     QUESTDB_HTTP_PORT: 9000
-
-  #     RABBITMQ_HOST: rabbitmq
-  #     RABBITMQ_USER: guest
-  #     RABBITMQ_PASS: changeme
-  #     RABBITMQ_URL: amqp://admin:changeme@rabbitmq:5672/
-      
-  #     # Application settings
-  #     DOTNET_ENVIRONMENT: Production
-  #     ASPNETCORE_URLS: http://+:5000
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '2'      # 1 core for telemetry processing
-  #         memory: 8g       # Much more memory for high-volume telemetry processing
-  #       reservations:
-  #         cpus: '0.25'     # Minimum guaranteed resources
-  #         memory: 1g
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 30s
-
   telemetry-service:
     build:
       context: ./telemetryService/golang
@@ -151,15 +75,12 @@ services:
       QUESTDB_URL: questdb:8812;username=admin;password=quest
       QUESTDB_HOST: questdb
       QUESTDB_PORT: 9000
-      RABBITMQ_HOST: rabbitmq
       GOMAXPROCS: "6"       # Limit Go scheduler
       GOGC: "200"           # Less aggressive GC
     ports:
       - "9092:9092"  # Prometheus metrics
       - "8010:8010"  # Prometheus metrics
     depends_on:
-      rabbitmq:
-        condition: service_healthy
       questdb:
         condition: service_started
 
@@ -172,7 +93,7 @@ services:
     ports:
       - "3000:8080"
     environment:
-      API_URL: "http://localhost:8010/"
+      API_URL: http://localhost:8010/
       QUESTDB_URL: postgresql://admin:quest@questdb:8812/qdb
       QUESTDB_HOST: questdb
       QUESTDB_PORT: 8812
@@ -309,8 +230,6 @@ services:
           memory: 128m
 
 volumes:
-  rabbitmq-data:
-    driver: local
   questdb-data:
     driver: local
   grafana-data:
