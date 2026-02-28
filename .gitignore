@@ -9,6 +9,8 @@
 *.dylib
 tailscaled.*
 
+**/.claude
+
 # Test binary, built with `go test -c`
 *.test
 
@@ -68,7 +70,6 @@ acme.json
 *.blk
 *.db
 *.influxdb
-*.sum
 *.inf
 **/bin
 *.ibt
@@ -236,3 +237,6 @@ ingest/go/kafka-data/*
 # Failed batch persistence (temporary recovery files)
 failed_batches/
 telemetryService/golang/benchmark_results/*
+dashboard/dist/**
+node_modules/
+learnings/

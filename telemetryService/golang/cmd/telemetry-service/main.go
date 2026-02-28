@@ -28,9 +28,7 @@ func main() {
 	}
 	log.Println("Database schema initialized successfully")
 
-	apiServer := api.NewServer(":8010", &persistance.QueryExecutor{
-		Config: config,
-	})
+	apiServer := api.NewServer(":8010", config)
 
 	log.Println("creating server")
 	go func() {

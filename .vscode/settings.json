@@ -20,5 +20,8 @@
 	"search.exclude": {
 		"**/routeTree.gen.ts": true
 	},
-	"biome.configurationPath": "dashboard/biome.json"
+	"biome.configurationPath": "dashboard/biome.json",
+	"files.associations": {
+		"wrangler.json": "jsonc"
+	}
 }

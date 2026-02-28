@@ -1,9 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { TelemetryDataPoint } from "../lib/types";
 
-/**
- * Custom hook to manage track position synchronization with chart
- */
+/* deprecated */
 export function useTrackPosition(telemetryData: TelemetryDataPoint[]) {
 	const [selectedPosition, setSelectedPosition] = useState<{
 		index: number;

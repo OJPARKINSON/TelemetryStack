@@ -4,7 +4,7 @@ restart:
 	@echo "🚀 Restarting Docker services..."
 	@docker compose --file docker-compose.yml down -v
 	@docker compose --file docker-compose.yml build --no-cache
-	@docker compose --file docker-compose.yml up -d
+	@docker compose --file docker-compose.yml up --pull=always -d
 	@echo "✅ Done! Check logs with: make logs"
 
 restart-dev:

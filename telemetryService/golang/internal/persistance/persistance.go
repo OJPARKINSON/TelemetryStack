@@ -3,8 +3,10 @@ package persistance
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/ojparkinson/telemetryService/internal/messaging"
 	qdb "github.com/questdb/go-questdb-client/v4"
@@ -23,7 +25,7 @@ func WriteBatch(sender qdb.LineSender, records []*messaging.Telemetry) error {
 			Symbol("session_num", sanitise(record.SessionNum)).
 			Symbol("session_type", sanitise(record.SessionType)).
 			Symbol("session_name", sanitise(record.SessionName)).
-			StringColumn("car_id", sanitise(record.CarId)).
+			Symbol("car_id", sanitise(record.CarId)).
 			Int64Column("gear", validateInt(record.Gear)).
 			Int64Column("player_car_position", validateInt(record.PlayerCarPosition)).
 			Float64Column("speed", validateDouble(record.Speed)).
@@ -60,7 +62,7 @@ func WriteBatch(sender qdb.LineSender, records []*messaging.Telemetry) error {
 			Float64Column("rFtempM", validateDouble(record.RFtempM)).
 			Float64Column("lRtempM", validateDouble(record.LRtempM)).
 			Float64Column("rRtempM", validateDouble(record.RRtempM)).
-			At(ctx, record.TickTime.AsTime())
+			At(ctx, tickTime(record))
 
 		// Flush every 10K records to keep memory and network packets reasonable
 		if (i+1)%flushInterval == 0 {
@@ -78,6 +80,14 @@ func WriteBatch(sender qdb.LineSender, records []*messaging.Telemetry) error {
 
 	// fmt.Printf("wrote %d records to QuestDb\n", len(records))
 	return nil
+}
+
+func tickTime(record *messaging.Telemetry) time.Time {
+	if record.TickTime != nil {
+		return record.TickTime.AsTime()
+	}
+	log.Printf("WARNING: record has nil TickTime, using time.Now() as fallback")
+	return time.Now()
 }
 
 func sanitise(value string) string {
