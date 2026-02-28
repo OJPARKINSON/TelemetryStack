@@ -6,6 +6,8 @@ COPY package.json package-lock.json ./
 
 RUN npm ci
 
+ENV API_URL=${API_URL}
+
 COPY . .
 
 RUN npm run build

@@ -17,13 +17,15 @@ type Server struct {
 	logger        *log.Logger
 	queryExecutor *persistance.QueryExecutor
 	config        *config.Config
+	senderPool    *persistance.SenderPool
 }
 
-func NewServer(addr string, config *config.Config) *Server {
+func NewServer(addr string, config *config.Config, senderPool *persistance.SenderPool) *Server {
 	server := &Server{
 		queryExecutor: &persistance.QueryExecutor{Config: config},
 		logger:        log.New(os.Stdout, "[API] ", log.LstdFlags),
 		config:        config,
+		senderPool:    senderPool,
 	}
 
 	server.httpServer = &http.Server{

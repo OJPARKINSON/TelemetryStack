@@ -3,9 +3,7 @@ package api
 import (
 	"bytes"
 	"compress/gzip"
-	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -16,7 +14,6 @@ import (
 	"github.com/ojparkinson/telemetryService/internal/messaging"
 	"github.com/ojparkinson/telemetryService/internal/persistance"
 	"github.com/ojparkinson/telemetryService/internal/sync"
-	qdb "github.com/questdb/go-questdb-client/v4"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -124,7 +121,6 @@ func (s *Server) handleSyncLap(w http.ResponseWriter, r *http.Request) {
 // /api/ingest
 func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost && r.Header.Get("content-type") == "application/x-protobuf" {
-		ctx := context.TODO()
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			w.WriteHeader(500)
@@ -136,18 +132,8 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(400)
 			return
 		}
-
-		sender, err := qdb.NewLineSender(
-			context.Background(),
-			qdb.WithHttp(),
-			qdb.WithAddress(fmt.Sprintf("%s:9000", s.config.QuestDbHost)),
-			qdb.WithInitBufferSize(2*1024*1024), // 2MB initial buffer (default: 128KB)
-		)
-		defer sender.Close(ctx)
-		if err != nil {
-			w.WriteHeader(500)
-			return
-		}
+		sender := s.senderPool.Get()
+		defer s.senderPool.Return(sender)
 
 		persistance.WriteBatch(sender, batch.Records)
 

@@ -52,21 +52,14 @@ func init() {
 
 func Process(telemetryFolder string) {
 	var quiet = flag.Bool("quiet", false, "Disable progress display")
-	var verbose = flag.Bool("verbose", false, "Enable verbose logging")
 
 	startTime := time.Now()
 
 	// Initialize Zap logger
 	var err error
-	if *verbose {
-		// Verbose mode: full development logging
-		logger, err = zap.NewDevelopment()
-	} else {
-		// Silent mode: errors and above
-		config := zap.NewProductionConfig()
-		config.Level = zap.NewAtomicLevelAt(zap.ErrorLevel)
-		logger, err = config.Build()
-	}
+	// Verbose mode: full development logging
+	logger, err = zap.NewDevelopment()
+
 	if err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
@@ -144,12 +137,12 @@ func Process(telemetryFolder string) {
 	log.Printf("STARTUP: Found %d IBT files to process", expectedFiles)
 
 	// Initialize progress display
-	if !*quiet {
-		progress = worker.NewProgressDisplay(cfg.WorkerCount, expectedFiles)
-		pool.SetProgressDisplay(progress)
-		progress.Start()
-		defer progress.Stop()
-	}
+	// if !*quiet {
+	// 	progress = worker.NewProgressDisplay(cfg.WorkerCount, expectedFiles)
+	// 	pool.SetProgressDisplay(progress)
+	// 	progress.Start()
+	// 	defer progress.Stop()
+	// }
 
 	// Start worker pool
 	if err := pool.Start(); err != nil {

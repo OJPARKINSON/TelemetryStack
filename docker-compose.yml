@@ -49,53 +49,6 @@ services:
       - "traefik.http.routers.dashboard-tailscale.middlewares=dashboard-auth,secure-dashboard@file"
       - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
 
-  rabbitmq:
-    image: rabbitmq:4.0-management
-    container_name: rabbitmq
-    restart: unless-stopped
-    ports:
-      - "5672:5672"
-      - "15672:15672" # Management UI
-      - "15692:15692" # Prometheus metrics
-    volumes:
-      - ./config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
-      - ./config/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
-      - ./config/definitions.json:/etc/rabbitmq/definitions.json:ro
-      - rabbitmq-data:/var/lib/rabbitmq
-    environment:
-      # Create default admin user automatically
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: changeme
-      # Enable management load definitions
-      RABBITMQ_MANAGEMENT_LOAD_DEFINITIONS: /etc/rabbitmq/definitions.json
-    networks:
-      - telemetry-network
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 5g
-        reservations:
-          cpus: '0.5'
-          memory: 1g
-    healthcheck:
-      test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.rabbitmq-local.rule=(Host(`${LOCAL_DOMAIN}`) || Host(`localhost`)) && PathPrefix(`/rabbitmq`)"
-      - "traefik.http.routers.rabbitmq-local.entrypoints=web"
-      - "traefik.http.routers.rabbitmq-local.middlewares=rabbitmq-stripprefix@file,secure-management@file"
-      - "traefik.http.routers.rabbitmq-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/rabbitmq`)"
-      - "traefik.http.routers.rabbitmq-tailscale.entrypoints=websecure"
-      - "traefik.http.routers.rabbitmq-tailscale.tls=true"
-      - "traefik.http.routers.rabbitmq-tailscale.tls.certresolver=tailscale"
-      - "traefik.http.routers.rabbitmq-tailscale.middlewares=rabbitmq-stripprefix@file,secure-management@file"
-      - "traefik.http.services.rabbitmq.loadbalancer.server.port=15672"
-
   questdb:
     image: questdb/questdb:latest
     container_name: questdb
@@ -152,10 +105,7 @@ services:
       QUESTDB_URL: questdb:8812;username=admin;password=quest
       QUESTDB_HOST: ${QUESTDB_HOST:-questdb}
       QUESTDB_PORT: ${QUESTDB_HTTP_PORT:-9000}
-      RABBITMQ_HOST: rabbitmq
     depends_on:
-      rabbitmq:
-        condition: service_healthy
       questdb:
         condition: service_started
     deploy:
@@ -329,8 +279,6 @@ services:
           memory: 256m
 
 volumes:
-  rabbitmq-data:
-    driver: local
   questdb-data:
     driver: local
   grafana-data:
