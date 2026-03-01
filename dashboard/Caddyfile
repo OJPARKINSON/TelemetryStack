@@ -10,18 +10,14 @@ handle /api/* {
 	reverse_proxy telemetry-service:8010
 }
 
-handle_path /dash/* {
+handle_path /dashboard/* {
 	root * /app/www
 	try_files {path} {path}/ /index.html
 	file_server
 }
 
-handle /dash {
-	redir /dash/ permanent
+handle /dashboard {
+	redir /dashboard/ permanent
 }
 
-handle {
-	root * /app/www
-	try_files {path} {path}/ /index.html
-	file_server
-}
+redir / /dashboard/ permanent

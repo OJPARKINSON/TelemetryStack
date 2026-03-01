@@ -102,18 +102,12 @@ services:
     labels:
       - "traefik.enable=true"
       # Dashboard main routes
-      - "traefik.http.routers.telemetry-dashboard-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && PathPrefix(`/dash`)"
+      - "traefik.http.routers.telemetry-dashboard-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && PathPrefix(`/dashboard`)"
       - "traefik.http.routers.telemetry-dashboard-local.entrypoints=websecure"
       - "traefik.http.routers.telemetry-dashboard-local.tls=true"
-      - "traefik.http.routers.telemetry-dashboard-local.middlewares=dashboard-stripprefix,default-security@file"
-      # Static assets routes (higher priority)
-      - "traefik.http.routers.dashboard-static-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && PathPrefix(`/_next/static`)"
-      - "traefik.http.routers.dashboard-static-local.entrypoints=websecure"
-      - "traefik.http.routers.dashboard-static-local.tls=true"
-      - "traefik.http.routers.dashboard-static-local.priority=200"
-      # Middlewares and services
-      - "traefik.http.middlewares.dashboard-stripprefix.stripprefix.prefixes=/dash"
-      - "traefik.http.services.telemetry-dashboard.loadbalancer.server.port=3000"
+      - "traefik.http.routers.telemetry-dashboard-local.middlewares=default-security@file"
+      # Service configuration
+      - "traefik.http.services.telemetry-dashboard.loadbalancer.server.port=8080"
       - "com.centurylinklabs.watchtower.enable=true"
 
   grafana:
