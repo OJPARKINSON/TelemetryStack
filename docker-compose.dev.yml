@@ -92,19 +92,6 @@ services:
     restart: unless-stopped
     ports:
       - "3000:8080"
-    environment:
-      API_URL: http://localhost:8010/
-      QUESTDB_URL: postgresql://admin:quest@questdb:8812/qdb
-      QUESTDB_HOST: questdb
-      QUESTDB_PORT: 8812
-      QUESTDB_DATABASE: qdb
-      QUESTDB_USER: admin
-      QUESTDB_PASSWORD: quest
-      
-      NODE_ENV: production
-      NODE_OPTIONS: "--max-old-space-size=768 --max-semi-space-size=128"  
-      NEXT_PUBLIC_APP_URL: https://localhost:3000/dashboard
-      NEXT_PUBLIC_BACKEND_URL: https://localhost:3000/dashboard/api
     networks:
       - telemetry-network
     deploy:
@@ -115,7 +102,7 @@ services:
     labels:
       - "traefik.enable=true"
       # Dashboard main routes
-      - "traefik.http.routers.telemetry-dashboard-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.telemetry-dashboard-local.rule=Host(`${LOCAL_DOMAIN:-pi.local}`) && PathPrefix(`/dash`)"
       - "traefik.http.routers.telemetry-dashboard-local.entrypoints=websecure"
       - "traefik.http.routers.telemetry-dashboard-local.tls=true"
       - "traefik.http.routers.telemetry-dashboard-local.middlewares=dashboard-stripprefix,default-security@file"
@@ -125,7 +112,7 @@ services:
       - "traefik.http.routers.dashboard-static-local.tls=true"
       - "traefik.http.routers.dashboard-static-local.priority=200"
       # Middlewares and services
-      - "traefik.http.middlewares.dashboard-stripprefix.stripprefix.prefixes=/dashboard"
+      - "traefik.http.middlewares.dashboard-stripprefix.stripprefix.prefixes=/dash"
       - "traefik.http.services.telemetry-dashboard.loadbalancer.server.port=3000"
       - "com.centurylinklabs.watchtower.enable=true"
 

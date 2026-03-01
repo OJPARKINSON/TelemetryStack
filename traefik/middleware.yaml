@@ -96,7 +96,7 @@ http:
     dashboard-stripprefix:
       stripPrefix:
         prefixes:
-          - "/dashboard"
+          - "/dash"
 
     prometheus-stripprefix:
       stripPrefix:
