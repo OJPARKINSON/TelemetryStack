@@ -3,7 +3,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-ENV VITE_BASE_PATH=/dash/
+ENV VITE_BASE_PATH=/dashboard/
 RUN npm run build
 
 FROM caddy:alpine
