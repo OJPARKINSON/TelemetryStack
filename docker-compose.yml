@@ -141,15 +141,13 @@ services:
         limits:
           cpus: '1.0'
           memory: 1g
-    environment:
-      API_URL: ${API_URL}
     labels:
       - "traefik.enable=true"
       # Dashboard routes
-      - "traefik.http.routers.telemetry-dashboard-local.rule=(Host(`${LOCAL_DOMAIN:-localhost}`) || Host(`localhost`)) && PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.telemetry-dashboard-local.rule=(Host(`${LOCAL_DOMAIN:-localhost}`) || Host(`localhost`)) && PathPrefix(`/dash`)"
       - "traefik.http.routers.telemetry-dashboard-local.entrypoints=web"
       - "traefik.http.routers.telemetry-dashboard-local.middlewares=dashboard-stripprefix@file,default-security@file"
-      - "traefik.http.routers.telemetry-dashboard-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.telemetry-dashboard-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/dash`)"
       - "traefik.http.routers.telemetry-dashboard-tailscale.entrypoints=websecure"
       - "traefik.http.routers.telemetry-dashboard-tailscale.tls=true"
       - "traefik.http.routers.telemetry-dashboard-tailscale.tls.certresolver=tailscale"
