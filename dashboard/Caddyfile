@@ -6,18 +6,22 @@ header {
 	X-Content-Type-Options "nosniff"
 }
 
-handle /api/* {
-	reverse_proxy telemetry-service:8010
+# Redirect bare /dashboard to /dashboard/
+@dashboard-bare path /dashboard
+handle @dashboard-bare {
+	redir /dashboard/ permanent
 }
 
+# Handle /dashboard/* — strip prefix and serve static files
 handle_path /dashboard/* {
 	root * /app/www
 	try_files {path} {path}/ /index.html
 	file_server
 }
 
-handle /dashboard {
-	redir /dashboard/ permanent
+# Fallback: serve at root (for when Traefik has already stripped the prefix)
+handle {
+	root * /app/www
+	try_files {path} {path}/ /index.html
+	file_server
 }
-
-redir / /dashboard/ permanent
