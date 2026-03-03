@@ -6,7 +6,6 @@ COPY . .
 ENV VITE_BASE_PATH=/dashboard/
 RUN npm run build
 
-FROM caddy:alpine
-COPY --from=build /app/dist /app/www
-COPY Caddyfile /etc/caddy/Caddyfile
-EXPOSE 8080
+FROM devforth/spa-to-http:latest
+COPY --from=build /app/dist/ .
+CMD ["--base-path", "/dashboard", "--brotli"]

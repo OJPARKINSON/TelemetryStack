@@ -2,6 +2,9 @@ services:
   traefik:
     image: traefik:latest
     restart: unless-stopped
+    security_opt:
+      - label:disable
+    user: "0"
     ports:
       - "8080:80"
       - "8443:443"
@@ -96,8 +99,6 @@ services:
       dockerfile: Dockerfile
     container_name: telemetry-dashboard
     restart: unless-stopped
-    ports:
-      - "3000:8080"
     networks:
       - telemetry-network
     deploy:
@@ -110,7 +111,6 @@ services:
       # Dashboard main routes
       - "traefik.http.routers.telemetry-dashboard-local.rule=Host(`${LOCAL_DOMAIN:-localhost}`) &&PathPrefix(`/dashboard`)"
       - "traefik.http.routers.telemetry-dashboard-local.entrypoints=web"
-      - "traefik.http.routers.telemetry-dashboard-local.middlewares=default-security@file"
       # Service configuration
       - "traefik.http.services.telemetry-dashboard.loadbalancer.server.port=8080"
       - "com.centurylinklabs.watchtower.enable=true"

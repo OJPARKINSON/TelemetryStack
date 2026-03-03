@@ -15,20 +15,12 @@ export const Route = createFileRoute("/$sessionId")({
 });
 
 const fetcher = (url: string) =>
-	fetch(url, {
-		mode: "no-cors",
-		method: "GET",
-		headers: { "Content-Type": "application/json", "Content-Encoding": "gzip" },
-	}).then(async (res) => {
+	fetch(url).then(async (res) => {
 		return processIRacingDataWithGPS(await res.json());
 	});
 
 const lapsFetcher = (url: string) =>
-	fetch(url, {
-		mode: "no-cors",
-		method: "GET",
-		headers: { "Content-Type": "application/json", "Content-Encoding": "gzip" },
-	}).then((res) => {
+	fetch(url).then((res) => {
 		return res.json() as unknown as Array<number>;
 	});
 
