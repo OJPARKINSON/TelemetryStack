@@ -107,7 +107,7 @@ function DatabaseUnavailableError() {
 
 function TelemetryLoadingSkeleton() {
 	return (
-		<div className="flex min-h-screen bg-zinc-950">
+		<div className="flex min-w-screen min-h-screen bg-zinc-950">
 			<div className="flex w-64 flex-col border-zinc-800/50 border-r bg-zinc-900/50">
 				<div className="px-6 py-6">
 					<div className="animate-pulse">
