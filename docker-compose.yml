@@ -146,12 +146,10 @@ services:
       # Dashboard routes
       - "traefik.http.routers.telemetry-dashboard-local.rule=(Host(`${LOCAL_DOMAIN:-localhost}`) || Host(`localhost`)) && PathPrefix(`/dashboard`)"
       - "traefik.http.routers.telemetry-dashboard-local.entrypoints=web"
-      - "traefik.http.routers.telemetry-dashboard-local.middlewares=default-security@file"
       - "traefik.http.routers.telemetry-dashboard-tailscale.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/dashboard`)"
       - "traefik.http.routers.telemetry-dashboard-tailscale.entrypoints=websecure"
       - "traefik.http.routers.telemetry-dashboard-tailscale.tls=true"
       - "traefik.http.routers.telemetry-dashboard-tailscale.tls.certresolver=tailscale"
-      - "traefik.http.routers.telemetry-dashboard-tailscale.middlewares=default-security@file"
       # Service configuration
       - "traefik.http.services.telemetry-dashboard.loadbalancer.server.port=8080"
 

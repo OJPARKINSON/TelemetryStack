@@ -7,14 +7,7 @@ import SessionSelector, {
 // import { fetcher } from "@/lib/Fetch";
 
 const fetcher = (url: string) =>
-	fetch(url, {
-		mode: "no-cors",
-		method: "GET",
-		headers: { "Content-Type": "application/json", "Content-Encoding": "gzip" },
-	}).then((res) => {
-		console.log(res);
-		return res.json() as unknown as Session[];
-	});
+	fetch(url).then((res) => res.json() as unknown as Session[]);
 
 export const Route = createFileRoute("/")({
 	component: RouteComponent,
