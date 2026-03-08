@@ -149,10 +149,11 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 
 		// Collect metrics from this group's PubSub
 		metrics := pubSub.GetMetrics()
+		totalRecords += metrics.TotalRecords
+		totalBatches += metrics.TotalBatches
 		if allMessagingMetrics == nil {
 			allMessagingMetrics = &metrics
 		} else {
-			// Accumulate metrics across groups
 			allMessagingMetrics.TotalBatches += metrics.TotalBatches
 			allMessagingMetrics.TotalRecords += metrics.TotalRecords
 			allMessagingMetrics.TotalBytes += metrics.TotalBytes

@@ -353,31 +353,31 @@ func (ps *PubSub) publishWorker() {
 	}
 }
 
-// doPublish performs the actual RabbitMQ publish operation
+// doPublish performs the actual HTTP publish operation
 func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte) error {
 	dataReader := bytes.NewReader(data)
 	res, err := http.Post("http://localhost:8010/api/ingest", "application/x-protobuf", dataReader)
-	if err == nil && res.StatusCode == 200 {
+	if err != nil {
+		log.Printf("Worker %d: Failed to publish batch %s: %v", ps.workerID, batch.BatchId, err)
+		ps.recordFailure()
+		ps.mu.Lock()
+		ps.failedBatchCount++
+		ps.mu.Unlock()
+		return nil
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		ps.recordSuccess()
 		return nil
 	}
 
-	log.Printf("Worker %d: Failed to publish batch : %v",
-		ps.workerID, err)
-
-	// If we reach here, publish failed completely
-	// Record the failure for circuit breaker
+	log.Printf("Worker %d: Batch %s publish returned status %d", ps.workerID, batch.BatchId, res.StatusCode)
 	ps.recordFailure()
-
-	log.Printf("Worker %d: Batch %s persisted to disk after RabbitMQ failure (consecutive failures: %d)",
-		ps.workerID, batch.BatchId, ps.consecutiveFailures)
-
-	// Periodically clean up old batches
 	ps.mu.Lock()
-	defer ps.mu.Unlock()
 	ps.failedBatchCount++
-
-	return nil // Don't return error since we've handled it via persistence
+	ps.mu.Unlock()
+	return nil
 }
 
 func (ps *PubSub) flushBatchInternal() error {
