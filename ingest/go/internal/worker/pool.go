@@ -39,8 +39,7 @@ type WorkerPool struct {
 	rabbitPool *messaging.ConnectionPool
 	logger     *zap.Logger
 
-	workerMetrics   []WorkerMetrics
-	progressDisplay *ProgressDisplay
+	workerMetrics []WorkerMetrics
 
 	// Data loss monitoring
 	totalRabbitMQFailures     int
@@ -107,10 +106,6 @@ func NewWorkerPool(cfg *config.Config, logger *zap.Logger) *WorkerPool {
 			WorkerMetrics: workerMetrics,
 		},
 	}
-}
-
-func (wp *WorkerPool) SetProgressDisplay(pd *ProgressDisplay) {
-	wp.progressDisplay = pd
 }
 
 func (wp *WorkerPool) Start() error {
@@ -188,10 +183,6 @@ func (wp *WorkerPool) Stop() error {
 	close(wp.resultsChan)
 	close(wp.errorsChan)
 
-	if wp.progressDisplay != nil {
-		wp.progressDisplay.Stop()
-	}
-
 	wp.logFinalMetrics()
 
 	return err
@@ -233,9 +224,6 @@ func (wp *WorkerPool) UpdateWorkerStatus(workerID int, currentFile, status strin
 		wp.workerMetrics[workerID].Status = status
 		wp.workerMetrics[workerID].LastActivity = time.Now()
 
-		if wp.progressDisplay != nil {
-			wp.progressDisplay.UpdateWorker(workerID, currentFile, status)
-		}
 	}
 }
 
@@ -310,31 +298,6 @@ func (wp *WorkerPool) handleResult(result WorkResult) {
 			wm.ProcessingRate = float64(result.ProcessedCount) / result.Duration.Seconds()
 		}
 	}
-
-	if wp.progressDisplay != nil {
-		if result.WorkerID >= 0 && result.WorkerID < len(wp.workerMetrics) {
-			wm := &wp.workerMetrics[result.WorkerID]
-
-			// Update status to IDLE (worker is now waiting for more work)
-			wp.progressDisplay.UpdateWorker(result.WorkerID, "", "IDLE")
-
-			// Update stats
-			throughput := 0.0
-			if result.Duration.Seconds() > 0 {
-				// Rough estimate: assuming average record size of 512 bytes
-				bytesProcessed := float64(result.ProcessedCount * 512)
-				throughput = (bytesProcessed / 1024 / 1024) / result.Duration.Seconds()
-			}
-
-			wp.progressDisplay.UpdateWorkerStats(result.WorkerID, WorkerStats{
-				FilesProcessed:   wm.FilesProcessed,
-				RecordsProcessed: int(wm.TotalRecords),
-				Throughput:       throughput,
-			})
-		}
-	}
-
-	// Removed non-actionable Info log - metrics tracked via Prometheus
 }
 
 func (wp *WorkerPool) handleError(workError WorkError) {

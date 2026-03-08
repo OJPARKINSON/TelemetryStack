@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"fmt"
+	"log"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -21,12 +21,12 @@ var rootCmd = &cobra.Command{
 	The ingest service uploads all the sessions that are stored on your local machine to the IRacing dashboard service. It can be run in the background or as a one off.`,
 	Args: cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Inside rootCmd Run with args: %v \n", cmd)
+		log.Printf("Inside rootCmd Run with args: %v \n", cmd)
 
 		telemetryPath := cmd.Flag("telemetryPath").Value.String()
 
 		if telemetryPath == "" {
-			fmt.Println("no telemetry path found")
+			log.Printf("no telemetry path found")
 		} else {
 			Process(telemetryPath)
 		}
