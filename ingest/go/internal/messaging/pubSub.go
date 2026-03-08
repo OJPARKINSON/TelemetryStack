@@ -186,14 +186,17 @@ func (ps *PubSub) Exec(data []map[string]interface{}) error {
 	return nil
 }
 
-func (ps *PubSub) recordRabbitMQFailure() {
+func (ps *PubSub) recordFailure() {
+	ps.mu.Lock()
 	ps.consecutiveFailures++
 	ps.lastFailureTime = time.Now()
-
+	ps.mu.Unlock()
 }
 
-func (ps *PubSub) recordRabbitMQSuccess() {
+func (ps *PubSub) recordSuccess() {
+	ps.mu.Lock()
 	ps.consecutiveFailures = 0
+	ps.mu.Unlock()
 }
 
 func (ps *PubSub) AddRecord(record map[string]interface{}) error {
@@ -354,28 +357,25 @@ func (ps *PubSub) publishWorker() {
 func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte) error {
 	dataReader := bytes.NewReader(data)
 	res, err := http.Post("http://localhost:8010/api/ingest", "application/x-protobuf", dataReader)
-	if err == nil {
-		fmt.Println("ingesting: ", res.StatusCode)
-
-		// Success! Record this and reset circuit breaker
-		ps.recordRabbitMQSuccess()
+	if err == nil && res.StatusCode == 200 {
+		ps.recordSuccess()
 		return nil
 	}
 
 	log.Printf("Worker %d: Failed to publish batch : %v",
 		ps.workerID, err)
 
-	// If we reach here, RabbitMQ publish failed completely
+	// If we reach here, publish failed completely
 	// Record the failure for circuit breaker
-	ps.recordRabbitMQFailure()
+	ps.recordFailure()
 
 	log.Printf("Worker %d: Batch %s persisted to disk after RabbitMQ failure (consecutive failures: %d)",
 		ps.workerID, batch.BatchId, ps.consecutiveFailures)
 
 	// Periodically clean up old batches
 	ps.mu.Lock()
+	defer ps.mu.Unlock()
 	ps.failedBatchCount++
-	ps.mu.Unlock()
 
 	return nil // Don't return error since we've handled it via persistence
 }

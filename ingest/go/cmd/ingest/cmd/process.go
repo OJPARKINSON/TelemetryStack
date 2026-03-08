@@ -5,8 +5,6 @@ package cmd
 
 import (
 	"context"
-	"flag"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -26,9 +24,8 @@ import (
 )
 
 var (
-	fresh    bool
-	progress *worker.ProgressDisplay
-	logger   *zap.Logger
+	fresh  bool
+	logger *zap.Logger
 )
 
 var processCmd = &cobra.Command{
@@ -38,7 +35,7 @@ var processCmd = &cobra.Command{
 	
 	To clean the cache of sent file run with --fresh to upload all data in the dir again`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Inside rootCmd Run with args: %v\n", args)
+		log.Printf("Inside rootCmd Run with args: %v\n", args)
 		Process(args[0])
 	},
 }
@@ -51,7 +48,6 @@ func init() {
 }
 
 func Process(telemetryFolder string) {
-	var quiet = flag.Bool("quiet", false, "Disable progress display")
 
 	startTime := time.Now()
 
@@ -136,14 +132,6 @@ func Process(telemetryFolder string) {
 	}
 	log.Printf("STARTUP: Found %d IBT files to process", expectedFiles)
 
-	// Initialize progress display
-	// if !*quiet {
-	// 	progress = worker.NewProgressDisplay(cfg.WorkerCount, expectedFiles)
-	// 	pool.SetProgressDisplay(progress)
-	// 	progress.Start()
-	// 	defer progress.Stop()
-	// }
-
 	// Start worker pool
 	if err := pool.Start(); err != nil {
 		logger.Fatal("Failed to start worker pool",
@@ -158,7 +146,7 @@ func Process(telemetryFolder string) {
 	}()
 
 	// Wait for completion
-	waitForCompletion(ctx, pool, startTime, expectedFiles, *quiet)
+	waitForCompletion(ctx, pool, startTime, expectedFiles)
 
 	// Write memory profile if MEM_PROFILE environment variable is set
 	if memProfile := os.Getenv("MEM_PROFILE"); memProfile != "" {
@@ -214,7 +202,7 @@ func discoverAndQueueFiles(ctx context.Context, pool *worker.WorkerPool, telemet
 	return filesQueued, nil
 }
 
-func waitForCompletion(ctx context.Context, pool *worker.WorkerPool, startTime time.Time, expectedFiles int, quiet bool) {
+func waitForCompletion(ctx context.Context, pool *worker.WorkerPool, startTime time.Time, expectedFiles int) {
 	for {
 		select {
 		case <-ctx.Done():

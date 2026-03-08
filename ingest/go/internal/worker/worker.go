@@ -70,11 +70,6 @@ func (wp *WorkerPool) processWorkItem(ctx context.Context, workerID int, item Wo
 	}
 	defer processor.Close()
 
-	// Set progress callback if progress display is available
-	if wp.progressDisplay != nil {
-		processor.SetProgressCallback(wp.progressDisplay)
-	}
-
 	processCtx, processCancel := context.WithTimeout(ctx, wp.config.FileProcessTimeout)
 	defer processCancel()
 
