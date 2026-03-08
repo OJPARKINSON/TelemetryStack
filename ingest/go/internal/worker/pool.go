@@ -64,7 +64,7 @@ type PoolMetrics struct {
 	PersistedBatches     int
 	CircuitBreakerEvents int
 	MemoryPressureEvents int
-	DataLossRate         float64 // Percentage of data that was lost vs persisted
+	DataLossRate         float64
 }
 
 func NewWorkerPool(cfg *config.Config, logger *zap.Logger) *WorkerPool {
@@ -76,10 +76,10 @@ func NewWorkerPool(cfg *config.Config, logger *zap.Logger) *WorkerPool {
 	if !cfg.DisableRabbitMQ {
 		rabbitPool, err = messaging.NewConnectionPool(cfg.RabbitMQURL, cfg.RabbitMQPoolSize)
 		if err != nil {
-			logger.Fatal("Failed to create RabbitMQ connection pool",
+			logger.Fatal("Failed to create connection pool",
 				zap.Error(err),
 				zap.String("url", cfg.RabbitMQURL),
-				zap.String("action", "Verify RabbitMQ is running and accessible"))
+			)
 		}
 	}
 
@@ -181,7 +181,7 @@ func (wp *WorkerPool) Stop() error {
 	wp.logger.Info("All publishers finished draining")
 
 	if wp.rabbitPool != nil {
-		wp.logger.Info("Closing RabbitMQ connection pool")
+		wp.logger.Info("Closing connection pool")
 		wp.rabbitPool.Close()
 	}
 
