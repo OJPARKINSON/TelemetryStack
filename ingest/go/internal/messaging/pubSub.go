@@ -63,12 +63,12 @@ type PubSub struct {
 	batchSizeRecords int
 
 	// Data persistence for RabbitMQ failures
-	failedBatchCount   int
+	failedBatchCount   atomic.Int32
 	persistedBatches   int
 	maxPersistentBytes int64
 
-	// RabbitMQ failures fallback
-	consecutiveFailures    int
+	// Publish failures fallback
+	consecutiveFailures    atomic.Int32
 	lastFailureTime        time.Time
 	maxConsecutiveFailures int
 
@@ -79,6 +79,8 @@ type PubSub struct {
 	isShuttingDown atomic.Bool
 
 	mu sync.Mutex
+
+	client http.Client
 }
 
 type publishRequest struct {
@@ -93,13 +95,14 @@ type PublishMetrics struct {
 	TotalBytes          int64
 	CurrentBatchSize    int
 	LastFlush           time.Time
-	FailedBatches       int
+	FailedBatches       atomic.Int32
 	PersistedBatches    int
 	CircuitBreakerOpen  bool
-	ConsecutiveFailures int
+	ConsecutiveFailures atomic.Int32
 }
 
 func NewPubSub(sessionId string, sessionTime time.Time, cfg *config.Config, pool *ConnectionPool, workerId int) *PubSub {
+	client := http.Client{Timeout: 10 * time.Second}
 
 	ps := &PubSub{
 		pool:               pool,
@@ -107,13 +110,13 @@ func NewPubSub(sessionId string, sessionTime time.Time, cfg *config.Config, pool
 		sessionTime:        sessionTime,
 		config:             cfg,
 		ctx:                context.Background(),
-		batchPool:          NewBatchPool(cfg.RabbitMQBatchSize),
+		batchPool:          NewBatchPool(cfg.WorkerCount),
 		batchSizeBytes:     cfg.BatchSizeBytes,
 		batchSizeRecords:   cfg.BatchSizeRecords,
 		lastFlush:          time.Now(),
 		maxPersistentBytes: 500 * 1024 * 1024, // 500MB max persistent storage per worker
 
-		consecutiveFailures:    0,
+		consecutiveFailures:    atomic.Int32{},
 		maxConsecutiveFailures: 3, // Open circuit after 3 consecutive failures
 
 		// Async publishing - buffer up to 20 batches to prevent blocking
@@ -121,6 +124,7 @@ func NewPubSub(sessionId string, sessionTime time.Time, cfg *config.Config, pool
 		publishDone:  make(chan struct{}),
 
 		workerID: workerId,
+		client:   client,
 	}
 
 	ps.recordBatch = make([]*Telemetry, 0, cfg.BatchSizeRecords)
@@ -187,16 +191,12 @@ func (ps *PubSub) Exec(data []map[string]interface{}) error {
 }
 
 func (ps *PubSub) recordFailure() {
-	ps.mu.Lock()
-	ps.consecutiveFailures++
+	ps.consecutiveFailures.Add(1)
 	ps.lastFailureTime = time.Now()
-	ps.mu.Unlock()
 }
 
 func (ps *PubSub) recordSuccess() {
-	ps.mu.Lock()
-	ps.consecutiveFailures = 0
-	ps.mu.Unlock()
+	ps.consecutiveFailures.Store(0)
 }
 
 func (ps *PubSub) AddRecord(record map[string]interface{}) error {
@@ -355,14 +355,16 @@ func (ps *PubSub) publishWorker() {
 
 // doPublish performs the actual HTTP publish operation
 func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte) error {
+	startTime := time.Now()
 	dataReader := bytes.NewReader(data)
-	res, err := http.Post("http://localhost:8010/api/ingest", "application/x-protobuf", dataReader)
+
+	res, err := ps.client.Post(ps.config.IngestUrl, "application/x-protobuf", dataReader)
 	if err != nil {
 		log.Printf("Worker %d: Failed to publish batch %s: %v", ps.workerID, batch.BatchId, err)
 		ps.recordFailure()
-		ps.mu.Lock()
-		ps.failedBatchCount++
-		ps.mu.Unlock()
+
+		ps.failedBatchCount.Add(1)
+
 		return nil
 	}
 	defer res.Body.Close()
@@ -374,9 +376,10 @@ func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte) error {
 
 	log.Printf("Worker %d: Batch %s publish returned status %d", ps.workerID, batch.BatchId, res.StatusCode)
 	ps.recordFailure()
-	ps.mu.Lock()
-	ps.failedBatchCount++
-	ps.mu.Unlock()
+
+	ps.failedBatchCount.Add(1)
+
+	log.Println("do publish took: ", time.Since(startTime))
 	return nil
 }
 

@@ -157,7 +157,7 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 			allMessagingMetrics.TotalBatches += metrics.TotalBatches
 			allMessagingMetrics.TotalRecords += metrics.TotalRecords
 			allMessagingMetrics.TotalBytes += metrics.TotalBytes
-			allMessagingMetrics.FailedBatches += metrics.FailedBatches
+			allMessagingMetrics.FailedBatches.Add(metrics.FailedBatches.Load())
 			allMessagingMetrics.PersistedBatches += metrics.PersistedBatches
 		}
 
