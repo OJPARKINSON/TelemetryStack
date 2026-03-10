@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/config"
@@ -42,7 +43,7 @@ type WorkerPool struct {
 	workerMetrics []WorkerMetrics
 
 	// Data loss monitoring
-	totalRabbitMQFailures     int
+	totalPublishFailures      atomic.Int32
 	totalPersistedBatches     int
 	totalCircuitBreakerEvents int
 	totalMemoryPressureEvents int
@@ -59,7 +60,7 @@ type PoolMetrics struct {
 	WorkerMetrics         []WorkerMetrics
 
 	// Data loss tracking
-	RabbitMQFailures     int
+	totalPublishFailures atomic.Int32
 	PersistedBatches     int
 	CircuitBreakerEvents int
 	MemoryPressureEvents int
@@ -73,7 +74,7 @@ func NewWorkerPool(cfg *config.Config, logger *zap.Logger) *WorkerPool {
 	var err error
 
 	if !cfg.DisableRabbitMQ {
-		rabbitPool, err = messaging.NewConnectionPool(cfg.RabbitMQURL, cfg.RabbitMQPoolSize)
+		rabbitPool, err = messaging.NewConnectionPool(cfg.RabbitMQURL, cfg.WorkerCount)
 		if err != nil {
 			logger.Fatal("Failed to create connection pool",
 				zap.Error(err),
@@ -199,7 +200,7 @@ func (wp *WorkerPool) GetMetrics() PoolMetrics {
 	copy(metrics.WorkerMetrics, wp.workerMetrics)
 
 	// Copy data loss tracking metrics
-	metrics.RabbitMQFailures = wp.totalRabbitMQFailures
+	metrics.totalPublishFailures = wp.totalPublishFailures
 	metrics.PersistedBatches = wp.totalPersistedBatches
 	metrics.CircuitBreakerEvents = wp.totalCircuitBreakerEvents
 	metrics.MemoryPressureEvents = wp.totalMemoryPressureEvents
@@ -273,7 +274,7 @@ func (wp *WorkerPool) handleResult(result WorkResult) {
 
 	// Aggregate messaging metrics from result if available
 	if result.MessagingMetrics != nil {
-		wp.totalRabbitMQFailures += result.MessagingMetrics.FailedBatches
+		wp.totalPublishFailures.Add(result.MessagingMetrics.FailedBatches.Load())
 		wp.totalPersistedBatches += result.MessagingMetrics.PersistedBatches
 		if result.MessagingMetrics.CircuitBreakerOpen {
 			wp.totalCircuitBreakerEvents++

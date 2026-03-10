@@ -29,15 +29,7 @@ type Config struct {
 	PprofPort    string
 	MemoryTuning bool
 
-	RabbitMQPoolSize      int
-	RabbitMQPrefetchCount int
-	RabbitMQBatchSize     int
-	RabbitMQBatchTimeout  time.Duration
-	RabbitMQConfirms      bool
-	RabbitMQPersistent    bool
-	RabbitMQHeartbeat     time.Duration
-	RabbitMQChannelMax    int
-	RabbitMQFrameSize     int
+	IngestUrl string
 
 	BatchSizeRecords int
 
@@ -90,15 +82,7 @@ func LoadConfig() *Config {
 		PprofPort:    getEnv("PPROF_PORT", "6060"),
 		MemoryTuning: getEnvAsBool("MEMORY_TUNING", true),
 
-		RabbitMQPoolSize:      getEnvAsInt("RABBITMQ_POOL_SIZE", workerCount),
-		RabbitMQPrefetchCount: getEnvAsInt("RABBITMQ_PREFETCH_COUNT", 100000),
-		RabbitMQBatchSize:     getEnvAsInt("RABBITMQ_BATCH_SIZE", 16000),
-		RabbitMQBatchTimeout:  getEnvAsDuration("RABBITMQ_BATCH_TIMEOUT", 2*time.Millisecond),
-		RabbitMQConfirms:      getEnvAsBool("RABBITMQ_CONFIRMS", false),
-		RabbitMQPersistent:    getEnvAsBool("RABBITMQ_PERSISTENT", false),
-		RabbitMQHeartbeat:     getEnvAsDuration("RABBITMQ_HEARTBEAT", 60*time.Second),
-		RabbitMQChannelMax:    getEnvAsInt("RABBITMQ_CHANNEL_MAX", 8192),
-		RabbitMQFrameSize:     getEnvAsInt("RABBITMQ_FRAME_SIZE", 16777216),
+		IngestUrl: getEnv("INGEST_URL", "http://localhost:8010/api/ingest"),
 
 		UseStructPipeline: getEnvAsBool("USE_STRUCT_PIPELINE", true),
 
