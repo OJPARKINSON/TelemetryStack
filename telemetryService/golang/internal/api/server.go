@@ -2,11 +2,9 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"runtime/debug"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/compress"
@@ -15,11 +13,11 @@ import (
 )
 
 type Server struct {
-	httpServer    *http.Server
+	config        *config.Config
 	logger        *log.Logger
 	queryExecutor *persistance.QueryExecutor
-	config        *config.Config
 	senderPool    *persistance.SenderPool
+	addr          string
 
 	app *fiber.App
 }
@@ -37,19 +35,17 @@ func NewServer(addr string, config *config.Config, senderPool *persistance.Sende
 		config:        config,
 		senderPool:    senderPool,
 		app:           app,
+		addr:          addr,
 	}
 
-	server.httpServer = &http.Server{
-		Addr:    addr,
-		Handler: server.setupRoutes(),
-	}
+	server.setupRoutes()
 
 	return server
 }
 
 func (s *Server) Start() error {
-	s.logger.Printf("Starting api server on: %s", s.httpServer.Addr)
-	if err := s.app.Listen(s.httpServer.Addr); err != nil && err != http.ErrServerClosed {
+	s.logger.Printf("Starting api server on: %s", s.addr)
+	if err := s.app.Listen(s.addr); err != nil && err != http.ErrServerClosed {
 		return err
 	}
 	return nil
@@ -57,33 +53,14 @@ func (s *Server) Start() error {
 
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.logger.Println("Shutting down admin server...")
-	return s.httpServer.Shutdown(ctx)
+	return s.app.Shutdown()
 }
 
-func (s *Server) setupRoutes() http.Handler {
-	mux := http.NewServeMux()
-
+func (s *Server) setupRoutes() {
 	s.app.Post("/api/ingest", s.handleIngest)
 
 	s.app.Get("/api/sessions", s.handleGetSessions)
 	s.app.Get("/api/sessions/:sessionId/laps", s.handleGetLaps)
 	s.app.Get("/api/sessions/:sessionId/laps/:lapId", s.handleGetTelemetry)
 	s.app.Get("/api/sessions/:sessionId/laps/:lapId/geojson", s.handleGetTelemetryGeoJson)
-
-	// Add panic recovery middleware
-	return RecoveryMiddleware(mux)
-}
-
-func RecoveryMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			if err := recover(); err != nil {
-				w.Header().Set("Connection", "close")
-				fmt.Println(err)
-				debug.PrintStack() // from "runtime/debug"
-				// app.serverError(w, fmt.Errorf("%s", err))
-			}
-		}()
-		next.ServeHTTP(w, r)
-	})
 }

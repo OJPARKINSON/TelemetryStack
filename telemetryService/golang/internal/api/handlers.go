@@ -51,7 +51,7 @@ func (s *Server) handleGetLaps(c fiber.Ctx) {
 
 	slices.Sort(laps)
 
-	respondCompressedJSON(c, 200, laps)
+	respondJSON(c, 200, laps)
 }
 
 // /api/sessions/123456/laps/1
@@ -70,7 +70,7 @@ func (s *Server) handleGetTelemetry(c fiber.Ctx) {
 		return
 	}
 
-	respondCompressedJSON(c, 200, lapData)
+	respondJSON(c, 200, lapData)
 }
 
 // /api/sessions/123456/laps/1/geojson
@@ -92,7 +92,7 @@ func (s *Server) handleGetTelemetryGeoJson(c fiber.Ctx) {
 		return
 	}
 
-	respondCompressedJSON(c, http.StatusOK, geoJSON)
+	respondJSON(c, http.StatusOK, geoJSON)
 }
 
 // /api/sync/lap/{sessionId}/{lapId}

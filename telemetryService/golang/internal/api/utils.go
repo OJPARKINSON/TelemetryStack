@@ -10,14 +10,7 @@ func respondJSON(c fiber.Ctx, status int, data interface{}) {
 	c.JSON(data)
 }
 
-func respondCompressedJSON(c fiber.Ctx, status int, data interface{}) {
-	c.JSON(data)
-	c.Type("application/json")
-	c.Status(status)
-
-}
-
 func respondError(c fiber.Ctx, message string, status int) {
-	c.JSON(fiber.Map{"error": message})
 	c.Status(status)
+	c.JSON(fiber.Map{"error": message})
 }
