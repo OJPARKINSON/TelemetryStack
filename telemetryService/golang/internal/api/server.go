@@ -8,6 +8,8 @@ import (
 	"os"
 	"runtime/debug"
 
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/compress"
 	"github.com/ojparkinson/telemetryService/internal/config"
 	"github.com/ojparkinson/telemetryService/internal/persistance"
 )
@@ -18,14 +20,23 @@ type Server struct {
 	queryExecutor *persistance.QueryExecutor
 	config        *config.Config
 	senderPool    *persistance.SenderPool
+
+	app *fiber.App
 }
 
 func NewServer(addr string, config *config.Config, senderPool *persistance.SenderPool) *Server {
+	app := fiber.New()
+
+	app.Use(compress.New(compress.Config{
+		Level: compress.LevelBestSpeed, // or LevelBestCompression, LevelDefault
+	}))
+
 	server := &Server{
 		queryExecutor: &persistance.QueryExecutor{Config: config},
 		logger:        log.New(os.Stdout, "[API] ", log.LstdFlags),
 		config:        config,
 		senderPool:    senderPool,
+		app:           app,
 	}
 
 	server.httpServer = &http.Server{
@@ -38,7 +49,7 @@ func NewServer(addr string, config *config.Config, senderPool *persistance.Sende
 
 func (s *Server) Start() error {
 	s.logger.Printf("Starting api server on: %s", s.httpServer.Addr)
-	if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	if err := s.app.Listen(s.httpServer.Addr); err != nil && err != http.ErrServerClosed {
 		return err
 	}
 	return nil
@@ -52,12 +63,12 @@ func (s *Server) Shutdown(ctx context.Context) error {
 func (s *Server) setupRoutes() http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("POST /api/ingest", s.handleIngest)
+	s.app.Post("/api/ingest", s.handleIngest)
 
-	mux.HandleFunc("GET /api/sessions", s.handleGetSessions)
-	mux.HandleFunc("GET /api/sessions/{sessionId}/laps", s.handleGetLaps)
-	mux.HandleFunc("GET /api/sessions/{sessionId}/laps/{lapId}", s.handleGetTelemetry)
-	mux.HandleFunc("GET /api/sessions/{sessionId}/laps/{lapId}/geojson", s.handleGetTelemetryGeoJson)
+	s.app.Get("/api/sessions", s.handleGetSessions)
+	s.app.Get("/api/sessions/:sessionId/laps", s.handleGetLaps)
+	s.app.Get("/api/sessions/:sessionId/laps/:lapId", s.handleGetTelemetry)
+	s.app.Get("/api/sessions/:sessionId/laps/:lapId/geojson", s.handleGetTelemetryGeoJson)
 
 	// Add panic recovery middleware
 	return RecoveryMiddleware(mux)

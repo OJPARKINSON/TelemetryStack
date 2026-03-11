@@ -1,28 +1,23 @@
 package api
 
 import (
-	"compress/gzip"
-	"encoding/json"
-	"net/http"
+	"github.com/gofiber/fiber/v3"
 )
 
-func respondJSON(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+func respondJSON(c fiber.Ctx, status int, data interface{}) {
+	c.Type("application/json")
+	c.Status(status)
+	c.JSON(data)
 }
 
-func respondGzipJSON(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Content-Encoding", "gzip")
-	w.WriteHeader(status)
+func respondCompressedJSON(c fiber.Ctx, status int, data interface{}) {
+	c.JSON(data)
+	c.Type("application/json")
+	c.Status(status)
 
-	gw := gzip.NewWriter(w)
-	defer gw.Close()
-
-	json.NewEncoder(gw).Encode(data)
 }
 
-func respondError(w http.ResponseWriter, status int, message string) {
-	respondJSON(w, status, map[string]string{"error": message})
+func respondError(c fiber.Ctx, message string, status int) {
+	c.JSON(fiber.Map{"error": message})
+	c.Status(status)
 }

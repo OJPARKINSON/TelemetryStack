@@ -2,7 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import React, { useState } from "react";
 import useSWR from "swr";
 import { InfoBox } from "../components/InfoBox";
-import { fetcher, type TelemetryRes } from "../lib/Fetch";
+import { fetcherBR, type TelemetryRes } from "../lib/Fetch";
 import type { TelemetryDataPoint } from "../lib/types";
 import { useChartHover } from "../hooks/useChartHover";
 import { useTelemetryData } from "../hooks/useTelemetryData";
@@ -39,7 +39,7 @@ export default function TelemetryPage({
 
 	const { data: racingLineData } = useSWR<GeoJSON.FeatureCollection, Error>(
 		`/api/sessions/${sessionId}/laps/${currentLapId}/geojson`,
-		fetcher,
+		fetcherBR,
 	);
 
 	const handleLapChange = (newLapId: string) => {

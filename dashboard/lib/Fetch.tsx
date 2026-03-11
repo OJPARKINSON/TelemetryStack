@@ -320,3 +320,40 @@ export const fetcher = async (url: string): Promise<any> => {
 		throw new Error("An unexpected error occurred");
 	}
 };
+
+export const fetcherBR = async (url: string): Promise<any> => {
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+	try {
+		const response = await fetch(url, {
+			signal: controller.signal,
+			headers: {
+				Accept: "application/json",
+				"Accept-Encoding": "br",
+				"Content-Type": "application/json",
+			},
+		});
+
+		clearTimeout(timeoutId);
+
+		if (!response.ok) {
+			throw new Error(
+				`HTTP error! status: ${response.status} - ${response.statusText}`,
+			);
+		}
+
+		return await response.json();
+	} catch (error) {
+		clearTimeout(timeoutId);
+
+		if (error instanceof Error) {
+			if (error.name === "AbortError") {
+				throw new Error("Request timeout - please try again");
+			}
+			throw error;
+		}
+
+		throw new Error("An unexpected error occurred");
+	}
+};

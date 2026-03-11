@@ -25,7 +25,7 @@ func (s *QueryExecutor) QuerySession(ctx context.Context, sessionID string) ([]m
 	return ExecuteSelectQuery(query, s.Config)
 }
 
-func (s *QueryExecutor) QuerySessions(ctx context.Context) ([]map[string]interface{}, error) {
+func (s *QueryExecutor) QuerySessions() ([]map[string]interface{}, error) {
 	query := `
 		SELECT DISTINCT session_id, track_name, session_name,
                 MAX(lap_id) as max_lap_id,
