@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
-	"io"
 	"log"
 	"net/http"
 	"slices"
 	"strconv"
 
+	"github.com/gofiber/fiber/v3"
 	"github.com/ojparkinson/telemetryService/internal/geojson"
 	"github.com/ojparkinson/telemetryService/internal/messaging"
 	"github.com/ojparkinson/telemetryService/internal/persistance"
@@ -18,29 +18,29 @@ import (
 )
 
 // /api/sessions
-func (s *Server) handleGetSessions(w http.ResponseWriter, r *http.Request) {
-	sessions, err := s.queryExecutor.QuerySessions(r.Context())
+func (s *Server) handleGetSessions(c fiber.Ctx) {
+	sessions, err := s.queryExecutor.QuerySessions()
 	if err != nil {
 		log.Println(err)
-		respondError(w, http.StatusInternalServerError, "Failed to fetch sessions")
+		respondError(c, "Failed to fetch sessions", http.StatusInternalServerError)
 		return
 	}
 
-	respondJSON(w, 200, sessions)
+	respondJSON(c, 200, sessions)
 }
 
 // /api/sessions/123456/laps
-func (s *Server) handleGetLaps(w http.ResponseWriter, r *http.Request) {
-	sessionID := r.PathValue("sessionId")
+func (s *Server) handleGetLaps(c fiber.Ctx) {
+	sessionID := c.Params("sessionId")
 	if sessionID == "" {
-		respondError(w, http.StatusBadRequest, "Invalid session ID")
+		respondError(c, "Invalid session ID", http.StatusBadRequest)
 		return
 	}
 
-	rows, err := s.queryExecutor.QueryLaps(r.Context(), sessionID)
+	rows, err := s.queryExecutor.QueryLaps(c.Context(), sessionID)
 	if err != nil {
 		log.Println(err)
-		respondError(w, http.StatusInternalServerError, "Failed to fetch laps")
+		respondError(c, "Failed to fetch laps", http.StatusInternalServerError)
 		return
 	}
 
@@ -51,58 +51,58 @@ func (s *Server) handleGetLaps(w http.ResponseWriter, r *http.Request) {
 
 	slices.Sort(laps)
 
-	respondJSON(w, 200, laps)
+	respondCompressedJSON(c, 200, laps)
 }
 
 // /api/sessions/123456/laps/1
-func (s *Server) handleGetTelemetry(w http.ResponseWriter, r *http.Request) {
-	sessionID := r.PathValue("sessionId")
-	lapID := r.PathValue("lapId")
+func (s *Server) handleGetTelemetry(c fiber.Ctx) {
+	sessionID := c.Params("sessionId")
+	lapID := c.Params("lapId")
 	if sessionID == "" || lapID == "" {
-		respondError(w, http.StatusBadRequest, "Invalid session ID")
+		respondError(c, "Invalid session ID", http.StatusBadRequest)
 		return
 	}
 
-	lapData, err := s.queryExecutor.QueryLap(r.Context(), sessionID, lapID)
+	lapData, err := s.queryExecutor.QueryLap(c.Context(), sessionID, lapID)
 	if err != nil {
 		log.Println(err)
-		respondError(w, http.StatusInternalServerError, "Failed to fetch lap data")
+		respondError(c, "Failed to fetch lap data", http.StatusInternalServerError)
 		return
 	}
 
-	respondGzipJSON(w, 200, lapData)
+	respondCompressedJSON(c, 200, lapData)
 }
 
 // /api/sessions/123456/laps/1/geojson
-func (s *Server) handleGetTelemetryGeoJson(w http.ResponseWriter, r *http.Request) {
-	sessionID := r.PathValue("sessionId")
-	lapID := r.PathValue("lapId")
+func (s *Server) handleGetTelemetryGeoJson(c fiber.Ctx) {
+	sessionID := c.Params("sessionId")
+	lapID := c.Params("lapId")
 
 	options := geojson.ConversionOptions{}
 
-	lapData, err := s.queryExecutor.QueryLap(r.Context(), sessionID, lapID)
+	lapData, err := s.queryExecutor.QueryLap(c.Context(), sessionID, lapID)
 	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to fetch lap data")
+		respondError(c, "Failed to fetch lap data", http.StatusInternalServerError)
 		return
 	}
 
 	geoJSON, err := geojson.ConvertToGeoJSON(lapData, options)
 	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to convert to GeoJSON")
+		respondError(c, "Failed to convert to GeoJSON", http.StatusInternalServerError)
 		return
 	}
 
-	respondGzipJSON(w, http.StatusOK, geoJSON)
+	respondCompressedJSON(c, http.StatusOK, geoJSON)
 }
 
 // /api/sync/lap/{sessionId}/{lapId}
-func (s *Server) handleSyncLap(w http.ResponseWriter, r *http.Request) {
-	sessionID := r.PathValue("sessionId")
-	lapID := r.PathValue("lapId")
+func (s *Server) handleSyncLap(c fiber.Ctx) {
+	sessionID := c.Params("sessionId")
+	lapID := c.Params("lapId")
 
-	sessionData, err := s.queryExecutor.QueryGeneralLap(r.Context(), sessionID, lapID)
+	sessionData, err := s.queryExecutor.QueryGeneralLap(c.Context(), sessionID, lapID)
 	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to fetch lap data")
+		respondError(c, "Failed to fetch lap data", http.StatusInternalServerError)
 		return
 	}
 
@@ -115,21 +115,16 @@ func (s *Server) handleSyncLap(w http.ResponseWriter, r *http.Request) {
 
 	sync.SyncLap(sessionData)
 
-	w.WriteHeader(200)
+	c.Status(200)
 }
 
 // /api/ingest
-func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPost && r.Header.Get("content-type") == "application/x-protobuf" {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			w.WriteHeader(500)
-			return
-		}
+func (s *Server) handleIngest(c fiber.Ctx) {
+	if c.Get("content-type") == "application/x-protobuf" {
 		batch := &messaging.TelemetryBatch{}
-		err = proto.Unmarshal(body, batch)
+		err := proto.Unmarshal(c.Body(), batch)
 		if err != nil {
-			w.WriteHeader(400)
+			respondError(c, "Failed to fetch lap data", http.StatusBadRequest)
 			return
 		}
 		sender := s.senderPool.Get()
@@ -137,9 +132,8 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 
 		persistance.WriteBatch(sender, batch.Records)
 
-		w.WriteHeader(200)
+		c.Status(http.StatusOK)
 	} else {
-
-		w.WriteHeader(400)
+		c.Status(http.StatusInternalServerError)
 	}
 }

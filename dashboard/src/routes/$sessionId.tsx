@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import useSWR from "swr";
 import TelemetryPage from "../../components/TelemetryPage";
-import { processIRacingDataWithGPS, type TelemetryRes } from "../../lib/Fetch";
+import {  processIRacingDataWithGPS, type TelemetryRes } from "../../lib/Fetch";
 
 export const Route = createFileRoute("/$sessionId")({
 	component: SessionPage,
@@ -14,8 +14,12 @@ export const Route = createFileRoute("/$sessionId")({
 	}),
 });
 
-const fetcher = (url: string) =>
-	fetch(url).then(async (res) => {
+export const fetcher = (url: string) =>
+	fetch(url, {headers: 			{
+		Accept: "application/json",
+				"Accept-Encoding": "br",
+				"Content-Type": "application/json"
+			}}).then(async (res) => {
 		return processIRacingDataWithGPS(await res.json());
 	});
 
