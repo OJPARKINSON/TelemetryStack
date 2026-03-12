@@ -1,10 +1,12 @@
 package api
 
 import (
+	"io"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/andybalholm/brotli"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/ojparkinson/telemetryService/internal/config"
@@ -24,6 +26,10 @@ type Server struct {
 func NewServer(addr string, config *config.Config, senderPool *persistance.SenderPool) *Server {
 	r := chi.NewRouter()
 
+	compressor := middleware.NewCompressor(5)
+	compressor.SetEncoder("br", func(w io.Writer, level int) io.Writer {
+		return brotli.NewWriterLevel(w, level)
+	})
 	r.Use(middleware.Logger)
 
 	server := &Server{
