@@ -42,7 +42,7 @@ func NewServer(addr string, config *config.Config, senderPool *persistance.Sende
 
 func (s *Server) Start() error {
 	s.logger.Printf("Starting api server on: %s", s.addr)
-	if err := http.ListenAndServe(":3000", s.app); err != nil {
+	if err := http.ListenAndServe(s.addr, s.app); err != nil {
 		log.Fatal(err)
 	}
 	return nil
