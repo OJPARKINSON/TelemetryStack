@@ -1,16 +1,18 @@
 package api
 
 import (
-	"github.com/gofiber/fiber/v3"
+	"encoding/json"
+	"net/http"
 )
 
-func respondJSON(c fiber.Ctx, status int, data interface{}) {
-	c.Type("application/json")
-	c.Status(status)
-	c.JSON(data)
+func respondJSON(w http.ResponseWriter, status int, data interface{}) {
+	w.WriteHeader(status)
+	w.Header().Set("Content-Type", "application/json")
+	jsonData, _ := json.Marshal(data)
+	w.Write([]byte(jsonData))
 }
 
-func respondError(c fiber.Ctx, message string, status int) {
-	c.Status(status)
-	c.JSON(fiber.Map{"error": message})
+func respondError(w http.ResponseWriter, status int, message string) {
+	w.WriteHeader(status)
+	w.Write([]byte(message))
 }
