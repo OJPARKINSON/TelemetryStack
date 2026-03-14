@@ -30,6 +30,7 @@ func NewServer(addr string, config *config.Config, senderPool *persistance.Sende
 	compressor.SetEncoder("br", func(w io.Writer, level int) io.Writer {
 		return brotli.NewWriterLevel(w, level)
 	})
+	r.Use(compressor.Handler)
 	r.Use(middleware.Logger)
 
 	server := &Server{

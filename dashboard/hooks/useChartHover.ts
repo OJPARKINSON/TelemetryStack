@@ -17,6 +17,7 @@ export function useChartHover() {
 		if (hoverFrameRef.current) {
 			cancelAnimationFrame(hoverFrameRef.current);
 		}
+		setHoveredIndex(null);
 	}, []);
 
 	useEffect(() => {

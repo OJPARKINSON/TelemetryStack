@@ -49,7 +49,7 @@ export default function SessionPage() {
 	);
 }
 
-function DatabaseUnavailableError() {
+export function DatabaseUnavailableError() {
 	return (
 		<div>
 			<div className="mx-auto max-w-md p-8 text-center">
@@ -94,7 +94,7 @@ function DatabaseUnavailableError() {
 	);
 }
 
-function TelemetryLoadingSkeleton() {
+export function TelemetryLoadingSkeleton() {
 	return (
 		<div className="flex min-h-screen min-w-screen bg-zinc-950">
 			<div className="flex w-64 flex-col border-zinc-800/50 border-r bg-zinc-900/50">

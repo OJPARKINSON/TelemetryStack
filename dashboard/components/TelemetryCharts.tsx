@@ -1,10 +1,8 @@
-"use client";
-
 import React, { useMemo } from "react";
 import type { TelemetryDataPoint } from "../lib/types";
 import { TelemetryChart } from "./TelemetryChart";
 
-export type chartConfig = {
+export type ChartConfig = {
 	title: string;
 	dataKey: string;
 	color: string;
@@ -13,19 +11,19 @@ export type chartConfig = {
 	height: number;
 };
 
-interface ProfessionalTelemetryChartsProps {
+interface TelemetryChartsProps {
 	telemetryData: TelemetryDataPoint[];
 	onMouseLeave?: () => void;
 	onHover?: (index: number | null) => void;
 }
 
-const ProfessionalTelemetryCharts = React.memo(
-	function ProfessionalTelemetryCharts({
+const TelemetryCharts = React.memo(
+	function TelemetryCharts({
 		telemetryData,
 		onMouseLeave,
 		onHover,
-	}: ProfessionalTelemetryChartsProps) {
-		const chartConfigs = useMemo<chartConfig[]>(
+	}: TelemetryChartsProps) {
+		const chartConfigs = useMemo<ChartConfig[]>(
 			() => [
 				{
 					title: "Speed",
@@ -81,18 +79,14 @@ const ProfessionalTelemetryCharts = React.memo(
 
 		return (
 			// biome-ignore lint/a11y/noStaticElementInteractions: na
-			<div className="flex flex-col space-y-3" onMouseLeave={onMouseLeave}>
-				<div className="mb-1 font-medium text-sm text-white">
-					Telemetry Data
-				</div>
-
+			<div className="flex flex-col space-y-1" onMouseLeave={onMouseLeave}>
 				{chartConfigs.map((config) => (
 					<TelemetryChart
 						onHover={onHover}
 						key={config.dataKey}
 						config={config}
 						chartData={telemetryData}
-						ReferenceLineX={(telemetryData?.[0]?.LapDistPct / 100) * 5.5}
+						ReferenceLineX={telemetryData?.[0]?.LapDistPct ?? 0}
 					/>
 				))}
 			</div>
@@ -100,6 +94,6 @@ const ProfessionalTelemetryCharts = React.memo(
 	},
 );
 
-ProfessionalTelemetryCharts.displayName = "ProfessionalTelemetryCharts";
+TelemetryCharts.displayName = "TelemetryCharts";
 
-export default ProfessionalTelemetryCharts;
+export default TelemetryCharts;
