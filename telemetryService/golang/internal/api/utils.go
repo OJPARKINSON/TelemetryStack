@@ -6,10 +6,10 @@ import (
 )
 
 func respondJSON(w http.ResponseWriter, status int, data interface{}) {
-	w.WriteHeader(status)
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
 	jsonData, _ := json.Marshal(data)
-	w.Write([]byte(jsonData))
+	w.Write(jsonData)
 }
 
 func respondError(w http.ResponseWriter, status int, message string) {

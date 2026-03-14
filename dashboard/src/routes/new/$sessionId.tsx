@@ -1,35 +1,49 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import TelemetryPage from "../../../components/TelemetryPage";
+import { DatabaseUnavailableError } from "../../../components/efecto/ErrorStates";
+import { Header } from "../../../components/efecto/Header";
+import { NewTelemetrySkeleton } from "../../../components/efecto/Skeleton";
+import { StatBox } from "../../../components/efecto/StatBox";
+import TelemetrySection from "../../../components/efecto/TelemetrySection";
+import { TrackStatsFooter } from "../../../components/efecto/TrackStatsFooter";
+import { useChartHover } from "../../../hooks/useChartHover";
+import { useTelemetryData } from "../../../hooks/useTelemetryData";
 import {
 	fetcher,
-	processIRacingDataWithGPS,
+	fetcherBR,
 	type TelemetryRes,
 	telemetryFetcher,
 } from "../../../lib/Fetch";
+import { formatLapTime } from "../../../lib/format";
+import type { TelemetryDataPoint } from "../../../lib/types";
 
 export const Route = createFileRoute("/new/$sessionId")({
 	component: SessionPage,
 	validateSearch: (
 		search: Record<string, unknown>,
 	): {
-		lapId: string;
+		lapId: number;
 	} => ({
-		lapId: (search?.lapId as string) || "1",
+		lapId: Number(search?.lapId) || 1,
 	}),
 });
 
 export default function SessionPage() {
 	const { sessionId } = Route.useParams();
 	const { lapId } = Route.useSearch();
+	const nav = useNavigate();
+	const currentLapId = lapId || 1;
 
 	const {
 		data: telemetryData,
 		error,
 		isLoading,
+		isValidating,
 	} = useSWR<TelemetryRes, Error>(
-		`/api/sessions/${sessionId}/laps/${lapId}`,
+		`/api/sessions/${sessionId}/laps/${currentLapId}`,
 		telemetryFetcher,
+		{ keepPreviousData: true },
 	);
 
 	const { data: availableLaps } = useSWR<Array<number>, Error>(
@@ -37,102 +51,153 @@ export default function SessionPage() {
 		fetcher,
 	);
 
-	const currentLapId = lapId ? Number.parseInt(lapId, 10) : 1;
+	const totalLaps = availableLaps?.length ?? 0;
+
+	const handleLapChange = (newLapId: number) => {
+		nav({
+			to: ".",
+			search: (prev) => ({ ...prev, lapId: newLapId }),
+			replace: true,
+		});
+	};
 
 	if (error) return <DatabaseUnavailableError />;
-	if (isLoading || telemetryData === undefined)
-		return <TelemetryLoadingSkeleton />;
+
+	// First load only — show skeleton
+	if (isLoading && !telemetryData) return <NewTelemetrySkeleton />;
 
 	return (
-		<TelemetryPage
-			initialTelemetryData={telemetryData}
-			availableLaps={availableLaps}
+		<SessionPageInner
+			telemetryData={telemetryData!}
+			isValidating={isValidating}
 			sessionId={sessionId}
 			currentLapId={currentLapId}
+			totalLaps={totalLaps}
+			onLapChange={handleLapChange}
 		/>
 	);
 }
 
-function DatabaseUnavailableError() {
-	return (
-		<div className="w-full">
-			<div className="mx-auto max-w-fit p-8 text-center">
-				<div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/20">
-					<div className="h-8 w-8 text-red-400">
-						<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<title>Error</title>
-							<path
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								strokeWidth={2}
-								d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-							/>
-						</svg>
-					</div>
-				</div>
-				<h1 className="mb-4 font-bold text-2xl text-white">
-					Database Unavailable
-				</h1>
-				<p className="mb-6 text-zinc-400">
-					The telemetry database is not running or accessible. Please start the
-					Docker Compose stack to access telemetry data.
-				</p>
-				<div className="rounded-lg bg-zinc-800/50 p-4 text-left">
-					<h3 className="mb-2 font-semibold text-sm text-zinc-300">
-						To start the system:
-					</h3>
-					<code className="block rounded bg-zinc-900 px-2 py-1 text-xs text-zinc-400">
-						docker compose up -d
-					</code>
-				</div>
-				<div className="mt-6">
-					<Link
-						to=".."
-						className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
-					>
-						← Back to Dashboard
-					</Link>
-				</div>
-			</div>
-		</div>
-	);
+interface SessionPageInnerProps {
+	telemetryData: TelemetryRes;
+	isValidating: boolean;
+	sessionId: string;
+	currentLapId: number;
+	totalLaps: number;
+	onLapChange: (lapId: number) => void;
 }
 
-function TelemetryLoadingSkeleton() {
-	return (
-		<div className="flex min-h-screen min-w-screen bg-zinc-950">
-			<div className="flex w-64 flex-col border-zinc-800/50 border-r bg-zinc-900/50">
-				<div className="px-6 py-6">
-					<div className="animate-pulse">
-						<div className="flex items-center space-x-3">
-							<div className="h-8 w-8 rounded-lg bg-zinc-700" />
-							<div>
-								<div className="mb-1 h-4 w-16 rounded bg-zinc-700" />
-								<div className="h-3 w-12 rounded bg-zinc-700" />
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
+function SessionPageInner({
+	telemetryData,
+	isValidating,
+	sessionId,
+	currentLapId,
+	totalLaps,
+	onLapChange,
+}: SessionPageInnerProps) {
+	const [showLoading, setShowLoading] = useState(false);
+	useEffect(() => {
+		if (!isValidating) {
+			setShowLoading(false);
+			return;
+		}
+		const id = setTimeout(() => setShowLoading(true), 150);
+		return () => clearTimeout(id);
+	}, [isValidating]);
 
-			<div className="flex flex-1 flex-col">
-				<div className="border-zinc-800/50 border-b bg-zinc-950/50 px-6 py-4">
-					<div className="h-4 w-48 animate-pulse rounded bg-zinc-700" />
-				</div>
-				<div className="flex-1 p-6">
-					<div className="animate-pulse space-y-6">
-						<div className="grid grid-cols-3 gap-6">
-							<div className="h-32 rounded-lg bg-zinc-800/50" />
-							<div className="h-32 rounded-lg bg-zinc-800/50" />
-							<div className="h-32 rounded-lg bg-zinc-800/50" />
-						</div>
-						<div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-							<div className="col-span-2 h-96 rounded-lg bg-zinc-800/50" />
-							<div className="h-96 rounded-lg bg-zinc-800/50" />
-						</div>
-					</div>
-				</div>
+	const { hoveredIndex, handleChartHover, handleChartMouseLeave } =
+		useChartHover();
+	const { dataWithGPSCoordinates, trackInfo, hoverCoordinates } =
+		useTelemetryData(telemetryData, sessionId, hoveredIndex);
+
+	const { data: racingLineData } = useSWR<GeoJSON.FeatureCollection, Error>(
+		`/api/sessions/${sessionId}/laps/${currentLapId}/geojson`,
+		fetcherBR,
+		{ keepPreviousData: true },
+	);
+
+	const data = dataWithGPSCoordinates as TelemetryDataPoint[];
+
+	const { avgSpeed, lastPoint, fuelLapsEstimate } = useMemo(() => {
+		if (data.length === 0)
+			return { avgSpeed: 0, lastPoint: null, fuelLapsEstimate: 0 };
+
+		const avg = data.reduce((sum, p) => sum + (p.Speed || 0), 0) / data.length;
+		const last = data[data.length - 1];
+		const first = data[0];
+		const fuelUsed = first.FuelLevel - last.FuelLevel;
+		const fuelEst = fuelUsed > 0 ? Math.floor(last.FuelLevel / fuelUsed) : 0;
+
+		return { avgSpeed: avg, lastPoint: last, fuelLapsEstimate: fuelEst };
+	}, [data]);
+
+	return (
+		<div className="flex flex-col bg-background border border-border w-full mx-auto min-h-screen">
+			<Header
+				trackName={trackInfo?.trackName || "Unknown Track"}
+				sessionNum={sessionId}
+				currentLapId={currentLapId}
+				totalLaps={totalLaps}
+				lapTime={formatLapTime(trackInfo?.lapTime)}
+				onPrevLap={() => {
+					if (currentLapId > 1) onLapChange(currentLapId - 1);
+				}}
+				onNextLap={() => {
+					if (currentLapId < totalLaps) onLapChange(currentLapId + 1);
+				}}
+			/>
+			<div className="flex items-stretch border-b border-border w-full bg-background">
+				<StatBox
+					title="Lap Time"
+					stat={formatLapTime(trackInfo?.lapTime)}
+					delta={
+						trackInfo?.lapTime
+							? `Δ${(trackInfo.lapTime % 1).toFixed(3).slice(1)}`
+							: undefined
+					}
+				/>
+				<StatBox
+					title="Max Speed"
+					stat={`${(trackInfo?.maxSpeed ?? 0).toFixed(1)}`}
+					unit="km/h"
+				/>
+				<StatBox
+					title="Position"
+					stat={`P${lastPoint?.PlayerCarPosition || "-"}`}
+					delta={
+						lastPoint?.PlayerCarPosition && lastPoint.PlayerCarPosition > 1
+							? `+${lastPoint.PlayerCarPosition - 1}`
+							: undefined
+					}
+				/>
+				<StatBox
+					title="Avg Speed"
+					stat={`${avgSpeed.toFixed(1)}`}
+					unit="km/h"
+				/>
+				<StatBox
+					title="Fuel Remaining"
+					stat={`${(lastPoint?.FuelLevel ?? 0).toFixed(1)}`}
+					unit="L"
+					delta={fuelLapsEstimate > 0 ? `~${fuelLapsEstimate} laps` : undefined}
+				/>
 			</div>
+			{showLoading && (
+				<div className="h-0.5 w-full bg-border overflow-hidden">
+					<div className="h-full w-1/3 bg-primary animate-slide" />
+				</div>
+			)}
+			<div className="flex flex-col flex-1">
+				<TelemetrySection
+					dataWithGPSCoordinates={data}
+					racingLineData={racingLineData}
+					hoverCoordinates={hoverCoordinates}
+					hoveredIndex={hoveredIndex}
+					onHover={handleChartHover}
+					onMouseLeave={handleChartMouseLeave}
+				/>
+			</div>
+			<TrackStatsFooter data={data} />
 		</div>
 	);
 }

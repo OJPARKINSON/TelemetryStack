@@ -10,13 +10,17 @@ import {
 	YAxis,
 } from "recharts";
 import type { TelemetryDataPoint } from "../lib/types";
-import type { chartConfig } from "./TelemetryCharts";
+import type { ChartConfig } from "./TelemetryCharts";
 
 interface TelemetryChartProps {
-	config: chartConfig;
+	config: ChartConfig;
 	chartData: TelemetryDataPoint[];
 	ReferenceLineX: number;
 	onHover?: (index: number | null) => void;
+}
+
+function formatTick(value: number): string {
+	return Number.isInteger(value) ? String(value) : value.toFixed(0);
 }
 
 export const TelemetryChart = ({
@@ -30,11 +34,11 @@ export const TelemetryChart = ({
 			const dataPoint = payload[0].payload as TelemetryDataPoint;
 
 			return (
-				<div className="rounded border border-zinc-600 bg-zinc-800 p-2 shadow-lg">
-					<p className="text-xs text-zinc-300">
+				<div className="rounded border border-border bg-card p-2 shadow-lg">
+					<p className="text-xs text-muted-foreground">
 						Distance: {dataPoint.LapDistPct?.toFixed(1)} %
 					</p>
-					<p className="text-xs text-zinc-300">
+					<p className="text-xs text-muted-foreground">
 						Time: {dataPoint.sessionTime?.toFixed(2)}s
 					</p>
 				</div>
@@ -44,19 +48,24 @@ export const TelemetryChart = ({
 	}, []);
 
 	return (
-		<div key={config.dataKey} className="rounded-lg bg-zinc-900/30 px-3">
-			<div className="flex items-center justify-between">
-				<span className="font-medium text-xs text-zinc-300">
-					{config.title}
-				</span>
-				<span className="text-xs text-zinc-500">{config.unit}</span>
+		<div key={config.dataKey} className="rounded-lg bg-secondary/30 px-3">
+			<div className="flex items-center justify-between py-1">
+				<div className="flex items-center gap-1.5">
+					<span
+						className="w-1 h-3 rounded-full"
+						style={{ backgroundColor: config.color }}
+					/>
+					<span className="font-medium text-xs text-foreground">
+						{config.title}
+					</span>
+				</div>
+				<span className="text-xs text-muted-foreground">{config.unit}</span>
 			</div>
 
 			<div style={{ height: config.height }}>
 				<ResponsiveContainer width="100%" height="100%">
 					<LineChart
 						data={chartData}
-						onClick={() => {}}
 						margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
 						syncId="telemetry-charts"
 						onMouseMove={(e) => {
@@ -67,25 +76,23 @@ export const TelemetryChart = ({
 					>
 						<CartesianGrid
 							strokeDasharray="3 3"
-							stroke="#374151"
+							stroke="hsl(var(--border))"
 							opacity={0.3}
 						/>
 						<XAxis
 							dataKey="LapDistPct"
-							domain={[0, 5.5]}
+							domain={["dataMin", "dataMax"]}
 							type="number"
 							scale="linear"
-							tick={{ fill: "#9ca3af", fontSize: 10 }}
-							axisLine={{ stroke: "#374151" }}
-							tickLine={{ stroke: "#374151" }}
 							hide
 						/>
 						<YAxis
 							domain={config.yDomain}
-							tick={{ fill: "#9ca3af", fontSize: 10 }}
-							axisLine={{ stroke: "#374151" }}
-							tickLine={{ stroke: "#374151" }}
-							width={35}
+							tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
+							axisLine={{ stroke: "hsl(var(--border))" }}
+							tickLine={{ stroke: "hsl(var(--border))" }}
+							tickFormatter={formatTick}
+							width={40}
 						/>
 						<Tooltip content={<CustomTooltip />} />
 
@@ -101,7 +108,7 @@ export const TelemetryChart = ({
 
 						<ReferenceLine
 							x={ReferenceLineX || 0}
-							stroke="#ffffff"
+							stroke="hsl(var(--foreground))"
 							strokeWidth={1}
 							strokeDasharray="2 2"
 						/>
