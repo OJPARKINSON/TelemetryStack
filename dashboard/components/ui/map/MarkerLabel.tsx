@@ -26,7 +26,7 @@ export function MarkerLabel({
 	return (
 		<div
 			className={cn(
-				"absolute left-1/2 -translate-x-1/2 whitespace-nowrap",
+				"-translate-x-1/2 absolute left-1/2 whitespace-nowrap",
 				"font-medium text-[10px] text-foreground",
 				positionClasses[position],
 				className,

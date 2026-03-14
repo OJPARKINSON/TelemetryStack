@@ -85,9 +85,7 @@ export function useSvgTrack() {
 
 						setStartFinishPosition(closestPoint);
 						console.log(
-							`Start/finish position found at ${closestPoint}/${pathLength} (${(
-								(closestPoint / pathLength) * 100
-							).toFixed(2)}%)`,
+							`Start/finish position found at ${closestPoint}/${pathLength} (${((closestPoint / pathLength) * 100).toFixed(2)}%)`,
 						);
 					} else {
 						console.warn(

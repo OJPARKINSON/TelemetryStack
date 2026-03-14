@@ -1,7 +1,7 @@
 "use client";
 
-import MapLibreGL, { type PopupOptions } from "maplibre-gl";
 import { X } from "lucide-react";
+import MapLibreGL, { type PopupOptions } from "maplibre-gl";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 
@@ -47,7 +47,7 @@ export function MapPopup({
 
 		return popupInstance;
 		// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
-	}, []);
+	}, [latitude, longitude, popupOptions]);
 
 	useEffect(() => {
 		if (!map) return;
@@ -65,7 +65,17 @@ export function MapPopup({
 			}
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [map]);
+	}, [
+		map,
+		container,
+		onClose,
+		popup.addTo,
+		popup.isOpen,
+		popup.off,
+		popup.on,
+		popup.remove,
+		popup.setDOMContent,
+	]);
 
 	if (popup.isOpen()) {
 		const prev = popupOptionsRef.current;

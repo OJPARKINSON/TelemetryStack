@@ -3,22 +3,13 @@ import useSWR from "swr";
 import SessionSelector, {
 	type Session,
 } from "../../components/SessionSelector";
-
-// import { fetcher } from "@/lib/Fetch";
-
-const fetcher = (url: string) =>
-	fetch(url).then((res) => res.json() as unknown as Session[]);
-
-export const Route = createFileRoute("/")({
-	component: RouteComponent,
-});
+import { fetcher } from "../../lib/Fetch";
 
 function RouteComponent() {
-	const {
-		data: sessions,
-		error: errorMessage,
-		isLoading,
-	} = useSWR<Session[], Error>("/api/sessions", fetcher);
+	const { data, error, isLoading } = useSWR<Session[], Error>(
+		"/api/sessions",
+		fetcher,
+	);
 
 	if (isLoading) return <div>Loading...</div>;
 	return (
@@ -56,10 +47,10 @@ function RouteComponent() {
 				<div className="border-zinc-800/50 border-t p-4">
 					<div className="flex items-center space-x-2">
 						<div
-							className={`h-2 w-2 rounded-full ${errorMessage ? "bg-red-400" : "bg-green-400"}`}
+							className={`h-2 w-2 rounded-full ${error ? "bg-red-400" : "bg-green-400"}`}
 						/>
 						<span className="text-xs text-zinc-400">
-							{errorMessage ? "Offline" : "Connected"}
+							{error ? "Offline" : "Connected"}
 						</span>
 					</div>
 				</div>
@@ -82,7 +73,7 @@ function RouteComponent() {
 					</div>
 
 					<div className="space-y-6">
-						{sessions === undefined ? (
+						{data === undefined ? (
 							<div className="rounded-lg border border-red-800/50 bg-red-950/50 p-6">
 								<div className="flex items-start space-x-3">
 									<div className="shrink-0">
@@ -116,15 +107,15 @@ function RouteComponent() {
 											</summary>
 											<div className="mt-2 rounded border border-red-800/50 bg-red-900/30 p-3">
 												<code className="font-mono text-red-200 text-xs">
-													{errorMessage?.message}
+													{error?.message}
 												</code>
 											</div>
 										</details>
 									</div>
 								</div>
 							</div>
-						) : sessions.length > 0 ? (
-							<SessionSelector sessions={sessions} />
+						) : data.length > 0 ? (
+							<SessionSelector sessions={data} />
 						) : (
 							<div className="rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-12 text-center">
 								<div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-zinc-800/50">
@@ -139,7 +130,7 @@ function RouteComponent() {
 							</div>
 						)}
 
-						{sessions !== undefined && sessions.length > 0 && (
+						{data !== undefined && data.length > 0 && (
 							<div className="grid grid-cols-1 gap-6 md:grid-cols-3">
 								<div className="rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-4">
 									<div className="mb-3 flex items-center justify-between">
@@ -147,11 +138,11 @@ function RouteComponent() {
 											Database
 										</h3>
 										<div
-											className={`h-2 w-2 rounded-full ${errorMessage ? "bg-red-400" : "bg-green-400"}`}
+											className={`h-2 w-2 rounded-full ${error ? "bg-red-400" : "bg-green-400"}`}
 										/>
 									</div>
 									<p className="mb-1 font-semibold text-lg text-white">
-										{errorMessage ? "Offline" : "Online"}
+										{error ? "Offline" : "Online"}
 									</p>
 									<p className="text-xs text-zinc-500">QuestDB Connection</p>
 								</div>
@@ -164,7 +155,7 @@ function RouteComponent() {
 										<div className="h-2 w-2 rounded-full bg-blue-400" />
 									</div>
 									<p className="mb-1 font-semibold text-lg text-white">
-										{sessions.length}
+										{data.length}
 									</p>
 									<p className="text-xs text-zinc-500">
 										Available for analysis
@@ -191,3 +182,7 @@ function RouteComponent() {
 		</>
 	);
 }
+
+export const Route = createFileRoute("/")({
+	component: RouteComponent,
+});

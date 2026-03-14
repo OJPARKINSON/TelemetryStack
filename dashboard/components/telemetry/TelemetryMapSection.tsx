@@ -1,11 +1,7 @@
 import { useMemo } from "react";
 import { Card } from "../ui/card";
 import type { MapStyleOption } from "../ui/map";
-import {
-	MapControls,
-	MapRoute,
-	NewMap as MapUI,
-} from "../ui/map";
+import { MapControls, MapRoute, NewMap as MapUI } from "../ui/map";
 import { HoverMarker } from "./HoverMarker";
 import { MemoizedRacingLine } from "./RacingLine";
 
@@ -46,14 +42,16 @@ export function TelemetryMapSection({
 }: TelemetryMapSectionProps) {
 	const routeCoordinates = useMemo(
 		() =>
-			dataWithGPSCoordinates.map((data) => [data.Lon, data.Lat] as [number, number]),
+			dataWithGPSCoordinates.map(
+				(data) => [data?.Lon, data?.Lat] as [number, number],
+			),
 		[dataWithGPSCoordinates],
 	);
 
 	return (
 		<div className="col-span-1 rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-6 lg:col-span-3">
 			<Card className="h-[42vw] w-full overflow-hidden p-0">
-				{dataWithGPSCoordinates[0].Lon !== undefined && (
+				{dataWithGPSCoordinates[0]?.Lon !== undefined && (
 					<MapUI
 						center={[
 							dataWithGPSCoordinates[0]?.Lon,
@@ -71,12 +69,7 @@ export function TelemetryMapSection({
 						{racingLineData && (
 							<MemoizedRacingLine dataWithGPSCoordinates={racingLineData} />
 						)}
-						<MapControls
-							showZoom
-							showCompass
-							showLocate
-							showFullscreen
-						/>
+						<MapControls showZoom showCompass showLocate showFullscreen />
 						{hoverCoordinates && (
 							<HoverMarker
 								longitude={hoverCoordinates.lon}

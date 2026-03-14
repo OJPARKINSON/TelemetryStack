@@ -2,10 +2,10 @@ import { useNavigate } from "@tanstack/react-router";
 import React, { useState } from "react";
 import useSWR from "swr";
 import { InfoBox } from "../components/InfoBox";
-import { fetcherBR, type TelemetryRes } from "../lib/Fetch";
-import type { TelemetryDataPoint } from "../lib/types";
 import { useChartHover } from "../hooks/useChartHover";
 import { useTelemetryData } from "../hooks/useTelemetryData";
+import { fetcherBR, type TelemetryRes } from "../lib/Fetch";
+import type { TelemetryDataPoint } from "../lib/types";
 import {
 	GPSAnalysisPanel,
 	TelemetryMapSection,
@@ -76,9 +76,7 @@ export default function TelemetryPage({
 						<div className="col-span-1 rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-4 lg:col-span-2">
 							{dataWithGPSCoordinates.length > 0 ? (
 								<ProfessionalTelemetryCharts
-									telemetryData={
-										dataWithGPSCoordinates as TelemetryDataPoint[]
-									}
+									telemetryData={dataWithGPSCoordinates as TelemetryDataPoint[]}
 									onMouseLeave={handleChartMouseLeave}
 									onHover={handleChartHover}
 								/>
