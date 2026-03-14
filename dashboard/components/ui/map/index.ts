@@ -1,11 +1,11 @@
-export { NewMap, type MapRef, type MapStyleOption } from "./Map";
+export { type MapRef, type MapStyleOption, NewMap } from "./Map";
+export { MapClusterLayer } from "./MapClusterLayer";
 export { useMap } from "./MapContext";
+export { MapControls } from "./MapControls";
 export { MapMarker } from "./MapMarker";
+export { MapPopup } from "./MapPopup";
+export { MapRoute } from "./MapRoute";
 export { MarkerContent } from "./MarkerContent";
+export { MarkerLabel } from "./MarkerLabel";
 export { MarkerPopup } from "./MarkerPopup";
 export { MarkerTooltip } from "./MarkerTooltip";
-export { MarkerLabel } from "./MarkerLabel";
-export { MapPopup } from "./MapPopup";
-export { MapControls } from "./MapControls";
-export { MapRoute } from "./MapRoute";
-export { MapClusterLayer } from "./MapClusterLayer";

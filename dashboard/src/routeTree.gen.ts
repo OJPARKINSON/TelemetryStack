@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SessionIdRouteImport } from './routes/$sessionId'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as NewSessionIdRouteImport } from './routes/new/$sessionId'
 
 const SessionIdRoute = SessionIdRouteImport.update({
   id: '/$sessionId',
@@ -22,31 +23,40 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NewSessionIdRoute = NewSessionIdRouteImport.update({
+  id: '/new/$sessionId',
+  path: '/new/$sessionId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$sessionId': typeof SessionIdRoute
+  '/new/$sessionId': typeof NewSessionIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$sessionId': typeof SessionIdRoute
+  '/new/$sessionId': typeof NewSessionIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$sessionId': typeof SessionIdRoute
+  '/new/$sessionId': typeof NewSessionIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/$sessionId'
+  fullPaths: '/' | '/$sessionId' | '/new/$sessionId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/$sessionId'
-  id: '__root__' | '/' | '/$sessionId'
+  to: '/' | '/$sessionId' | '/new/$sessionId'
+  id: '__root__' | '/' | '/$sessionId' | '/new/$sessionId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SessionIdRoute: typeof SessionIdRoute
+  NewSessionIdRoute: typeof NewSessionIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +75,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/new/$sessionId': {
+      id: '/new/$sessionId'
+      path: '/new/$sessionId'
+      fullPath: '/new/$sessionId'
+      preLoaderRoute: typeof NewSessionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SessionIdRoute: SessionIdRoute,
+  NewSessionIdRoute: NewSessionIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

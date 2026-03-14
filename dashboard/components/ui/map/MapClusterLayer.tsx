@@ -143,7 +143,20 @@ export function MapClusterLayer<
 			}
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [isLoaded, map, sourceId]);
+	}, [
+		isLoaded,
+		map,
+		sourceId,
+		clusterColors[0],
+		clusterCountLayerId,
+		clusterLayerId,
+		clusterMaxZoom,
+		clusterRadius,
+		clusterThresholds[0],
+		data,
+		pointColor,
+		unclusteredLayerId,
+	]);
 
 	// Update source data when data prop changes (only for non-URL data)
 	useEffect(() => {
@@ -192,10 +205,7 @@ export function MapClusterLayer<
 			}
 
 			// Update unclustered point layer color
-			if (
-				map.getLayer(unclusteredLayerId) &&
-				prev.pointColor !== pointColor
-			) {
+			if (map.getLayer(unclusteredLayerId) && prev.pointColor !== pointColor) {
 				map.setPaintProperty(unclusteredLayerId, "circle-color", pointColor);
 			}
 

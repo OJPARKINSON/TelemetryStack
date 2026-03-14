@@ -22,9 +22,7 @@ export function useTelemetryData(
 			lapTime: lastPoint?.LapCurrentLapTime,
 			trackName: firstPoint?.TrackName || "Unknown Track",
 			sessionNum: firstPoint?.SessionNum || sessionId,
-			maxSpeed: Math.max(
-				...dataWithGPSCoordinates.map((p) => p.Speed || 0),
-			),
+			maxSpeed: Math.max(...dataWithGPSCoordinates.map((p) => p.Speed || 0)),
 		};
 	}, [dataWithGPSCoordinates, sessionId]);
 

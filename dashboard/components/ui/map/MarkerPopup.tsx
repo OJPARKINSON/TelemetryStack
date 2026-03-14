@@ -1,7 +1,7 @@
 "use client";
 
-import MapLibreGL, { type PopupOptions } from "maplibre-gl";
 import { X } from "lucide-react";
+import MapLibreGL, { type PopupOptions } from "maplibre-gl";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 
@@ -39,7 +39,7 @@ export function MarkerPopup({
 		return popupInstance;
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 		// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
-	}, []);
+	}, [container, popupOptions]);
 
 	useEffect(() => {
 		if (!map) return;

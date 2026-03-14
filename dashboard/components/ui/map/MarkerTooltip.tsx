@@ -32,9 +32,8 @@ export function MarkerTooltip({
 		}).setMaxWidth("none");
 
 		return tooltipInstance;
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 		// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
-	}, []);
+	}, [popupOptions]);
 
 	useEffect(() => {
 		if (!map) return;
@@ -54,8 +53,7 @@ export function MarkerTooltip({
 			marker.getElement()?.removeEventListener("mouseleave", handleMouseLeave);
 			tooltip.remove();
 		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [map]);
+	}, [map, tooltip, container, marker.getElement, marker.getLngLat]);
 
 	if (tooltip.isOpen()) {
 		const prev = prevTooltipOptions.current;

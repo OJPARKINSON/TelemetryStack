@@ -1,7 +1,8 @@
 "use client";
 
 import { Loader2, Locate, Maximize, Minus, Plus } from "lucide-react";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import type React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { cn } from "../../../lib/utils";
 import { useMap } from "./MapContext";

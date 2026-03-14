@@ -85,7 +85,7 @@ export function MapRoute({
 			}
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [isLoaded, map]);
+	}, [isLoaded, map, color, dashArray, layerId, opacity, sourceId, width]);
 
 	// When coordinates change, update the source data
 	useEffect(() => {

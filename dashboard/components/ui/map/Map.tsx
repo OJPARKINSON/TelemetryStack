@@ -75,6 +75,7 @@ export const NewMap = forwardRef<MapRef, MapProps>(function MapFunc(
 		}
 	}, []);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: props changes on every re render
 	useEffect(() => {
 		if (!containerRef.current) return;
 

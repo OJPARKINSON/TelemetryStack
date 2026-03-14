@@ -62,6 +62,7 @@ export function MapMarker({
 }: MapMarkerProps) {
 	const { map } = useMap();
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: markerOptions changes on every re-render and should not be used as a hook
 	const marker = useMemo(() => {
 		const markerInstance = new MapLibreGL.Marker({
 			...markerOptions,
@@ -99,8 +100,6 @@ export function MapMarker({
 		markerInstance.on("dragend", handleDragEnd);
 
 		return markerInstance;
-
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
 	useEffect(() => {
@@ -113,7 +112,7 @@ export function MapMarker({
 		};
 
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [map]);
+	}, [map, marker.addTo, marker.remove]);
 
 	if (
 		marker.getLngLat().lng !== longitude ||

@@ -357,3 +357,14 @@ export const fetcherBR = async (url: string): Promise<any> => {
 		throw new Error("An unexpected error occurred");
 	}
 };
+
+export const telemetryFetcher = (url: string) =>
+	fetch(url, {
+		headers: {
+			Accept: "application/json",
+			"Accept-Encoding": "br",
+			"Content-Type": "application/json",
+		},
+	}).then(async (res) => {
+		return processIRacingDataWithGPS(await res.json());
+	});

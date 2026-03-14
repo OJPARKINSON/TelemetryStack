@@ -1,9 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import useSWR from "swr";
-import TelemetryPage from "../../components/TelemetryPage";
-import { fetcher, type TelemetryRes, telemetryFetcher } from "../../lib/Fetch";
+import TelemetryPage from "../../../components/TelemetryPage";
+import {
+	fetcher,
+	processIRacingDataWithGPS,
+	type TelemetryRes,
+	telemetryFetcher,
+} from "../../../lib/Fetch";
 
-export const Route = createFileRoute("/$sessionId")({
+export const Route = createFileRoute("/new/$sessionId")({
 	component: SessionPage,
 	validateSearch: (
 		search: Record<string, unknown>,
@@ -32,7 +37,6 @@ export default function SessionPage() {
 		fetcher,
 	);
 
-	// Default to lap 1 if no lapId provided
 	const currentLapId = lapId ? Number.parseInt(lapId, 10) : 1;
 
 	if (error) return <DatabaseUnavailableError />;
@@ -51,8 +55,8 @@ export default function SessionPage() {
 
 function DatabaseUnavailableError() {
 	return (
-		<div>
-			<div className="mx-auto max-w-md p-8 text-center">
+		<div className="w-full">
+			<div className="mx-auto max-w-fit p-8 text-center">
 				<div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/20">
 					<div className="h-8 w-8 text-red-400">
 						<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
