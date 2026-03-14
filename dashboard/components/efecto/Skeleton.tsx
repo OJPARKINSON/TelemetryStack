@@ -60,7 +60,7 @@ export function NewTelemetrySkeleton() {
 				</div>
 
 				{/* Charts area */}
-				<div className="flex flex-col w-[720px] min-w-[400px]">
+				<div className="flex flex-col min-w-[400px]">
 					<div className="flex items-center justify-between px-5 py-3 border-b border-border">
 						<div className="h-3 w-16 rounded bg-secondary animate-pulse" />
 					</div>

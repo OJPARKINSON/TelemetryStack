@@ -30,22 +30,6 @@ export const Header = ({
 					<p className="text-muted-foreground text-sm">/</p>
 					<p className="text-muted-foreground text-sm">{trackName}</p>
 				</div>
-				<div className="flex items-center gap-1 ml-4">
-					<div className="px-3 py-1.5 rounded-md bg-secondary">
-						<p className="text-foreground text-xs font-medium">Lap Data</p>
-					</div>
-					<div className="px-3 py-1.5 rounded-md">
-						<p className="text-muted-foreground text-xs font-medium">
-							Track Map
-						</p>
-					</div>
-					<div className="px-3 py-1.5 rounded-md">
-						<p className="text-muted-foreground text-xs font-medium">Sectors</p>
-					</div>
-					<div className="px-3 py-1.5 rounded-md">
-						<p className="text-muted-foreground text-xs font-medium">Compare</p>
-					</div>
-				</div>
 			</div>
 			<div className="flex items-center gap-4">
 				<div className="flex items-center gap-0 rounded-lg border border-border overflow-hidden bg-card w-full">
@@ -70,7 +54,9 @@ export const Header = ({
 							</p>
 						</div>
 						<div className="h-3 w-px bg-border" />
-						<p className="text-emerald-500 text-xs font-mono font-semibold">{lapTime}</p>
+						<p className="text-emerald-500 text-xs font-mono font-semibold">
+							{lapTime}
+						</p>
 					</div>
 					<button
 						type="button"
