@@ -1,10 +1,9 @@
 import React, { useMemo, useState } from "react";
 import type { TelemetryDataPoint } from "../../lib/types";
-import type { MapStyleOption } from "../ui/map";
-import { MapControls, MapRoute, NewMap as MapUI } from "../ui/map";
-
 import { HoverMarker } from "../telemetry/HoverMarker";
 import { MemoizedRacingLine } from "../telemetry/RacingLine";
+import type { MapStyleOption } from "../ui/map";
+import { MapControls, MapRoute, NewMap as MapUI } from "../ui/map";
 import { SectorBar } from "./SectorBar";
 
 const ProfessionalTelemetryCharts = React.lazy(
@@ -68,14 +67,16 @@ export default function TelemetrySection({
 	const maxSpeed = speeds.length > 0 ? Math.max(...speeds) : 0;
 
 	const hoveredPoint =
-		hoveredIndex !== null && hoveredIndex >= 0 && hoveredIndex < dataWithGPSCoordinates.length
+		hoveredIndex !== null &&
+		hoveredIndex >= 0 &&
+		hoveredIndex < dataWithGPSCoordinates.length
 			? dataWithGPSCoordinates[hoveredIndex]
 			: null;
 
 	const hasData = dataWithGPSCoordinates.length > 0;
 
 	return (
-		<div className="flex flex-row flex-1 w-full bg-background">
+		<div className="grid grid-cols-2 w-full bg-background">
 			{/* Left: Track Map */}
 			<div className="flex flex-col border-r border-border flex-1 min-w-0">
 				<div className="flex items-center justify-between px-6 py-3 border-b border-border">
@@ -85,7 +86,7 @@ export default function TelemetrySection({
 						<p className="text-muted-foreground text-xs">Color by speed</p>
 					</div>
 					<div className="flex items-center gap-2">
-						<div className="h-1.5 w-20 rounded-full bg-gradient-to-r from-blue-500 via-emerald-400 via-yellow-400 to-red-500" />
+						<div className="h-1.5 w-20 rounded-full bg-gradient-to-r to-emerald-400 via-yellow-400 from-red-500" />
 						<p className="text-muted-foreground text-xs font-mono">
 							{minSpeed.toFixed(0)}
 						</p>
@@ -112,9 +113,7 @@ export default function TelemetrySection({
 								opacity={0}
 							/>
 							{racingLineData && (
-								<MemoizedRacingLine
-									dataWithGPSCoordinates={racingLineData}
-								/>
+								<MemoizedRacingLine dataWithGPSCoordinates={racingLineData} />
 							)}
 							<MapControls showZoom showCompass />
 							{hoverCoordinates && (
@@ -140,7 +139,7 @@ export default function TelemetrySection({
 			</div>
 
 			{/* Right: Telemetry Channels */}
-			<div className="flex flex-col w-[720px] min-w-[400px]">
+			<div className="flex flex-col min-w-[400px]">
 				<div className="flex items-center justify-between px-5 py-3 border-b border-border">
 					<p className="text-foreground text-xs font-medium">Channels</p>
 					{hoveredPoint && (

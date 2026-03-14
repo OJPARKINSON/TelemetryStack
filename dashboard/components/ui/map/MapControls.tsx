@@ -181,10 +181,10 @@ export function MapControls({
 			{showZoom && (
 				<ControlGroup>
 					<ControlButton onClick={handleZoomIn} label="Zoom in">
-						<Plus className="size-4" />
+						<Plus className="size-4 text-primary" />
 					</ControlButton>
 					<ControlButton onClick={handleZoomOut} label="Zoom out">
-						<Minus className="size-4" />
+						<Minus className="size-4 text-primary" />
 					</ControlButton>
 				</ControlGroup>
 			)}
