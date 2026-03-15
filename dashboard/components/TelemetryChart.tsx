@@ -76,7 +76,7 @@ export const TelemetryChart = ({
 					>
 						<CartesianGrid
 							strokeDasharray="3 3"
-							stroke="hsl(var(--border))"
+							stroke="var(--border)"
 							opacity={0.3}
 						/>
 						<XAxis
@@ -88,9 +88,9 @@ export const TelemetryChart = ({
 						/>
 						<YAxis
 							domain={config.yDomain}
-							tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
-							axisLine={{ stroke: "hsl(var(--border))" }}
-							tickLine={{ stroke: "hsl(var(--border))" }}
+							tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
+							axisLine={{ stroke: "var(--border)" }}
+							tickLine={{ stroke: "var(--border)" }}
 							tickFormatter={formatTick}
 							width={40}
 						/>
@@ -108,7 +108,7 @@ export const TelemetryChart = ({
 
 						<ReferenceLine
 							x={ReferenceLineX || 0}
-							stroke="hsl(var(--foreground))"
+							stroke="var(--foreground)"
 							strokeWidth={1}
 							strokeDasharray="2 2"
 						/>

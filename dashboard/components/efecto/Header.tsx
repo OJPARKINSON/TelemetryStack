@@ -1,3 +1,5 @@
+import { Link } from "@tanstack/react-router";
+
 interface HeaderProps {
 	trackName: string;
 	sessionNum: string;
@@ -20,16 +22,18 @@ export const Header = ({
 	return (
 		<div className="flex items-center justify-between px-8 py-4 border-b border-border w-full bg-background">
 			<div className="flex items-center gap-6">
-				<div className="flex items-center gap-2.5">
-					<div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center">
-						<p className="text-primary-foreground text-xs font-bold">iR</p>
+				<Link to="/">
+					<div className="flex items-center gap-2.5">
+						<div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center">
+							<p className="text-primary-foreground text-xs font-bold">iR</p>
+						</div>
+						<p className="text-foreground text-sm font-medium tracking-tight">
+							Telemetry
+						</p>
+						<p className="text-muted-foreground text-sm">/</p>
+						<p className="text-muted-foreground text-sm">{trackName}</p>
 					</div>
-					<p className="text-foreground text-sm font-medium tracking-tight">
-						Telemetry
-					</p>
-					<p className="text-muted-foreground text-sm">/</p>
-					<p className="text-muted-foreground text-sm">{trackName}</p>
-				</div>
+				</Link>
 			</div>
 			<div className="flex items-center gap-4">
 				<div className="flex items-center gap-0 rounded-lg border border-border overflow-hidden bg-card w-full">
