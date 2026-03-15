@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/suspicious/noArrayIndexKey: <explanation> */
 export function NewTelemetrySkeleton() {
 	return (
 		<div className="flex flex-col bg-background border border-border w-full mx-auto min-h-screen">

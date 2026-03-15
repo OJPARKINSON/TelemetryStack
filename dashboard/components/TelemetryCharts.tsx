@@ -69,7 +69,7 @@ const TelemetryCharts = React.memo(function TelemetryCharts({
 				dataKey: "SteeringWheelAngle",
 				color: "#ec4899",
 				unit: "deg",
-				yDomain: [-180, 180],
+				yDomain: [-3, 3],
 				height: 50,
 			},
 		],
