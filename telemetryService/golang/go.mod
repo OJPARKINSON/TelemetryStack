@@ -4,7 +4,6 @@ go 1.26
 
 require (
 	github.com/prometheus/client_golang v1.23.2
-	github.com/rabbitmq/amqp091-go v1.10.0
 )
 
 require (
@@ -22,10 +21,7 @@ require (
 	github.com/go-playground/validator/v10 v10.27.0 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/goccy/go-yaml v1.18.0 // indirect
-	github.com/gofiber/fiber/v3 v3.1.0 // indirect
-	github.com/gofiber/schema v1.7.0 // indirect
-	github.com/gofiber/utils v0.0.10 // indirect
-	github.com/gofiber/utils/v2 v2.0.2 // indirect
+
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/schema v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
