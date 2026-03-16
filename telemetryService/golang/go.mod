@@ -62,8 +62,6 @@ require (
 )
 
 require (
-	github.com/gin-gonic/gin v1.11.0
-	github.com/gofiber/fiber v1.14.6
 	github.com/joho/godotenv v1.5.1
 	github.com/questdb/go-questdb-client v1.0.5 // indirect
 	github.com/questdb/go-questdb-client/v4 v4.1.0
