@@ -1,24 +1,15 @@
-package persistance
+package questdb
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"time"
-
-	"github.com/ojparkinson/telemetryService/internal/config"
 )
 
 type Schema struct {
-	config *config.Config
-}
-
-func NewSchema(config *config.Config) *Schema {
-	return &Schema{
-		config: config,
-	}
+	host string
+	port string
 }
 
 func (s *Schema) CreateTableHTTP() error {
@@ -74,7 +65,7 @@ func (s *Schema) CreateTableHTTP() error {
             WITH maxUncommittedRows=1000000
             DEDUP UPSERT KEYS(timestamp, session_id);
 	`
-	_, err := ExecuteSelectQuery(sql, s.config)
+	err := s.execDDL(sql)
 	return err
 }
 
@@ -86,7 +77,7 @@ func (s *Schema) AddIndexes() error {
 	}
 
 	for _, idx := range indexes {
-		if _, err := ExecuteSelectQuery(idx, s.config); err != nil {
+		if err := s.execDDL(idx); err != nil {
 			return fmt.Errorf("failed to create index: %w", err)
 		}
 	}
@@ -94,62 +85,19 @@ func (s *Schema) AddIndexes() error {
 	return nil
 }
 
-func ExecuteSelectQuery(query string, config *config.Config) ([]map[string]interface{}, error) {
-	maxRetries := 3
-	baseDelay := 500 * time.Millisecond
-
-	for attempt := 0; attempt < maxRetries; attempt++ {
-		resp, err := http.Get(
-			fmt.Sprintf("http://%s:%d/exec?query=%s",
-				config.QuestDbHost,
-				config.QuestDBPort,
-				url.QueryEscape(query)),
-		)
-
-		if err != nil {
-			if attempt < maxRetries-1 {
-				delay := baseDelay * time.Duration(1<<uint(attempt))
-				fmt.Printf("QuestDB query failed (attempt %d/%d), retrying in %v: %v\n", attempt+1, maxRetries, delay, err)
-				time.Sleep(delay)
-				continue
-			}
-			return nil, fmt.Errorf("failed to execute select query after all retries: %w", err)
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(resp.Body)
-			return nil, fmt.Errorf("query failed with status %d: %s", resp.StatusCode, string(body))
-		}
-
-		// Parse JSON response from QuestDB /exec endpoint
-		var result struct {
-			Columns []struct {
-				Name string `json:"name"`
-				Type string `json:"type"`
-			} `json:"columns"`
-			Dataset [][]interface{} `json:"dataset"`
-			Count   int             `json:"count"`
-		}
-
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			return nil, fmt.Errorf("failed to parse response: %w", err)
-		}
-
-		// Convert to []map[string]interface{} for easy JSON marshaling
-		rows := make([]map[string]interface{}, len(result.Dataset))
-		for i, row := range result.Dataset {
-			rowMap := make(map[string]interface{})
-			for j, col := range result.Columns {
-				if j < len(row) {
-					rowMap[col.Name] = row[j]
-				}
-			}
-			rows[i] = rowMap
-		}
-
-		return rows, nil
+func (s *Schema) execDDL(sql string) error {
+	resp, err := http.Get(
+		fmt.Sprintf("http://%s:%d/exec?query=%s", s.host, s.port,
+			url.QueryEscape(sql)),
+	)
+	if err != nil {
+		return fmt.Errorf("ddl exec: %w", err)
 	}
+	defer resp.Body.Close()
 
-	return nil, fmt.Errorf("failed to execute query after %d retries", maxRetries)
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("ddl failed (%d): %s", resp.StatusCode, body)
+	}
+	return nil
 }

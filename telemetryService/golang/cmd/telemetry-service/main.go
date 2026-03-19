@@ -1,25 +1,27 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"log"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/ojparkinson/telemetryService/internal/adapter/questdb"
 	"github.com/ojparkinson/telemetryService/internal/api"
 	"github.com/ojparkinson/telemetryService/internal/config"
 	"github.com/ojparkinson/telemetryService/internal/metrics"
-	"github.com/ojparkinson/telemetryService/internal/persistance"
 )
 
 func main() {
 	log.Println("Starting telemetry service")
 
-	config := config.NewConfig()
+	cfg := config.NewConfig()
 
-	// Create database schema
-	schema := persistance.NewSchema(config)
+	schema := questdb.NewRepository(cfg.QuestDbHost, cfg.QuestDBPort)
 	if err := schema.CreateTableHTTP(); err != nil {
 		log.Printf("Failed to create table: %v", err)
 		log.Println("Exiting due to database initialization failure")
@@ -28,7 +30,7 @@ func main() {
 	log.Println("Database schema initialized successfully")
 
 	// Create sender pool
-	senderPool, err := persistance.NewSenderPool(config)
+	senderPool, err := questdb.NewSenderPool(cfg)
 	if err != nil {
 		log.Printf("Failed to create sender pool: %v", err)
 		log.Println("Exiting due to sender pool initialization failure")
@@ -36,7 +38,16 @@ func main() {
 	}
 	log.Println("Sender pool created successfully")
 
-	apiServer := api.NewServer(":8010", config, senderPool)
+	pgxPool, err := pgxpool.New(context.Background(), fmt.Sprintf("postgres://%s:%d/questdb?sslmode=disable", cfg.QuestDbHost,
+		8812))
+	if err != nil {
+		log.Fatalf("pgx pool: %v", err)
+	}
+	defer pgxPool.Close()
+
+	repo := questdb.NewRepository(pgxPool, senderPool)
+
+	apiServer := api.NewServer(":8010", repo, repo)
 
 	log.Println("creating server")
 	go func() {

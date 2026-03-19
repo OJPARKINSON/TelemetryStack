@@ -1,4 +1,4 @@
-package persistance
+package questdb
 
 import (
 	"context"

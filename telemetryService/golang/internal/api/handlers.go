@@ -8,20 +8,17 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"slices"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/ojparkinson/telemetryService/internal/geojson"
 	"github.com/ojparkinson/telemetryService/internal/messaging"
-	"github.com/ojparkinson/telemetryService/internal/persistance"
 	"github.com/ojparkinson/telemetryService/internal/sync"
 	"google.golang.org/protobuf/proto"
 )
 
 // /api/sessions
 func (s *Server) handleGetSessions(w http.ResponseWriter, r *http.Request) {
-	sessions, err := s.queryExecutor.QuerySessions()
+	sessions, err := s.sessions.ListSessions(r.Context())
 	if err != nil {
 		log.Println(err)
 		respondError(w, http.StatusInternalServerError, "Failed to fetch sessions")
@@ -39,21 +36,14 @@ func (s *Server) handleGetLaps(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := s.queryExecutor.QueryLaps(r.Context(), sessionID)
+	rows, err := s.sessions.ListLaps(r.Context(), sessionID)
 	if err != nil {
 		log.Println(err)
 		respondError(w, http.StatusInternalServerError, "Failed to fetch laps")
 		return
 	}
 
-	laps := make([]int, len(rows))
-	for i, row := range rows {
-		laps[i], _ = strconv.Atoi(row["lap_id"].(string))
-	}
-
-	slices.Sort(laps)
-
-	respondJSON(w, 200, laps)
+	respondJSON(w, 200, rows)
 
 }
 
@@ -66,7 +56,7 @@ func (s *Server) handleGetTelemetry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lapData, err := s.queryExecutor.QueryLap(r.Context(), sessionID, lapID)
+	lapData, err := s.sessions.GetLapTelemetry(r.Context(), sessionID, lapID)
 	if err != nil {
 		log.Println(err)
 		respondError(w, http.StatusInternalServerError, "Failed to fetch lap data")
@@ -84,7 +74,7 @@ func (s *Server) handleGetTelemetryGeoJson(w http.ResponseWriter, r *http.Reques
 
 	options := geojson.ConversionOptions{}
 
-	lapData, err := s.queryExecutor.QueryLap(r.Context(), sessionID, lapID)
+	lapData, err := s.sessions.GetLapTelemetry(r.Context(), sessionID, lapID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to fetch lap data")
 		return
@@ -105,7 +95,7 @@ func (s *Server) handleSyncLap(w http.ResponseWriter, r *http.Request) {
 	sessionID := chi.URLParam(r, "sessionId")
 	lapID := chi.URLParam(r, "lapId")
 
-	sessionData, err := s.queryExecutor.QueryGeneralLap(r.Context(), sessionID, lapID)
+	sessionData, err := s.sessions.GetLapTelemetry(r.Context(), sessionID, lapID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to fetch lap data")
 		return
@@ -139,10 +129,8 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 			respondError(w, http.StatusBadRequest, "Failed to fetch lap data")
 			return
 		}
-		sender := s.senderPool.Get()
-		defer s.senderPool.Return(sender)
 
-		persistance.WriteBatch(sender, batch.Records)
+		s.writer.WriteBatch(r.Context(), batch.Records)
 
 		w.WriteHeader(http.StatusOK)
 	} else {

@@ -1,7 +1,9 @@
 package sync
 
-import "github.com/ojparkinson/telemetryService/internal/messaging"
+import (
+	"github.com/ojparkinson/telemetryService/internal/domain"
+)
 
-func SyncLap(sessionData []messaging.Telemetry) {
+func SyncLap(sessionData []domain.TelemetryPoint) {
 
 }
