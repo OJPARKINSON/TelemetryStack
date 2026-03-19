@@ -3,10 +3,10 @@ package geojson
 import (
 	"math"
 
-	"github.com/ojparkinson/telemetryService/internal/messaging"
+	"github.com/ojparkinson/telemetryService/internal/domain"
 )
 
-func ConvertToGeoJSON(lapData []messaging.Telemetry, options ConversionOptions) (*FeatureCollection, error) {
+func ConvertToGeoJSON(lapData []domain.TelemetryPoint, options ConversionOptions) (*FeatureCollection, error) {
 	minSpeed := math.MaxFloat32
 	maxSpeed := 0.0
 	for _, lap := range lapData {

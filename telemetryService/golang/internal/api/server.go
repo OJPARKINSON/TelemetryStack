@@ -9,37 +9,33 @@ import (
 	"github.com/andybalholm/brotli"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/ojparkinson/telemetryService/internal/config"
-	"github.com/ojparkinson/telemetryService/internal/persistance"
+	"github.com/ojparkinson/telemetryService/internal/domain"
 )
 
 type Server struct {
-	config        *config.Config
-	logger        *log.Logger
-	queryExecutor *persistance.QueryExecutor
-	senderPool    *persistance.SenderPool
-	addr          string
-
-	app *chi.Mux
+	sessions domain.SessionRepository
+	writer   domain.TelemetryWriter
+	logger   *log.Logger
+	addr     string
+	app      *chi.Mux
 }
 
-func NewServer(addr string, config *config.Config, senderPool *persistance.SenderPool) *Server {
-	r := chi.NewRouter()
+func NewServer(addr string, sessions domain.SessionRepository, writer domain.TelemetryWriter) *Server {
+	app := chi.NewRouter()
 
 	compressor := middleware.NewCompressor(5)
 	compressor.SetEncoder("br", func(w io.Writer, level int) io.Writer {
 		return brotli.NewWriterLevel(w, level)
 	})
-	r.Use(compressor.Handler)
-	r.Use(middleware.Logger)
+	app.Use(compressor.Handler)
+	app.Use(middleware.Logger)
 
 	server := &Server{
-		queryExecutor: &persistance.QueryExecutor{Config: config},
-		logger:        log.New(os.Stdout, "[API] ", log.LstdFlags),
-		config:        config,
-		senderPool:    senderPool,
-		app:           r,
-		addr:          addr,
+		sessions: sessions,
+		writer:   writer,
+		logger:   log.New(os.Stdout, "[API] ", log.LstdFlags),
+		addr:     addr,
+		app:      app,
 	}
 
 	server.setupRoutes()

@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import useSWR from "swr";
+import { StatBox } from "../../components/efecto/StatBox";
 import SessionSelector, {
 	type Session,
 } from "../../components/SessionSelector";
-import { StatBox } from "../../components/efecto/StatBox";
 import { fetcher } from "../../lib/Fetch";
 
 function RouteComponent() {
@@ -103,9 +103,7 @@ function RouteComponent() {
 									type="button"
 									key={trackName}
 									onClick={() =>
-										setActiveTrack(
-											activeTrack === trackName ? null : trackName,
-										)
+										setActiveTrack(activeTrack === trackName ? null : trackName)
 									}
 									className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
 										activeTrack === trackName
@@ -132,22 +130,10 @@ function RouteComponent() {
 			{/* Stats row — matches session page StatBox pattern */}
 			{sessions.length > 0 && (
 				<div className="flex items-stretch border-b border-border w-full bg-background">
-					<StatBox
-						title="Total Sessions"
-						stat={String(sessions.length)}
-					/>
-					<StatBox
-						title="Total Laps"
-						stat={totalLaps.toLocaleString()}
-					/>
-					<StatBox
-						title="Tracks"
-						stat={String(trackNames.length)}
-					/>
-					<StatBox
-						title="Database"
-						stat={error ? "Offline" : "Online"}
-					/>
+					<StatBox title="Total Sessions" stat={String(sessions.length)} />
+					<StatBox title="Total Laps" stat={totalLaps.toLocaleString()} />
+					<StatBox title="Tracks" stat={String(trackNames.length)} />
+					<StatBox title="Database" stat={error ? "Offline" : "Online"} />
 				</div>
 			)}
 
