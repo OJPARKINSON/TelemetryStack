@@ -7,6 +7,7 @@
 *.dll
 *.so
 *.dylib
+tailscaled.*
 
 # Test binary, built with `go test -c`
 *.test
@@ -16,10 +17,222 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+dynamic/tls.yml
 
 # Go workspace file
 go.work
 go.work.sum
+tailscale/
 
-# env file
+# Environment and sensitive files
 .env
+.env.local
+.env.production
+.env.development
+**/.env*
+!.env.template
+*.pdf
+
+# Secrets and tokens
+*.token
+*.secret
+api_keys/
+tokens/
+credentials/
+auth_credentials.txt
+ingest/go/ibt_files/*.ibt
+*.DS_Store
+.DS_Store
+**/.env.influxdb-admin-password
+**/.env.influxdb-admin-token
+CLAUDE.md
+**/.env.influxdb-admin-username
+
+# SSL Certificates and keys
+ssl/
+certs/
+*.pem
+*.crt
+*.key
+*.p12
+*.pfx
+
+# Docker secrets and configs
+docker-compose.override.yml
+secrets/
+configs/
+
+# Traefik dynamic configuration with secrets
+dynamic/tls.yaml
+acme.json
+*.blk
+*.db
+*.influxdb
+*.sum
+*.inf
+**/bin
+*.ibt
+
+*.suo
+*.user
+*.sln.docstates
+
+# Build results
+
+[Dd]ebug/
+[Rr]elease/
+x64/
+[Bb]in/
+[Oo]bj/
+
+# MSTest test Results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+*_i.c
+*_p.c
+*_i.h
+*.ilk
+*.meta
+*.obj
+*.pch
+*.pdb
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.tmp_proj
+*.log
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.log
+*.svclog
+*.scc
+
+# Visual C++ cache files
+ipch/
+*.aps
+*.ncb
+*.opensdf
+*.sdf
+*.cachefile
+
+# Visual Studio profiler
+*.psess
+*.vsp
+*.vspx
+
+# Guidance Automation Toolkit
+*.gpState
+
+# ReSharper is a .NET coding add-in
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# Click-Once directory
+publish/
+
+# Publish Web Output
+*.Publish.xml
+*.pubxml
+*.azurePubxml
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Build results
+[Dd]ebug/
+[Rr]elease/
+bin/
+obj/
+
+# NuGet Packages Directory
+## TODO: If you have NuGet Package Restore enabled, uncomment the next line
+packages/
+## TODO: If the tool you use requires repositories.config, also uncomment the next line
+!packages/repositories.config
+
+# Windows Azure Build Output
+csx/
+*.build.csdef
+
+# Windows Store app package directory
+AppPackages/
+
+# Others
+sql/
+*.Cache
+ClientBin/
+[Ss]tyle[Cc]op.*
+![Ss]tyle[Cc]op.targets
+~$*
+*~
+*.dbmdl
+*.[Pp]ublish.xml
+
+*.publishsettings
+
+# RIA/Silverlight projects
+Generated_Code/
+
+# Backup & report files from converting an old project file to a newer
+# Visual Studio version. Backup files are not needed, because we have git ;-)
+_UpgradeReport_Files/
+Backup*/
+UpgradeLog*.XML
+UpgradeLog*.htm
+
+# SQL Server files
+App_Data/*.mdf
+App_Data/*.ldf
+
+# =========================
+# Windows detritus
+# =========================
+
+# Windows image file caches
+Thumbs.db
+ehthumbs.db
+
+# Folder config file
+Desktop.ini
+
+# Recycle Bin used on file shares
+$RECYCLE.BIN/
+
+# Mac desktop service store files
+.DS_Store
+
+_NCrunch*
+
+.idea/
+
+[Oo]bj/
+[Bb]in/
+.nuget/
+_ReSharper.*
+packages/
+artifacts/
+*.user
+*.suo
+*.userprefs
+*DS_Store
+*.sln.ide
+keys/
+*.key
+
+telemetryService/kafka/*
+ingest/go/kafka-data/*
+
+# Failed batch persistence (temporary recovery files)
+failed_batches/
+telemetryService/golang/benchmark_results/*

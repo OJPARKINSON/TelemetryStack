@@ -1,0 +1,85 @@
+http:
+  middlewares:
+    # Security Headers Middleware
+    # Works with both Tailscale certificates and local self-signed certificates
+    security-headers:
+      headers:
+        customFrameOptionsValue: "SAMEORIGIN"
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+        customResponseHeaders:
+          X-Robots-Tag: "none,noarchive,nosnippet,notranslate,noimageindex"
+          X-Frame-Options: "SAMEORIGIN"
+          X-Content-Type-Options: "nosniff"
+          Referrer-Policy: "same-origin"
+          Cross-Origin-Embedder-Policy: "require-corp"
+          Cross-Origin-Opener-Policy: "same-origin"
+          Cross-Origin-Resource-Policy: "same-origin"
+        sslProxyHeaders:
+          X-Forwarded-Proto: "https"
+        stsSeconds: 0
+        stsIncludeSubdomains: false
+        stsPreload: false
+        forceSTSHeader: false
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "same-origin"
+
+    # Rate Limiting Middleware
+    rate-limit:
+      rateLimit:
+        burst: 100
+        period: 60s
+
+    # API Rate Limiting (stricter)
+    api-rate-limit:
+      rateLimit:
+        burst: 20
+        period: 60s
+
+    # Default Security Chain
+    default-security:
+      chain:
+        middlewares:
+          - security-headers
+          - rate-limit
+
+    # API Security Chain
+    api-security:
+      chain:
+        middlewares:
+          - security-headers
+          - api-rate-limit
+
+    # IP Allowlist for Local Network
+    local-allowlist:
+      ipAllowList:
+        sourceRange:
+          - "127.0.0.1/32"
+          - "10.0.0.0/8"
+          - "172.16.0.0/12"
+          - "192.168.0.0/16"
+
+    # IP Allowlist for Dashboard (more restrictive)
+    dashboard-allowlist:
+      ipAllowList:
+        sourceRange:
+          - "127.0.0.1/32"
+          - "192.168.1.0/24"  # Your local subnet
+          - "172.20.0.0/16"   # Docker network
+
+    # Secure Dashboard Chain
+    secure-dashboard:
+      chain:
+        middlewares:
+          - dashboard-allowlist
+          - security-headers
+          - api-rate-limit
+
+    # Secure Management Chain (for RabbitMQ, Grafana, etc.)
+    secure-management:
+      chain:
+        middlewares:
+          - local-allowlist
+          - security-headers
+          - rate-limit
