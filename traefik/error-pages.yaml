@@ -1,0 +1,15 @@
+http:
+  middlewares:
+    # Custom Error Pages
+    error-pages:
+      errors:
+        status:
+          - "400-599"
+        service: error-pages-service
+        query: "/{status}.html"
+
+  services:
+    error-pages-service:
+      loadBalancer:
+        servers:
+          - url: "https://httpstatus.io"

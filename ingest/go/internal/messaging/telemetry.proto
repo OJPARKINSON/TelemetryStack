@@ -1,0 +1,63 @@
+syntax = "proto3";
+package pubSub;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/messaging";
+
+message Telemetry {
+    string lap_id = 1;
+    double speed = 2;
+    double lap_dist_pct = 3;
+    string session_id = 4;
+    string session_num = 5;
+    string session_type = 6;
+    string session_name = 7;
+    double session_time = 8;
+    string car_id = 9;
+    string track_name = 10;
+    string track_id = 11;
+    uint32 worker_id = 12;
+    double steering_wheel_angle = 13;
+    double player_car_position = 14;
+    double velocity_x = 15;
+    double velocity_y = 16;
+    double velocity_z = 17;
+    double fuel_level = 18;
+    double throttle = 19;
+    double brake = 20;
+    double rpm = 21;
+    double lat = 22;
+    double lon = 23;
+    uint32 gear = 24;
+    double alt = 25;
+    double lat_accel = 26;
+    double long_accel = 27;
+    double vert_accel = 28;
+    double pitch = 29;
+    double roll = 30;
+    double yaw = 31;
+    double yaw_north = 32;
+    double voltage = 33;
+    double lap_last_lap_time = 34;
+    double water_temp = 35;
+    double lap_delta_to_best_lap = 36;
+    double lap_current_lap_time = 37;
+    double l_fpressure = 38;
+    double r_fpressure = 39;
+    double l_rpressure = 40;
+    double r_rpressure = 41;
+    double l_ftemp_m = 42;
+    double r_ftemp_m = 43;
+    double l_rtemp_m = 44;
+    double r_rtemp_m = 45;
+    google.protobuf.Timestamp tick_time = 46;
+}
+
+message TelemetryBatch {
+    repeated Telemetry records = 1;
+    string batch_id = 2;
+    string session_id = 3;
+    uint32 worker_id = 4;
+    google.protobuf.Timestamp timestamp = 5;
+}

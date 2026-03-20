@@ -1,0 +1,3 @@
+[submodule "ingest/go/ibt"]
+	path = ingest/go/ibt
+	url = https://github.com/OJPARKINSON/ibt.git
