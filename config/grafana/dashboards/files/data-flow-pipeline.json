@@ -1,0 +1,164 @@
+{
+  "title": "Data Flow Pipeline",
+  "uid": "data-flow-pipeline",
+  "editable": true,
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "title": "Record Throughput (Records/sec)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+      "targets": [
+        {
+          "expr": "rate(ingest_records_processed_total[1m])",
+          "legendFormat": "Ingest Rate"
+        },
+        {
+          "expr": "rate(telemetry_records_written_total[1m])",
+          "legendFormat": "DB Write Rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "rps",
+          "custom": {"drawStyle": "line", "lineInterpolation": "smooth", "showPoints": "auto"}
+        }
+      }
+    },
+    {
+      "title": "File Processing Rate (Files/sec)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+      "targets": [
+        {
+          "expr": "rate(ingest_files_processed_total[1m])",
+          "legendFormat": "Files/sec"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "points",
+            "pointSize": 5,
+            "showPoints": "always",
+            "lineWidth": 0
+          }
+        }
+      }
+    },
+    {
+      "title": "End-to-End Latency",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(ingest_file_processing_duration_seconds_bucket[1m]))",
+          "legendFormat": "P50 File Processing"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(ingest_file_processing_duration_seconds_bucket[1m]))",
+          "legendFormat": "P95 File Processing"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(ingest_file_processing_duration_seconds_bucket[1m]))",
+          "legendFormat": "P99 File Processing"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "s"}
+      }
+    },
+    {
+      "title": "Database Write Latency",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(telemetry_db_write_duration_seconds_bucket[1m]))",
+          "legendFormat": "P50 DB Write"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(telemetry_db_write_duration_seconds_bucket[1m]))",
+          "legendFormat": "P95 DB Write"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(telemetry_db_write_duration_seconds_bucket[1m]))",
+          "legendFormat": "P99 DB Write"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "s"}
+      }
+    },
+    {
+      "title": "Current Rates",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 16},
+      "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+      "targets": [
+        {
+          "expr": "rate(ingest_records_processed_total[1m])",
+          "legendFormat": "Ingest Rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "rps", "decimals": 0}
+      }
+    },
+    {
+      "title": "Total Records Processed",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 16},
+      "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+      "targets": [
+        {
+          "expr": "ingest_records_processed_total",
+          "legendFormat": "Total Records"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"decimals": 0}
+      }
+    },
+    {
+      "title": "DB Write Success Rate",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 16},
+      "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+      "targets": [
+        {
+          "expr": "(rate(telemetry_records_written_total[5m]) / rate(telemetry_records_received_total[5m])) * 100",
+          "legendFormat": "Success Rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "percent", "decimals": 2, "thresholds": {"steps": [{"color": "red", "value": 0}, {"color": "yellow", "value": 90}, {"color": "green", "value": 99}]}}
+      }
+    },
+    {
+      "title": "Queue Depth",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 16},
+      "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+      "targets": [
+        {
+          "expr": "ingest_queue_depth",
+          "legendFormat": "Queue Depth"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"decimals": 0, "thresholds": {"steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 100}, {"color": "red", "value": 500}]}}
+      }
+    }
+  ]
+}

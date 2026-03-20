@@ -1,0 +1,230 @@
+services:
+  traefik:
+    image: traefik:latest
+    restart: unless-stopped
+    security_opt:
+      - label:disable
+    user: "0"
+    ports:
+      - "8080:80"
+      - "8443:443"
+      - "8081:8080"
+    networks:
+      - telemetry-network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik:/etc/traefik:ro
+      - traefik-logs:/var/log/traefik
+    environment:
+      - TRAEFIK_DASHBOARD_AUTH=${TRAEFIK_DASHBOARD_AUTH}
+      - LOCAL_DOMAIN=${LOCAL_DOMAIN:-localhost}
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "traefik.enable=true"
+      # Dashboard accessible via both domains with enhanced security
+      - "traefik.http.routers.dashboard-local.rule=Host(`${LOCAL_DOMAIN:-localhost}`) && PathPrefix(`/net-dash`)"
+      - "traefik.http.routers.dashboard-local.entrypoints=websecure"
+      - "traefik.http.routers.dashboard-local.service=api@internal"
+      - "traefik.http.routers.dashboard-local.tls=true"
+      - "traefik.http.routers.dashboard-local.middlewares=dashboard-auth,secure-dashboard@file"
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
+
+  questdb:
+    image: questdb/questdb:latest
+    container_name: questdb
+    restart: unless-stopped
+    ports:
+      - "9000:9000" 
+      - "8812:8812" 
+      - "9009:9009" 
+      - "9003:9003" 
+    volumes:
+      - questdb-data:/var/lib/questdb
+    environment:
+      JAVA_OPTS: "-Xmx2g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:G1ReservePercent=20"
+      QDB_SHARED_WORKER_COUNT: "5"
+      QDB_HTTP_ENABLED: "true"
+      QDB_PG_ENABLED: "false"
+      QDB_LINE_TCP_ENABLED: "true"
+      QDB_METRICS_ENABLED: "true"
+      QDB_CAIRO_WAL_ENABLED_DEFAULT: "true"
+      QDB_CAIRO_COMMIT_LAG: "120000"
+      QDB_CAIRO_MAX_UNCOMMITTED_ROWS: "50000"
+    networks:
+      - telemetry-network
+    labels:
+      - "traefik.enable=true"
+      # QuestDB API routes (no web UI, direct API access)
+      - "traefik.http.routers.questdb-local.rule=Host(`${LOCAL_DOMAIN}`) && PathPrefix(`/questdb`)"
+      - "traefik.http.routers.questdb-local.entrypoints=websecure"
+      - "traefik.http.routers.questdb-local.tls=true"
+      - "traefik.http.routers.questdb-local.middlewares=questdb-stripprefix"
+      - "traefik.http.middlewares.questdb-stripprefix.stripprefix.prefixes=/questdb"
+      - "traefik.http.services.questdb.loadbalancer.server.port=9000"
+
+  telemetry-service:
+    build:
+      context: ./telemetryService/golang
+      dockerfile: Dockerfile
+    container_name: telemetry-service
+    restart: unless-stopped
+    networks:
+      - telemetry-network
+    environment:
+      QUESTDB_URL: questdb:8812;username=admin;password=quest
+      QUESTDB_HOST: questdb
+      QUESTDB_PORT: 9000
+      GOMAXPROCS: "6"       # Limit Go scheduler
+      GOGC: "200"           # Less aggressive GC
+    ports:
+      - "9092:9092"  # Prometheus metrics
+      - "8010:8010"  # Prometheus metrics
+    depends_on:
+      questdb:
+        condition: service_started
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.telemetry-api-local.rule=Host(`${LOCAL_DOMAIN:-localhost}`) &&PathPrefix(`/api`)"
+      - "traefik.http.routers.telemetry-api-local.entrypoints=web"
+      - "traefik.http.routers.telemetry-api-local.middlewares=api-security@file"
+      - "traefik.http.services.telemetry-service.loadbalancer.server.port=8010"
+
+  telemetry-dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: telemetry-dashboard
+    restart: unless-stopped
+    networks:
+      - telemetry-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'      
+          memory: 1g       
+    labels:
+      - "traefik.enable=true"
+      # Dashboard main routes
+      - "traefik.http.routers.telemetry-dashboard-local.rule=Host(`${LOCAL_DOMAIN:-localhost}`) &&PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.telemetry-dashboard-local.entrypoints=web"
+      # Service configuration
+      - "traefik.http.services.telemetry-dashboard.loadbalancer.server.port=8080"
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  grafana:
+    image: dhi.io/grafana:12.3
+    container_name: grafana
+    restart: unless-stopped
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana:/etc/grafana/provisioning:ro
+    ports:
+      - "3002:3000"
+    environment:
+      # Grafana settings optimized for high performance
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin123}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: http://localhost:3002
+      GF_SERVER_SERVE_FROM_SUB_PATH: "false"
+      GF_INSTALL_PLUGINS: grafana-clock-panel
+      GF_PROVISIONING_AUTO_ASSIGN_ORG: "true"
+      GF_PROVISIONING_AUTO_ASSIGN_ORG_ROLE: Admin
+      
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/files/system-monitoring.json
+      GF_USERS_DEFAULT_THEME: dark
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      
+    networks:
+      - telemetry-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'     
+          memory: 1.5g     
+        reservations:
+          cpus: '0.25'    
+          memory: 256m
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana-local.rule=Host(`${LOCAL_DOMAIN:-localhost}`) &&PathPrefix(`/grafana`)"
+      - "traefik.http.routers.grafana-local.entrypoints=websecure"
+      - "traefik.http.routers.grafana-local.tls=true"
+      - "traefik.http.routers.grafana-local.middlewares=secure-management@file"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+
+  prometheus:
+    image: prom/prometheus:v2.47.2
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'  # Extended retention with 16GB RAM
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.external-url=https://${LOCAL_DOMAIN:-localhost}/prometheus'
+      - '--web.route-prefix=/'
+      - '--storage.tsdb.retention.size=4GB'   # Use more disk space for metrics
+    networks:
+      - telemetry-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'     # More CPU for metrics processing
+          memory: 2g       # Double memory for larger datasets
+        reservations:
+          cpus: '0.25'
+          memory: 512m
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus-local.rule=Host(`${LOCAL_DOMAIN:-localhost}`) && PathPrefix(`/prometheus`)"
+      - "traefik.http.routers.prometheus-local.entrypoints=websecure"
+      - "traefik.http.routers.prometheus-local.tls=true"
+      - "traefik.http.routers.prometheus-local.middlewares=prometheus-stripprefix,secure-management@file"
+      - "traefik.http.middlewares.prometheus-stripprefix.stripprefix.prefixes=/prometheus"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+
+  # Simplified monitoring stack
+  node-exporter:
+    image: prom/node-exporter:v1.6.1
+    container_name: node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - telemetry-network
+    deploy:
+      resources:
+        limits:
+          cpus: 0.2
+          memory: 128m
+
+volumes:
+  questdb-data:
+    driver: local
+  grafana-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  traefik-logs:
+    driver: local
+
+networks:
+  telemetry-network:
+    driver: bridge

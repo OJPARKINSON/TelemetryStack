@@ -1,0 +1,33 @@
+name = "iracing-api"
+main = "src/index.ts"
+compatibility_date = "2026-02-18"
+
+[assets]
+directory = "../dashboard/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[[containers]]
+class_name = "IracingAPI"
+image = "./Dockerfile"
+max_instances = 1
+
+[[durable_objects.bindings]]
+class_name = "IracingAPI"
+name = "IRACING_API"
+
+[[migrations]]
+new_sqlite_classes = ["IracingAPI"]
+tag = "v1"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "telemetry"
+database_id = "8b2a184a-f60c-4d0c-9acb-6e935a5bec0d"
+preview_database_id = "local"  # uses local sqlite in dev
+
+[observability]
+enabled = true
+
+[dev]
+container_engine = "unix:///var/folders/jd/_dwy1xxx1qn7jwgcxx53qxw80000gn/T/podman/podman-machine-default-api.sock"

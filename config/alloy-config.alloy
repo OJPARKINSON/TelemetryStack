@@ -1,0 +1,60 @@
+// Collect logs from Docker containers
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+// Add custom labels to logs and filter for our main services
+loki.relabel "add_labels" {
+  forward_to = [loki.write.default.receiver]
+  
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    target_label  = "container"
+  }
+  
+  rule {
+    source_labels = ["__meta_docker_container_image"]
+    target_label  = "image"
+  }
+  
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    target_label  = "service"
+    regex = "(questdb|telemetry_service|telemetry-dashboard|rabbitMQ)"
+    replacement = "${1}"
+  }
+  
+  // Add environment label
+  rule {
+    target_label = "environment"
+    replacement = "production"
+  }
+  
+  // Add job label
+  rule {
+    target_label = "job"
+    replacement = "docker-logs"
+  }
+  
+  // Only collect logs from our main services (optional filter)
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex = "(questdb|telemetry_service|telemetry-dashboard|rabbitMQ|prometheus|grafana|loki|grafana-alloy).*"
+    action = "keep"
+  }
+}
+
+// Scrape logs from all discovered containers
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.docker.containers.targets
+  forward_to = [loki.relabel.add_labels.receiver]
+  refresh_interval = "30s"
+}
+
+// Send logs to Loki
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
