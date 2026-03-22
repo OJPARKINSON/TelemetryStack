@@ -21,7 +21,7 @@ func main() {
 
 	cfg := config.NewConfig()
 
-	schema := questdb.NewRepository(cfg.QuestDbHost, cfg.QuestDBPort)
+	schema := questdb.NewSchema(cfg.QuestDbHost, cfg.QuestDBPort)
 	if err := schema.CreateTableHTTP(); err != nil {
 		log.Printf("Failed to create table: %v", err)
 		log.Println("Exiting due to database initialization failure")
@@ -38,7 +38,7 @@ func main() {
 	}
 	log.Println("Sender pool created successfully")
 
-	pgxPool, err := pgxpool.New(context.Background(), fmt.Sprintf("postgres://%s:%d/questdb?sslmode=disable", cfg.QuestDbHost,
+	pgxPool, err := pgxpool.New(context.Background(), fmt.Sprintf("postgres://admin:quest@%s:%d/questdb?sslmode=disable", cfg.QuestDbHost,
 		8812))
 	if err != nil {
 		log.Fatalf("pgx pool: %v", err)

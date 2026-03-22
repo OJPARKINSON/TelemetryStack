@@ -13,5 +13,5 @@ type SessionRepository interface {
 }
 
 type TelemetryWriter interface {
-	WriteBatch(ctx context.Context, records []*messaging.Telemetry)
+	WriteBatch(ctx context.Context, records []*messaging.Telemetry) error
 }

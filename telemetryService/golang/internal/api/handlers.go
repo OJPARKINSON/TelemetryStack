@@ -43,7 +43,13 @@ func (s *Server) handleGetLaps(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, 200, rows)
+	lapIDs := make([]int, len(rows))
+
+	for i, row := range rows {
+		lapIDs[i] = row.LapID
+	}
+
+	respondJSON(w, 200, lapIDs)
 
 }
 

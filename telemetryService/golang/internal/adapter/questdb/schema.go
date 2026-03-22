@@ -9,7 +9,11 @@ import (
 
 type Schema struct {
 	host string
-	port string
+	port int
+}
+
+func NewSchema(host string, port int) *Schema {
+	return &Schema{host: host, port: port}
 }
 
 func (s *Schema) CreateTableHTTP() error {
