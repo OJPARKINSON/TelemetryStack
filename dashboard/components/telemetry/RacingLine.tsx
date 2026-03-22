@@ -26,7 +26,7 @@ function RacingLine({
 					source: "racing-line",
 					paint: {
 						"line-color": ["get", "color"],
-						"line-width": 4,
+						"line-width": 2,
 						"line-opacity": 1,
 					},
 					layout: {
