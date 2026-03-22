@@ -76,7 +76,7 @@ export default function TelemetrySection({
 	const hasData = dataWithGPSCoordinates.length > 0;
 
 	return (
-		<div className="grid grid-cols-2 w-full bg-background">
+		<div className="grid grid-cols-2 h-full w-full bg-background">
 			{/* Left: Track Map */}
 			<div className="flex flex-col border-r border-border flex-1 min-w-0">
 				<div className="flex items-center justify-between px-6 py-3 border-b border-border">
