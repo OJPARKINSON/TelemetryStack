@@ -1,5 +1,7 @@
   FROM golang:1.26-alpine AS builder
 
+ARG TARGETARCH
+
   WORKDIR /build
 
   COPY go.mod go.sum ./
@@ -7,7 +9,7 @@
 
   COPY . .
 
-  RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build \
+  RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
       -o telemetry-service \
       -trimpath \
       -ldflags="-w -s" \
