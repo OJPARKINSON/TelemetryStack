@@ -2,8 +2,6 @@ package domain
 
 import (
 	"context"
-
-	"github.com/ojparkinson/telemetryService/internal/messaging"
 )
 
 type SessionRepository interface {
@@ -13,5 +11,5 @@ type SessionRepository interface {
 }
 
 type TelemetryWriter interface {
-	WriteBatch(ctx context.Context, records []*messaging.Telemetry) error
+	WriteBatch(ctx context.Context, records []*TelemetryPoint) error
 }

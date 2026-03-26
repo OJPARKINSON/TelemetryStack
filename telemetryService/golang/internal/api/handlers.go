@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/ojparkinson/telemetryService/internal/domain"
 	"github.com/ojparkinson/telemetryService/internal/geojson"
 	"github.com/ojparkinson/telemetryService/internal/messaging"
 	"github.com/ojparkinson/telemetryService/internal/sync"
@@ -136,7 +137,12 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		s.writer.WriteBatch(r.Context(), batch.Records)
+		points := make([]*domain.TelemetryPoint, len(batch.Records))
+		for i, rec := range batch.Records {
+			p := domain.TelemetryPointFromProto(rec)
+			points[i] = &p
+		}
+		s.writer.WriteBatch(r.Context(), points)
 
 		w.WriteHeader(http.StatusOK)
 	} else {

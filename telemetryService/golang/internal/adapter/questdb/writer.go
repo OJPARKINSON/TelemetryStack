@@ -3,12 +3,11 @@ package questdb
 import (
 	"context"
 	"log"
-	"time"
 
-	"github.com/ojparkinson/telemetryService/internal/messaging"
+	"github.com/ojparkinson/telemetryService/internal/domain"
 )
 
-func (r *Repository) WriteBatch(ctx context.Context, records []*messaging.Telemetry) error {
+func (r *Repository) WriteBatch(ctx context.Context, records []*domain.TelemetryPoint) error {
 	if len(records) == 0 {
 		return nil
 	}
@@ -17,20 +16,15 @@ func (r *Repository) WriteBatch(ctx context.Context, records []*messaging.Teleme
 	defer r.writers.Return(sender)
 
 	for _, rec := range records {
-		ts := time.Now()
-
-		if rec.TickTime != nil {
-			ts = rec.TickTime.AsTime()
-		}
-
-		err := sender.Table("TelemetryTicks").Symbol("session_id", rec.SessionId).
+		err := sender.Table("TelemetryTicks").
+			Symbol("session_id", rec.SessionID).
 			Symbol("track_name", rec.TrackName).
-			Symbol("track_id", rec.TrackId).
-			Symbol("lap_id", rec.LapId).
+			Symbol("track_id", rec.TrackID).
+			Symbol("lap_id", rec.LapID).
 			Symbol("session_num", rec.SessionNum).
 			Symbol("session_type", rec.SessionType).
 			Symbol("session_name", rec.SessionName).
-			Symbol("car_id", rec.CarId).
+			Symbol("car_id", rec.CarID).
 			Int64Column("gear", int64(rec.Gear)).
 			Int64Column("player_car_position", int64(rec.PlayerCarPosition)).
 			Float64Column("speed", rec.Speed).
@@ -44,7 +38,7 @@ func (r *Repository) WriteBatch(ctx context.Context, records []*messaging.Teleme
 			Float64Column("throttle", rec.Throttle).
 			Float64Column("brake", rec.Brake).
 			Float64Column("steering_wheel_angle", rec.SteeringWheelAngle).
-			Float64Column("rpm", rec.Rpm).
+			Float64Column("rpm", rec.RPM).
 			Float64Column("velocity_x", rec.VelocityX).
 			Float64Column("velocity_y", rec.VelocityY).
 			Float64Column("velocity_z", rec.VelocityZ).
@@ -67,13 +61,14 @@ func (r *Repository) WriteBatch(ctx context.Context, records []*messaging.Teleme
 			Float64Column("rFtempM", rec.RFtempM).
 			Float64Column("lRtempM", rec.LRtempM).
 			Float64Column("rRtempM", rec.RRtempM).
-			At(ctx, ts)
+			At(ctx, rec.Timestamp)
 
 		if err != nil {
 			log.Printf("Failed to write telemetry record: %v", err)
 			return err
 		}
 	}
+
 	if err := sender.Flush(ctx); err != nil {
 		log.Printf("Failed to flush telemetry batch: %v", err)
 		return err
