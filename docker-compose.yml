@@ -84,7 +84,7 @@ services:
           cpus: '1'
           memory: 2g
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000"]
+      test: ["CMD", "curl", "-f", "http://localhost:9003"]
       interval: 5s
       timeout: 3s
       retries: 10
