@@ -53,6 +53,10 @@ services:
     image: questdb/questdb:latest
     container_name: questdb
     restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
     ports:
       - "9000:9000"
       - "8812:8812"
@@ -62,15 +66,13 @@ services:
       - questdb-data:/var/lib/questdb
       - ./config/questdb.conf:/root/.questdb/conf/server.conf:ro
     environment:
-      JAVA_OPTS: "-Xmx2g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:G1ReservePercent=20"
+      JAVA_OPTS: "-Xmx1g -Xms512m -XX:+UseG1GC"
       QDB_SHARED_WORKER_COUNT: "2"
       QDB_HTTP_ENABLED: "true"
       QDB_PG_ENABLED: "true"
       QDB_METRICS_ENABLED: "true"
       QDB_LINE_TCP_ENABLED: "true"
       QDB_CAIRO_WAL_ENABLED_DEFAULT: "true"
-      QDB_CAIRO_COMMIT_LAG: "120000"
-      QDB_CAIRO_MAX_UNCOMMITTED_ROWS: "50000"
     networks:
       - telemetry-network
     deploy:
@@ -99,6 +101,7 @@ services:
     restart: unless-stopped
     ports:
       - "9092:9092"  # Prometheus metrics
+      - "8010:8010"  # Data ingestion
     networks:
       - telemetry-network
     environment:
