@@ -3,9 +3,17 @@ package questdb
 import (
 	"context"
 	"log"
+	"math"
 
 	"github.com/ojparkinson/telemetryService/internal/domain"
 )
+
+func gearToInt64(g uint32) int64 {
+	if g == math.MaxUint32 {
+		return -1
+	}
+	return int64(g)
+}
 
 func (r *Repository) WriteBatch(ctx context.Context, records []*domain.TelemetryPoint) error {
 	if len(records) == 0 {
@@ -25,7 +33,7 @@ func (r *Repository) WriteBatch(ctx context.Context, records []*domain.Telemetry
 			Symbol("session_type", rec.SessionType).
 			Symbol("session_name", rec.SessionName).
 			Symbol("car_id", rec.CarID).
-			Int64Column("gear", int64(rec.Gear)).
+			Int64Column("gear", gearToInt64(rec.Gear)).
 			Int64Column("player_car_position", int64(rec.PlayerCarPosition)).
 			Float64Column("speed", rec.Speed).
 			Float64Column("lap_dist_pct", rec.LapDistPct).

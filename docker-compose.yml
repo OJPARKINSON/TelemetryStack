@@ -24,11 +24,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'
-          memory: 1g
+          cpus: '0.5'
+          memory: 512m
         reservations:
-          cpus: '0.25'
-          memory: 256m
+          cpus: '0.1'
+          memory: 128m
     healthcheck:
       test: [ "CMD", "traefik", "healthcheck" ]
       interval: 30s
@@ -66,7 +66,7 @@ services:
       - questdb-data:/var/lib/questdb
       - ./config/questdb.conf:/root/.questdb/conf/server.conf:ro
     environment:
-      JAVA_OPTS: "-Xmx1g -Xms512m -XX:+UseG1GC"
+      JAVA_OPTS: "-Xmx2g -Xms1g -XX:+UseG1GC"
       QDB_SHARED_WORKER_COUNT: "2"
       QDB_HTTP_ENABLED: "true"
       QDB_PG_ENABLED: "true"
@@ -79,10 +79,10 @@ services:
       resources:
         limits:
           cpus: '1.5'
-          memory: 3g
+          memory: 6g
         reservations:
-          cpus: '0.25'
-          memory: 512m
+          cpus: '1'
+          memory: 2g
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000"]
       interval: 5s
@@ -117,11 +117,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.25'
-          memory: 8g
-        reservations:
-          cpus: '0.25'
+          cpus: '1.0'
           memory: 1g
+        reservations:
+          cpus: '0.5'
+          memory: 512m
     depends_on:
       questdb:
         condition: service_healthy
@@ -148,8 +148,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'
-          memory: 1g
+          cpus: '0.5'
+          memory: 512m
     labels:
       - "traefik.enable=true"
       # Dashboard routes
@@ -189,11 +189,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.75'
-          memory: 1.5g
+          cpus: '0.5'
+          memory: 768m
         reservations:
-          cpus: '0.25'
-          memory: 256m
+          cpus: '0.1'
+          memory: 128m
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.grafana-local.rule=(Host(`${LOCAL_DOMAIN:-localhost}`) || Host(`localhost`)) && PathPrefix(`/grafana`)"
@@ -216,23 +216,23 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=30d' # Extended retention with 16GB RAM
+      - '--storage.tsdb.retention.time=14d'
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--web.enable-lifecycle'
       - '--web.external-url=http://${LOCAL_DOMAIN:-localhost}/prometheus'
       - '--web.route-prefix=/'
-      - '--storage.tsdb.retention.size=4GB' # Use more disk space for metrics
+      - '--storage.tsdb.retention.size=2GB'
     networks:
       - telemetry-network
     deploy:
       resources:
         limits:
-          cpus: '0.75' # More CPU for metrics processing
-          memory: 2g # Double memory for larger datasets
+          cpus: '0.5'
+          memory: 1g
         reservations:
-          cpus: '0.25'
-          memory: 512m
+          cpus: '0.1'
+          memory: 256m
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.prometheus-local.rule=(Host(`${LOCAL_DOMAIN:-localhost}`) || Host(`localhost`)) && PathPrefix(`/prometheus`)"
