@@ -19,11 +19,11 @@ func (r *Repository) ListSessions(ctx context.Context) ([]domain.Session, error)
 
 	sessions := make([]domain.Session, len(rows))
 	for i, row := range rows {
-		var maxLapID string
-		if v, ok := row.MaxLapID.(string); ok {
+		var maxLapID int
+		if v, ok := row.MaxLapID.(int); ok {
 			maxLapID = v
-		} else if v, ok := row.MaxLapID.(pgtype.Text); ok {
-			maxLapID = v.String
+		} else if v, ok := row.MaxLapID.(int); ok {
+			maxLapID = v
 		}
 
 		var lastUpdated time.Time
