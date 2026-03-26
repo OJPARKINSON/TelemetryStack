@@ -43,6 +43,7 @@ tokens/
 credentials/
 auth_credentials.txt
 ingest/go/ibt_files/*
+ingest/go/handful_ibt_files/*
 *.DS_Store
 .DS_Store
 **/.env.influxdb-admin-password

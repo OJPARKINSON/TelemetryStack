@@ -16,6 +16,7 @@ func NewSchema(host string, port int) *Schema {
 	return &Schema{host: host, port: port}
 }
 
+// todo: add retry logic to stop it falling over on the pi
 func (s *Schema) CreateTableHTTP() error {
 	sql := `
 		    CREATE TABLE IF NOT EXISTS TelemetryTicks (
@@ -64,7 +65,7 @@ func (s *Schema) CreateTableHTTP() error {
                 lRtempM DOUBLE,
                 rRtempM DOUBLE,
                 timestamp TIMESTAMP
-            ) TIMESTAMP(timestamp) PARTITION BY DAY 
+            ) TIMESTAMP(timestamp) PARTITION BY DAY
             WAL
             WITH maxUncommittedRows=1000000
             DEDUP UPSERT KEYS(timestamp, session_id);
