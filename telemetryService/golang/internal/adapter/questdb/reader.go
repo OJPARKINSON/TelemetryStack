@@ -20,10 +20,15 @@ func (r *Repository) ListSessions(ctx context.Context) ([]domain.Session, error)
 	sessions := make([]domain.Session, len(rows))
 	for i, row := range rows {
 		var maxLapID int
-		if v, ok := row.MaxLapID.(int); ok {
+		switch v := row.MaxLapID.(type) {
+		case int:
 			maxLapID = v
-		} else if v, ok := row.MaxLapID.(int); ok {
-			maxLapID = v
+		case int32:
+			maxLapID = int(v)
+		case int64:
+			maxLapID = int(v)
+		case string:
+			maxLapID, _ = strconv.Atoi(v)
 		}
 
 		var lastUpdated time.Time
