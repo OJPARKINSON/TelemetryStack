@@ -114,9 +114,6 @@ services:
       QUESTDB_URL: questdb:8812;username=admin;password=quest
       QUESTDB_HOST: ${QUESTDB_HOST:-questdb}
       QUESTDB_PORT: ${QUESTDB_HTTP_PORT:-9000}
-    depends_on:
-      questdb:
-        condition: service_started
     deploy:
       resources:
         limits:
