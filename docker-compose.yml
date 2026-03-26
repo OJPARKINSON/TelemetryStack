@@ -83,6 +83,12 @@ services:
         reservations:
           cpus: '0.25'
           memory: 512m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
     labels:
       - "traefik.enable=true"
       # QuestDB API routes (no web UI, direct API access)
@@ -119,6 +125,9 @@ services:
         reservations:
           cpus: '0.25'
           memory: 1g
+    depends_on:
+      questdb:
+        condition: service_healthy
     labels:
       - "traefik.enable=true"
       # API routes for local access

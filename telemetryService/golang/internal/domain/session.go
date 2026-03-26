@@ -6,7 +6,7 @@ type Session struct {
 	SessionID   string    `json:"session_id"`
 	TrackName   string    `json:"track_name"`
 	SessionName string    `json:"session_name"`
-	MaxLapID    string    `json:"max_lap_id"`
+	MaxLapID    int       `json:"max_lap_id"`
 	LastUpdated time.Time `json:"last_updated"`
 }
 
