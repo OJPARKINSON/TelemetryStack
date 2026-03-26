@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 type Schema struct {
@@ -70,8 +71,19 @@ func (s *Schema) CreateTableHTTP() error {
             WITH maxUncommittedRows=1000000
             DEDUP UPSERT KEYS(timestamp, session_id);
 	`
-	err := s.execDDL(sql)
-	return err
+
+	for i := 0; i < 3; i++ {
+		err := s.execDDL(sql)
+		if err == nil {
+			return nil
+		}
+		if i == 2 {
+			return err
+		}
+		time.Sleep(12 * time.Second)
+	}
+
+	return nil
 }
 
 func (s *Schema) AddIndexes() error {
