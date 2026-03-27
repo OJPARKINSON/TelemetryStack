@@ -33,6 +33,8 @@ tailscale/
 .env.development
 **/.env*
 !.env.template
+!.env.pi.example
+!**/.env.pi.example
 *.pdf
 
 # Secrets and tokens
