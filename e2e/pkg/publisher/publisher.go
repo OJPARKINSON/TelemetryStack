@@ -1,44 +1,35 @@
-package publisher
+package mockPublisher
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"log"
+	"net/http"
 	"runtime"
 	sync "sync"
 	"time"
 
-	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/testcontainers/testcontainers-go"
 	"google.golang.org/protobuf/proto"
 )
 
 type Publisher struct {
-	conn    *amqp.Connection
-	channel *amqp.Channel
+	serverUrl string
 }
 
-func NewPublisher(rabbitmq *testcontainers.DockerContainer, ctx context.Context) (*Publisher, error) {
-	host, _ := rabbitmq.Host(ctx)
-	port, _ := rabbitmq.MappedPort(ctx, "5672")
+func NewPublisher(ctx context.Context, telemetryService *testcontainers.DockerContainer) (*Publisher, error) {
+	host, _ := telemetryService.Host(ctx)
+	port, _ := telemetryService.MappedPort(ctx, "8010")
 
-	conn, err := amqp.Dial(fmt.Sprintf("amqp://admin:changeme@%s:%s", host, port.Port()))
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Println("Connecting channel")
-	channel, err := conn.Channel()
-	if err != nil {
-		return nil, err
-	}
+	serverUrl := fmt.Sprintf("%s:%s", host, port.Port())
 
 	return &Publisher{
-		conn:    conn,
-		channel: channel,
+		serverUrl: serverUrl,
 	}, nil
 }
 
-func (p *Publisher) PublishBatch(rabbitmq *testcontainers.DockerContainer, batches []*TelemetryBatch, ctx context.Context) {
+func (p *Publisher) PublishBatch(ctx context.Context, batches []*TelemetryBatch) {
 	numWorkers := runtime.NumCPU() // Use all CPUs
 	if numWorkers > len(batches)/10 {
 		numWorkers = len(batches) / 10
@@ -54,6 +45,8 @@ func (p *Publisher) PublishBatch(rabbitmq *testcontainers.DockerContainer, batch
 	// Start workers
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
+		client := http.Client{Timeout: 10 * time.Second}
+
 		go func(workerID int) {
 			defer wg.Done()
 			published := 0
@@ -65,19 +58,17 @@ func (p *Publisher) PublishBatch(rabbitmq *testcontainers.DockerContainer, batch
 					continue
 				}
 
-				err = p.channel.PublishWithContext(ctx, "telemetry_topic", "telemetry.ticks",
-					false, false,
-					amqp.Publishing{
-						ContentType:  "application/x-protobuf",
-						Body:         data,
-						DeliveryMode: amqp.Transient,
-						Timestamp:    time.Now(),
-						MessageId:    batch.BatchId,
-					})
+				dataReader := bytes.NewReader(data)
 
+				res, err := client.Post("http://"+p.serverUrl+"/api/ingest", "application/x-protobuf", dataReader)
 				if err != nil {
-					errChan <- fmt.Errorf("worker %d: publish error: %w", workerID, err)
-				} else {
+					log.Printf("Worker %d: Failed to publish batch %s: %v", batch.WorkerId, batch.BatchId, err)
+
+					continue
+				}
+				defer res.Body.Close()
+
+				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					published++
 				}
 			}

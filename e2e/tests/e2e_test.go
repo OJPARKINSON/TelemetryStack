@@ -7,12 +7,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/ojparkinson/IRacing-Display/e2e/pkg/containers"
-	"github.com/ojparkinson/IRacing-Display/e2e/pkg/publisher"
+	mockPublisher "github.com/ojparkinson/IRacing-Display/e2e/pkg/publisher"
 	"github.com/ojparkinson/IRacing-Display/e2e/pkg/verification"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
+	"golang.org/x/text/number"
 )
 
 func TestAllTicksAreStored(t *testing.T) {
@@ -56,18 +60,18 @@ func TestAllTicksAreStored(t *testing.T) {
 			network, _ := containers.CreateNetwork(ctx)
 
 			containers.SpinUpQuestDB(t, ctx, network)
-			rabbitmqC := containers.StartRabbitMQ(t, ctx, network)
-			containers.StartTelemetryService(t, ctx, network)
 
-			batches := publisher.GenerateBatch(tc.numBatches, tc.recordsPerBatch)
+			telemetryService := containers.StartTelemetryService(t, ctx, network)
 
-			pub, err := publisher.NewPublisher(rabbitmqC, ctx)
+			batches := mockPublisher.GenerateBatch(tc.numBatches, tc.recordsPerBatch)
+
+			pub, err := mockPublisher.NewPublisher(ctx, telemetryService)
 			if err != nil {
 				t.Fatalf("Failed to create publisher: %v", err)
 			}
 
 			publishStart := time.Now()
-			pub.PublishBatch(rabbitmqC, batches, ctx)
+			pub.PublishBatch(ctx, batches)
 
 			publishDuration := time.Since(publishStart)
 			expectedCount := tc.numBatches * tc.recordsPerBatch
@@ -79,14 +83,21 @@ func TestAllTicksAreStored(t *testing.T) {
 			}
 
 			// Report
+			p := message.NewPrinter(language.English)
+
+			publishThroughputDisplay := strings.ReplaceAll(p.Sprintf("%v", number.Decimal(publishThroughput)), ",", "_")
+			avgThroughput := strings.ReplaceAll(p.Sprintf("%v", number.Decimal(metrics.AvgThroughput())), ",", "_")
+			peakThroughput := strings.ReplaceAll(p.Sprintf("%v", number.Decimal(metrics.PeakThroughput())), ",", "_")
+			p95Throughput := strings.ReplaceAll(p.Sprintf("%v", number.Decimal(metrics.P95Throughput())), ",", "_")
+
 			t.Logf("📊 Throughput Metrics:")
-			t.Logf("  Publisher:  %.0f rec/sec", publishThroughput)
-			t.Logf("  E2E Avg:    %.0f rec/sec", metrics.AvgThroughput())
-			t.Logf("  E2E Peak:   %.0f rec/sec", metrics.PeakThroughput())
-			t.Logf("  E2E P95:    %.0f rec/sec", metrics.P95Throughput())
+			t.Logf("  Publisher:  %s rec/sec", publishThroughputDisplay)
+			t.Logf("  E2E Avg:    %s rec/sec", avgThroughput)
+			t.Logf("  E2E Peak:   %s rec/sec", peakThroughput)
+			t.Logf("  E2E P95:    %s rec/sec", p95Throughput)
 
 			// Assert minimum performance
-			if metrics.P95Throughput() < 50000 {
+			if metrics.AvgThroughput() < 50000 {
 				t.Errorf("Throughput below target: %.0f < 50000 rec/sec",
 					metrics.P95Throughput())
 			}
@@ -103,7 +114,7 @@ func TestFixedFilesProcessedSpeed(t *testing.T) {
 	network, _ := containers.CreateNetwork(ctx)
 
 	// Discover .ibt files
-	ibtPath, err := filepath.Abs("../../ingest/go/ibt")
+	ibtPath, err := filepath.Abs("../../ingest/go/ibt_files")
 	if err != nil {
 		t.Fatalf("Failed to get absolute path: %v", err)
 	}
@@ -154,7 +165,7 @@ func TestFixedFilesProcessedSpeed(t *testing.T) {
 
 	// Run the ingest app
 	t.Logf("🚀 Starting ingest process...")
-	ingestCmd := fmt.Sprintf("cd ../../ingest/go && go run cmd/ingest-app/main.go --quiet \"%s\"", ibtPath)
+	ingestCmd := fmt.Sprintf("cd ../../ingest/go && go run cmd/ingest/main.go -p \"%s\"", ibtPath)
 
 	// Run ingest in background and capture output
 	ingestResult := make(chan error, 1)

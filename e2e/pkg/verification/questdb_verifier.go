@@ -225,6 +225,6 @@ func (m *ThroughputMetrics) P95Throughput() float64 {
 	}
 	sort.Float64s(throughputs)
 
-	idx := int(float64(len(throughputs)) * 0.95)
+	idx := int(float64(len(throughputs)-1) * 0.95)
 	return throughputs[idx]
 }
