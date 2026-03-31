@@ -129,7 +129,7 @@ All services accessible on both the local domain and via Tailscale (with TLS).
 ## Roadmap
 
 ### Now
-- [ ] Remove RabbitMQ — replace with direct HTTP/gRPC ingestion
+- [x] Remove RabbitMQ — replace with direct HTTP/gRPC ingestion
 - [ ] Handle session num 0 (practice sessions)
 - [ ] Track which `.ibt` files have already been ingested
 - [ ] Containerise the ingest CLI for e2e testing

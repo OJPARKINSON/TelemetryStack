@@ -20,7 +20,6 @@ type E2eTestingConfig struct {
 	verificationTimeout time.Duration
 	IntegritySampleSize int
 
-	RabbitMQMemory         string
 	QuestDBMemory          string
 	TelemetryServiceMemory string
 }

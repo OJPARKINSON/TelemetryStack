@@ -56,7 +56,7 @@ func (wp *WorkerPool) processWorkItem(ctx context.Context, workerID int, item Wo
 		wp.logger.Error("Failed to create file processor",
 			zap.String("file", item.FilePath),
 			zap.Error(err),
-			zap.String("action", "Check system resources and RabbitMQ connectivity"))
+			zap.String("action", "Check system resources and telemtry service connectivity"))
 		wp.UpdateWorkerStatus(workerID, filename, "ERROR")
 		wp.errorsChan <- WorkError{
 			FilePath:   item.FilePath,

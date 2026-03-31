@@ -62,7 +62,7 @@ type PubSub struct {
 	batchSizeBytes   int
 	batchSizeRecords int
 
-	// Data persistence for RabbitMQ failures
+	// Data persistence for failures
 	failedBatchCount   atomic.Int32
 	persistedBatches   int
 	maxPersistentBytes int64

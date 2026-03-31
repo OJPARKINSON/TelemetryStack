@@ -30,7 +30,6 @@ func StartTelemetryService(t *testing.T, ctx context.Context, nw *testcontainers
 			"QUESTDB_URL":      "questdb:8812;username=admin;password=quest",
 			"QUESTDB_HOST":     "questdb",
 			"QUESTDB_PORT":     "9000",
-			"RABBITMQ_HOST":    "rabbitmq",
 			"SENDER_POOL_SIZE": "60",
 		}),
 		testcontainers.WithWaitStrategy(

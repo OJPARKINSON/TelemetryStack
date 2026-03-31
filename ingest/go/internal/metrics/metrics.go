@@ -27,7 +27,7 @@ var (
 	// Batch metrics
 	BatchesSentTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "ingest_batches_sent_total",
-		Help: "Total number of batches sent to RabbitMQ",
+		Help: "Total number of batches sent to the telemetry service",
 	})
 
 	BatchSizeBytes = promauto.NewHistogram(prometheus.HistogramOpts{

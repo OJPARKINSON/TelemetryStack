@@ -17,9 +17,6 @@ type Config struct {
 	MaxRetries     int
 	RetryDelay     time.Duration
 
-	RabbitMQURL     string
-	DisableRabbitMQ bool
-
 	FileAgeThreshold   time.Duration
 	FileProcessTimeout time.Duration
 
@@ -68,9 +65,6 @@ func LoadConfig() *Config {
 		BatchTimeout:   getEnvAsDuration("BATCH_TIMEOUT", 50*time.Millisecond),
 		MaxRetries:     getEnvAsInt("MAX_RETRIES", 3),
 		RetryDelay:     getEnvAsDuration("RETRY_DELAY", 250*time.Millisecond),
-
-		DisableRabbitMQ: getEnvAsBool("DISABLE_RABBITMQ", false),
-		RabbitMQURL:     getEnv("RABBITMQ_URL", "amqp://admin:changeme@localhost:5672"),
 
 		FileAgeThreshold:   getEnvAsDuration("FILE_AGE_THRESHOLD", 30*time.Second),
 		FileProcessTimeout: getEnvAsDuration("FILE_PROCESS_TIMEOUT", 10*time.Minute),

@@ -10,19 +10,16 @@ type Config struct {
 	QuestDbHost   string
 	QuestDBPort   int
 	QuestPoolSize int
-	RabbitMQHost  string
 }
 
 func NewConfig() *Config {
 	questdbHost := getEnv("QUESTDB_HOST", "localhost")
 	questdbPort := getEnvInt("QUESTDB_PORT", 9000)
-	rabbitMqHost := getEnv("RABBITMQ_HOST", "localhost")
 
 	return &Config{
 		QuestDbHost:   questdbHost,
 		QuestDBPort:   questdbPort,
 		QuestPoolSize: getSenderPool(),
-		RabbitMQHost:  rabbitMqHost,
 	}
 }
 

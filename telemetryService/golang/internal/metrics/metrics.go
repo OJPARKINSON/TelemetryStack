@@ -9,7 +9,7 @@ var (
 	// Records received from RabbitMQ
 	RecordsReceivedTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "telemetry_records_received_total",
-		Help: "Total number of telemetry records received from RabbitMQ",
+		Help: "Total number of telemetry records received from ingest",
 	})
 
 	// Records written to QuestDB

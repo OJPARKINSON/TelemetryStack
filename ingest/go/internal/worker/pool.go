@@ -71,17 +71,6 @@ func NewWorkerPool(cfg *config.Config, logger *zap.Logger) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	var rabbitPool *messaging.ConnectionPool
-	var err error
-
-	if !cfg.DisableRabbitMQ {
-		rabbitPool, err = messaging.NewConnectionPool(cfg.RabbitMQURL, cfg.WorkerCount)
-		if err != nil {
-			logger.Fatal("Failed to create connection pool",
-				zap.Error(err),
-				zap.String("url", cfg.RabbitMQURL),
-			)
-		}
-	}
 
 	workerMetrics := make([]WorkerMetrics, cfg.WorkerCount)
 	for i := range workerMetrics {
@@ -356,8 +345,7 @@ func (wp *WorkerPool) logFinalMetrics() {
 			wp.logger.Warn("High data persistence rate detected",
 				zap.Float64("rate_percent", dataLossRate),
 				zap.Int("persisted_batches", wp.totalPersistedBatches),
-				zap.Int("total_batches", totalBatches),
-				zap.String("action", "Check RabbitMQ connectivity and service health at "+wp.config.RabbitMQURL))
+				zap.Int("total_batches", totalBatches))
 		}
 	}
 

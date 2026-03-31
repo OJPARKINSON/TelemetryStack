@@ -144,7 +144,7 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 
 		if err := processor.Close(); err != nil {
 			pubSub.Close()
-			return nil, fmt.Errorf("error closing processor for group %d: %w\nAction: Check RabbitMQ connectivity and disk space", groupNumber, err)
+			return nil, fmt.Errorf("error closing processor for group %d: %w\nAction: Check telemetry service connectivity and disk space", groupNumber, err)
 		}
 
 		// Collect metrics from this group's PubSub

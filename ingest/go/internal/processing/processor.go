@@ -12,7 +12,7 @@ import (
 	"github.com/OJPARKINSON/ibt/headers"
 )
 
-// loaderProcessor processes telemetry data and sends it to RabbitMQ.
+// loaderProcessor processes telemetry data and sends it to telemetry service.
 // It uses struct-based processing for optimal performance.
 type loaderProcessor struct {
 	pubSub         *messaging.PubSub
@@ -146,13 +146,6 @@ func (l *loaderProcessor) loadBatch() error {
 	}
 
 	batchSize := len(l.cache)
-
-	if !l.config.DisableRabbitMQ {
-		err := l.pubSub.ExecStructs(l.cache)
-		if err != nil {
-			return err
-		}
-	}
 
 	for _, tick := range l.cache {
 		l.tickPool.Put(tick)

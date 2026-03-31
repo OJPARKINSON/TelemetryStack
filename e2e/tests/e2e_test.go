@@ -140,18 +140,7 @@ func TestFixedFilesProcessedSpeed(t *testing.T) {
 
 	// Start containers
 	containers.SpinUpQuestDB(t, ctx, network)
-	rabbitmqC := containers.StartRabbitMQ(t, ctx, network)
 	containers.StartTelemetryService(t, ctx, network)
-
-	// Get RabbitMQ connection details for ingest app
-	host, _ := rabbitmqC.Host(ctx)
-	port, _ := rabbitmqC.MappedPort(ctx, "5672")
-
-	// Set environment variables for ingest app
-	os.Setenv("RABBITMQ_URL", fmt.Sprintf("amqp://admin:changeme@%s:%s", host, port.Port()))
-	os.Setenv("IBT_DATA_DIR", ibtPath)
-	defer os.Unsetenv("RABBITMQ_URL")
-	defer os.Unsetenv("IBT_DATA_DIR")
 
 	// Get initial count from QuestDB
 	initialCount, err := verification.GetRecordCount()
@@ -165,7 +154,7 @@ func TestFixedFilesProcessedSpeed(t *testing.T) {
 
 	// Run the ingest app
 	t.Logf("🚀 Starting ingest process...")
-	ingestCmd := fmt.Sprintf("cd ../../ingest/go && go run cmd/ingest/main.go -p \"%s\"", ibtPath)
+	ingestCmd := fmt.Sprintf("cd ../../ingest/go && go run cmd/ingest/main.go -p=\"%s\"", ibtPath)
 
 	// Run ingest in background and capture output
 	ingestResult := make(chan error, 1)
