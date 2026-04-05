@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/config"
+	"github.com/OJPARKINSON/ibt"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -102,7 +103,7 @@ type PublishMetrics struct {
 }
 
 func NewPubSub(sessionId string, sessionTime time.Time, cfg *config.Config, pool *ConnectionPool, workerId int) *PubSub {
-	client := http.Client{Timeout: 10 * time.Second}
+	client := http.Client{Timeout: 30 * time.Second}
 
 	ps := &PubSub{
 		pool:               pool,
@@ -319,6 +320,82 @@ func (ps *PubSub) transformRecord(record map[string]interface{}) *Telemetry {
 	}
 }
 
+// AddStructRecords converts TelemetryTick structs directly to protobuf Telemetry
+// records and adds them to the batch, bypassing the map-based path.
+func (ps *PubSub) AddStructRecords(ticks []*ibt.TelemetryTick) error {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	for _, tick := range ticks {
+		tickTime := ps.sessionTime.Add(time.Duration(tick.SessionTime * float64(time.Second)))
+
+		record := &Telemetry{
+			LapId:              fmt.Sprintf("%d", tick.LapID),
+			Speed:              tick.Speed,
+			LapDistPct:         tick.LapDistPct,
+			SessionId:          ps.sessionID,
+			SessionNum:         strconv.Itoa(int(tick.SessionNum)),
+			SessionType:        tick.SessionType,
+			SessionName:        tick.SessionName,
+			SessionTime:        tick.SessionTime,
+			CarId:              strconv.Itoa(int(tick.PlayerCarIdx)),
+			TrackName:          strings.ReplaceAll(tick.TrackName, " ", "-"),
+			TrackId:            strconv.Itoa(tick.TrackID),
+			WorkerId:           uint32(ps.workerID),
+			SteeringWheelAngle: tick.SteeringWheelAngle,
+			PlayerCarPosition:  tick.PlayerCarPosition,
+			VelocityX:          tick.VelocityX,
+			VelocityY:          tick.VelocityY,
+			VelocityZ:          tick.VelocityZ,
+			FuelLevel:          tick.FuelLevel,
+			Throttle:           tick.Throttle,
+			Brake:              tick.Brake,
+			Rpm:                tick.RPM,
+			Lat:                tick.Lat,
+			Lon:                tick.Lon,
+			Gear:               tick.Gear,
+			Alt:                tick.Alt,
+			LatAccel:           tick.LatAccel,
+			LongAccel:          tick.LongAccel,
+			VertAccel:          tick.VertAccel,
+			Pitch:              tick.Pitch,
+			Roll:               tick.Roll,
+			Yaw:                tick.Yaw,
+			YawNorth:           tick.YawNorth,
+			Voltage:            tick.Voltage,
+			LapLastLapTime:     tick.LapLastLapTime,
+			WaterTemp:          tick.WaterTemp,
+			LapDeltaToBestLap:  tick.LapDeltaToBestLap,
+			LapCurrentLapTime:  tick.LapCurrentLapTime,
+			LFpressure:         tick.LFpressure,
+			RFpressure:         tick.RFpressure,
+			LRpressure:         tick.LRpressure,
+			RRpressure:         tick.RRpressure,
+			LFtempM:            tick.LFtempM,
+			RFtempM:            tick.RFtempM,
+			LRtempM:            tick.LRtempM,
+			RRtempM:            tick.RRtempM,
+			TickTime:           timestamppb.New(tickTime.UTC()),
+		}
+
+		ps.recordBatch = append(ps.recordBatch, record)
+		ps.totalRecords++
+
+		estimatedSize := proto.Size(record)
+		ps.totalBytes += int64(estimatedSize)
+	}
+
+	shouldFlush := len(ps.recordBatch) >= ps.batchSizeRecords ||
+		ps.totalBytes >= int64(ps.batchSizeBytes) ||
+		time.Since(ps.lastFlush) > time.Duration(ps.config.BatchTimeout)
+
+	if shouldFlush {
+		return ps.flushBatchInternal()
+	}
+
+	return nil
+}
+
 // publishWorker runs in background goroutine to handle async publishing
 func (ps *PubSub) publishWorker() {
 	defer ps.publishWg.Done()
@@ -362,10 +439,8 @@ func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte) error {
 	if err != nil {
 		log.Printf("Worker %d: Failed to publish batch %s: %v", ps.workerID, batch.BatchId, err)
 		ps.recordFailure()
-
 		ps.failedBatchCount.Add(1)
-
-		return nil
+		return err
 	}
 	defer res.Body.Close()
 

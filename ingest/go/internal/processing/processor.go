@@ -145,7 +145,9 @@ func (l *loaderProcessor) loadBatch() error {
 		return nil
 	}
 
-	batchSize := len(l.cache)
+	if err := l.pubSub.AddStructRecords(l.cache); err != nil {
+		return fmt.Errorf("failed to publish struct batch: %w", err)
+	}
 
 	for _, tick := range l.cache {
 		l.tickPool.Put(tick)
@@ -156,8 +158,6 @@ func (l *loaderProcessor) loadBatch() error {
 
 	// Report progress after batch is sent
 	l.progressCallback.OnBatchSent(l.currentFile, l.totalProcessed, l.totalBatches)
-
-	_ = batchSize // Keep for potential future use
 
 	return nil
 }

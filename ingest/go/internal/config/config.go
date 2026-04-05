@@ -45,11 +45,11 @@ type Config struct {
 }
 
 func LoadConfig() *Config {
-	cpuCount := runtime.NumCPU()
+	cpuCount := runtime.GOMAXPROCS(0)
 
-	defaultWorkerCount := cpuCount + (cpuCount / 4)
-	if defaultWorkerCount < 4 {
-		defaultWorkerCount = 4
+	defaultWorkerCount := cpuCount / 2
+	if defaultWorkerCount < 2 {
+		defaultWorkerCount = 2
 	}
 
 	defaultGoMaxProcs := 0
