@@ -21,7 +21,7 @@ type Queue struct {
 
 func NewQueue(writer domain.TelemetryWriter) *Queue {
 	workers := max(runtime.GOMAXPROCS(0), 2)
-	bufSize := workers * 4
+	bufSize := workers * 8
 
 	return &Queue{
 		ch:      make(chan []*domain.TelemetryPoint, bufSize),
@@ -60,7 +60,7 @@ func (q *Queue) WriteBatch(ctx context.Context, records []*domain.TelemetryPoint
 	select {
 	case q.ch <- records:
 		return nil
-	default:
+	case <-ctx.Done():
 		return ErrQueueFull
 	}
 }
