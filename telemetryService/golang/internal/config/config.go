@@ -45,6 +45,6 @@ func getSenderPool() int {
 		return intEnv
 	}
 
-	cpuCount := runtime.NumCPU()
-	return min(cpuCount*2+cpuCount/2, 50)
+	cpuCount := runtime.GOMAXPROCS(0)
+	return max(cpuCount, 2)
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/ojparkinson/telemetryService/internal/api"
 	"github.com/ojparkinson/telemetryService/internal/config"
 	"github.com/ojparkinson/telemetryService/internal/metrics"
+	"github.com/ojparkinson/telemetryService/internal/queue"
 )
 
 func main() {
@@ -29,7 +30,6 @@ func main() {
 	}
 	log.Println("Database schema initialized successfully")
 
-	// Create sender pool
 	senderPool, err := questdb.NewSenderPool(cfg)
 	if err != nil {
 		log.Printf("Failed to create sender pool: %v", err)
@@ -47,7 +47,12 @@ func main() {
 
 	repo := questdb.NewRepository(pgxPool, senderPool)
 
-	apiServer := api.NewServer(":8010", repo, repo)
+	ingestQueue := queue.NewQueue(repo)
+
+	ingestQueue.Start()
+	log.Println("Telemetry queue created successfully")
+
+	apiServer := api.NewServer(":8010", repo, ingestQueue)
 
 	log.Println("creating server")
 	go func() {
@@ -64,5 +69,6 @@ func main() {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	<-sigChan
+	ingestQueue.Shutdown()
 	log.Println("Shutting down...")
 }

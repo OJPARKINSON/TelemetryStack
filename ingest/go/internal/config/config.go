@@ -47,14 +47,7 @@ type Config struct {
 func LoadConfig() *Config {
 	cpuCount := runtime.GOMAXPROCS(0)
 
-	defaultWorkerCount := cpuCount / 2
-	if defaultWorkerCount < 2 {
-		defaultWorkerCount = 2
-	}
-
-	defaultGoMaxProcs := 0
-
-	workerCount := getEnvAsInt("WORKER_COUNT", defaultWorkerCount)
+	workerCount := getEnvAsInt("WORKER_COUNT", cpuCount)
 
 	return &Config{
 		WorkerCount:   workerCount,
@@ -69,7 +62,7 @@ func LoadConfig() *Config {
 		FileAgeThreshold:   getEnvAsDuration("FILE_AGE_THRESHOLD", 30*time.Second),
 		FileProcessTimeout: getEnvAsDuration("FILE_PROCESS_TIMEOUT", 10*time.Minute),
 
-		GoMaxProcs: getEnvAsInt("GOMAXPROCS", defaultGoMaxProcs),
+		GoMaxProcs: getEnvAsInt("GOMAXPROCS", cpuCount),
 
 		// Development & Monitoring
 		EnablePprof:  getEnvAsBool("ENABLE_PPROF", false),

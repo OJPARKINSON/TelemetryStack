@@ -124,6 +124,7 @@ func (s *Server) handleSyncLap(w http.ResponseWriter, r *http.Request) {
 // /api/ingest
 func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Content-Type") == "application/x-protobuf" {
+
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			respondError(w, 500, fmt.Sprintf("failed to read body: %w", err))
@@ -142,9 +143,14 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 			p := domain.TelemetryPointFromProto(rec)
 			points[i] = &p
 		}
-		s.writer.WriteBatch(r.Context(), points)
 
-		w.WriteHeader(http.StatusOK)
+		err = s.writer.WriteBatch(r.Context(), points)
+		if err != nil {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+
+		w.WriteHeader(http.StatusAccepted)
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 	}

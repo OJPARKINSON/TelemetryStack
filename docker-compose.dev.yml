@@ -45,15 +45,15 @@ services:
     volumes:
       - questdb-data:/var/lib/questdb
     environment:
-      JAVA_OPTS: "-Xmx2g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:G1ReservePercent=20"
-      QDB_SHARED_WORKER_COUNT: "5"
+      JAVA_OPTS: "-Xmx4g -Xms2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+      QDB_SHARED_WORKER_COUNT: "8"
       QDB_HTTP_ENABLED: "true"
       QDB_PG_ENABLED: "true"
       QDB_LINE_TCP_ENABLED: "true"
       QDB_METRICS_ENABLED: "true"
       QDB_CAIRO_WAL_ENABLED_DEFAULT: "true"
       QDB_CAIRO_COMMIT_LAG: "120000"
-      QDB_CAIRO_MAX_UNCOMMITTED_ROWS: "50000"
+      QDB_CAIRO_MAX_UNCOMMITTED_ROWS: "100000"
     networks:
       - telemetry-network
     labels:
@@ -78,7 +78,7 @@ services:
       QUESTDB_URL: questdb:8812;username=admin;password=quest
       QUESTDB_HOST: questdb
       QUESTDB_PORT: 9000
-      GOMAXPROCS: "6"       # Limit Go scheduler
+      GOMAXPROCS: "0"       # Limit Go scheduler
       GOGC: "200"           # Less aggressive GC
     ports:
       - "9092:9092"  # Prometheus metrics
