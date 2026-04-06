@@ -1,6 +1,6 @@
 module github.com/OJPARKINSON/IRacing-Display/ingest/go
 
-go 1.25.5
+go 1.26.1
 
 require (
 	github.com/OJPARKINSON/ibt v0.1.5
