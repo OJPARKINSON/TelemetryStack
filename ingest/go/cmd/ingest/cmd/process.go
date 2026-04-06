@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/config"
+	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/metrics"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/processing"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/worker"
 	"github.com/spf13/cobra"
@@ -68,6 +69,9 @@ func Process(telemetryFolder string) {
 	if cfg.GoMaxProcs > 0 {
 		runtime.GOMAXPROCS(cfg.GoMaxProcs)
 	}
+
+	// Start metrics pusher
+	metrics.StartPusher(cfg.PushgatewayURL)
 
 	if os.Getenv("ENABLE_PPROF") == "true" {
 		go func() {

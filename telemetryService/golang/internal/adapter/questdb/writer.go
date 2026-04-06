@@ -4,8 +4,10 @@ import (
 	"context"
 	"log"
 	"math"
+	"time"
 
 	"github.com/ojparkinson/telemetryService/internal/domain"
+	"github.com/ojparkinson/telemetryService/internal/metrics"
 )
 
 func gearToInt64(g uint32) int64 {
@@ -19,6 +21,10 @@ func (r *Repository) WriteBatch(ctx context.Context, records []*domain.Telemetry
 	if len(records) == 0 {
 		return nil
 	}
+
+	start := time.Now()
+	metrics.RecordsReceivedTotal.Add(float64(len(records)))
+	metrics.BatchSizeRecords.Observe(float64(len(records)))
 
 	sender := r.writers.Get()
 	defer r.writers.Return(sender)
@@ -79,8 +85,12 @@ func (r *Repository) WriteBatch(ctx context.Context, records []*domain.Telemetry
 
 	if err := sender.Flush(ctx); err != nil {
 		log.Printf("Failed to flush telemetry batch: %v", err)
+		metrics.DBWriteErrors.Inc()
+		metrics.DBWriteDuration.Observe(time.Since(start).Seconds())
 		return err
 	}
 
+	metrics.DBWriteDuration.Observe(time.Since(start).Seconds())
+	metrics.RecordsWrittenTotal.Add(float64(len(records)))
 	return nil
 }

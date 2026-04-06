@@ -12,11 +12,6 @@ scrape_configs:
       - targets: ['node-exporter:9100']
     scrape_interval: 5s
 
-  - job_name: 'rabbitmq-metrics'
-    static_configs:
-      - targets: ['rabbitmq:15692']  # RabbitMQ Prometheus metrics port
-    scrape_interval: 15s
-
   - job_name: 'questdb-metrics'
     static_configs:
       - targets: ['questdb:9003']  # QuestDB metrics port
@@ -27,9 +22,10 @@ scrape_configs:
       - targets: ['traefik:8080']  # Traefik metrics endpoint
     scrape_interval: 10s
 
-  - job_name: 'ingest-service'
+  - job_name: 'pushgateway'
+    honor_labels: true
     static_configs:
-      - targets: ['host.docker.internal:9091']  # Ingest service running on host
+      - targets: ['pushgateway:9091']
     scrape_interval: 5s
 
   - job_name: 'telemetry-service'

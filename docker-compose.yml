@@ -205,6 +205,15 @@ services:
       - "traefik.http.routers.grafana-secure.middlewares=secure-management@file"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
 
+  pushgateway:
+    image: prom/pushgateway:latest
+    container_name: pushgateway
+    restart: unless-stopped
+    ports:
+      - "9091:9091"
+    networks:
+      - telemetry-network
+
   prometheus:
     image: prom/prometheus:v2.47.2
     container_name: prometheus

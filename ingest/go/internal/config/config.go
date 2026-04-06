@@ -42,6 +42,8 @@ type Config struct {
 	R2AccessKeyID  string
 	R2SecretAccess string
 	R2BucketNme    string
+
+	PushgatewayURL string
 }
 
 func LoadConfig() *Config {
@@ -74,7 +76,7 @@ func LoadConfig() *Config {
 		UseStructPipeline: getEnvAsBool("USE_STRUCT_PIPELINE", true),
 
 		// Record Processing
-		BatchSizeRecords: getEnvAsInt("BATCH_SIZE_RECORDS", 16000),
+		BatchSizeRecords: getEnvAsInt("BATCH_SIZE_RECORDS", 24000),
 
 		CFAccountID:    getEnv("CF_ACCOUNT_ID", ""),
 		CFD1DatabaseID: getEnv("CF_D1_DATABASE_ID", ""),
@@ -83,6 +85,8 @@ func LoadConfig() *Config {
 		R2AccessKeyID:  getEnv("R2_ACCESS_KEY_ID", ""),
 		R2SecretAccess: getEnv("R2_SECRET_ACCESS_KEY", ""),
 		R2BucketNme:    getEnv("R2_BUCKET_NAME", ""),
+
+		PushgatewayURL: getEnv("PUSHGATEWAY_URL", "http://localhost:9091"),
 
 		// Data Directory - defaults to ./ibt_files/ for backward compatibility
 		// DataDirectory: getEnv("IBT_DATA_DIR", "./ibt_files/"),

@@ -6,8 +6,10 @@ import (
 	"log"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/ojparkinson/telemetryService/internal/domain"
+	"github.com/ojparkinson/telemetryService/internal/metrics"
 )
 
 var ErrQueueFull = errors.New("ingest queue full")
@@ -38,15 +40,22 @@ func (q *Queue) Start() {
 			defer q.wg.Done()
 			for batch := range q.ch {
 				merged := batch
+				coalesced := 0
 				for {
 					select {
 					case extra := <-q.ch:
 						merged = append(merged, extra...)
+						coalesced++
 					default:
 						goto flush
 					}
 				}
 			flush:
+				metrics.QueueDepth.Set(float64(len(q.ch)))
+				metrics.QueueBatchesFlushed.Inc()
+				if coalesced > 0 {
+					metrics.QueueCoalescedBatches.Add(float64(coalesced))
+				}
 				if err := q.writer.WriteBatch(context.Background(), merged); err != nil {
 					log.Printf("queue worker %d: write failed (%d points): %v", id, len(merged), err)
 				}
@@ -57,8 +66,11 @@ func (q *Queue) Start() {
 }
 
 func (q *Queue) WriteBatch(ctx context.Context, records []*domain.TelemetryPoint) error {
+	start := time.Now()
 	select {
 	case q.ch <- records:
+		metrics.QueueEnqueueDuration.Observe(time.Since(start).Seconds())
+		metrics.QueueDepth.Set(float64(len(q.ch)))
 		return nil
 	case <-ctx.Done():
 		return ErrQueueFull

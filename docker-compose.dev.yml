@@ -53,7 +53,7 @@ services:
       QDB_METRICS_ENABLED: "true"
       QDB_CAIRO_WAL_ENABLED_DEFAULT: "true"
       QDB_CAIRO_COMMIT_LAG: "120000"
-      QDB_CAIRO_MAX_UNCOMMITTED_ROWS: "100000"
+      QDB_CAIRO_MAX_UNCOMMITTED_ROWS: "300000"
     networks:
       - telemetry-network
     labels:
@@ -156,6 +156,15 @@ services:
       - "traefik.http.routers.grafana-local.tls=true"
       - "traefik.http.routers.grafana-local.middlewares=secure-management@file"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+
+  pushgateway:
+    image: prom/pushgateway:latest
+    container_name: pushgateway
+    restart: unless-stopped
+    ports:
+      - "9091:9091"
+    networks:
+      - telemetry-network
 
   prometheus:
     image: prom/prometheus:v2.47.2
