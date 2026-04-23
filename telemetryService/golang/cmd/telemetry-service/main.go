@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/ojparkinson/telemetryService/internal/adapter/questdb"
 	"github.com/ojparkinson/telemetryService/internal/api"
@@ -38,8 +39,10 @@ func main() {
 	}
 	log.Println("Sender pool created successfully")
 
-	pgxPool, err := pgxpool.New(context.Background(), fmt.Sprintf("postgres://admin:quest@%s:%d/questdb?sslmode=disable", cfg.QuestDbHost,
-		8812))
+	config, err := pgxpool.ParseConfig(fmt.Sprintf("postgres://admin:quest@%s:%d/questdb?sslmode=disable", cfg.QuestDbHost, 8812))
+	config.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+
+	pgxPool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		log.Fatalf("pgx pool: %v", err)
 	}
