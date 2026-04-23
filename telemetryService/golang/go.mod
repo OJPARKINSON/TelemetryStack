@@ -61,7 +61,7 @@ require (
 )
 
 require (
-	github.com/jackc/pgx/v5 v5.8.0
+	github.com/jackc/pgx/v5 v5.9.2
 	github.com/joho/godotenv v1.5.1
 	github.com/questdb/go-questdb-client v1.0.5 // indirect
 	github.com/questdb/go-questdb-client/v4 v4.1.0
