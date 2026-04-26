@@ -17,7 +17,17 @@ func NewSchema(host string, port int) *Schema {
 	return &Schema{host: host, port: port}
 }
 
-// todo: add retry logic to stop it falling over on the pi
+// CREATE TABLE IF NOT EXISTS TelemetryTicks (
+//     session_id TEXT,
+//     lap_id INT,
+//     session_num TEXT,
+//     session_name TEXT,
+//     track_name TEXT,
+//     session_type TEXT,
+//     car_id TEXT,
+//     track_id TEXT,
+//     gear INT,
+
 func (s *Schema) CreateTableHTTP() error {
 	sql := `
 		    CREATE TABLE IF NOT EXISTS TelemetryTicks (
@@ -25,10 +35,10 @@ func (s *Schema) CreateTableHTTP() error {
                 lap_id SYMBOL INDEX,
                 session_num SYMBOL CAPACITY 20,
                 session_name SYMBOL,
-                track_name SYMBOL,
-                session_type SYMBOL,
-                car_id SYMBOL,
-                track_id SYMBOL,
+                track_name STRING,
+                session_type STRING,
+                car_id STRING,
+                track_id STRING,
                 gear INT,
                 player_car_position INT,
                 speed DOUBLE,
