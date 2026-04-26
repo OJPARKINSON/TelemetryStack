@@ -57,16 +57,19 @@ func (r *Repository) ListLaps(ctx context.Context, sessionsID string) ([]domain.
 
 	laps := make([]domain.Lap, len(rows))
 	for i, row := range rows {
-		lapID, _ := strconv.Atoi(row.String)
-		laps[i] = domain.Lap{LapID: lapID}
+		laps[i] = domain.Lap{LapID: int(row.Int32)}
 	}
 	return laps, nil
 }
 
 func (r *Repository) GetLapTelemetry(ctx context.Context, sessionID, lapID string) ([]domain.TelemetryPoint, error) {
+	lapIDInt, err := strconv.ParseInt(lapID, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("invalid lap_id: %w", err)
+	}
 	rows, err := r.queries.GetLapTelemetry(ctx, generated.GetLapTelemetryParams{
 		SessionID: pgtype.Text{String: sessionID, Valid: true},
-		LapID:     pgtype.Text{String: lapID, Valid: true},
+		LapID:     pgtype.Int4{Int32: int32(lapIDInt), Valid: true},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("get lap telemetry: %w", err)

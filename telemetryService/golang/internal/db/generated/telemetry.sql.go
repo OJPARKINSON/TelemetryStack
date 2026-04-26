@@ -12,14 +12,14 @@ import (
 )
 
 const getLapTelemetry = `-- name: GetLapTelemetry :many
-SELECT session_id, track_name, track_id, lap_id, session_num, session_type, session_name, car_id, gear, player_car_position, speed, lap_dist_pct, session_time, lat, lon, lap_current_lap_time, laplastlaptime, lapdeltatobestlap, throttle, brake, steering_wheel_angle, rpm, velocity_x, velocity_y, velocity_z, fuel_level, alt, lat_accel, long_accel, vert_accel, pitch, roll, yaw, yaw_north, voltage, watertemp, lfpressure, rfpressure, lrpressure, rrpressure, lftempm, rftempm, lrtempm, rrtempm, timestamp FROM TelemetryTicks
+SELECT session_id, lap_id, session_num, session_name, track_name, session_type, car_id, track_id, gear, player_car_position, speed, lap_dist_pct, session_time, lat, lon, lap_current_lap_time, laplastlaptime, lapdeltatobestlap, throttle, brake, steering_wheel_angle, rpm, velocity_x, velocity_y, velocity_z, fuel_level, alt, lat_accel, long_accel, vert_accel, pitch, roll, yaw, yaw_north, voltage, watertemp, lfpressure, rfpressure, lrpressure, rrpressure, lftempm, rftempm, lrtempm, rrtempm, timestamp FROM TelemetryTicks
 WHERE session_name = 'RACE' AND session_id = $1 AND lap_id = $2
 ORDER BY timestamp ASC
 `
 
 type GetLapTelemetryParams struct {
 	SessionID pgtype.Text `json:"session_id"`
-	LapID     pgtype.Text `json:"lap_id"`
+	LapID     pgtype.Int4 `json:"lap_id"`
 }
 
 func (q *Queries) GetLapTelemetry(ctx context.Context, arg GetLapTelemetryParams) ([]Telemetrytick, error) {
@@ -33,13 +33,13 @@ func (q *Queries) GetLapTelemetry(ctx context.Context, arg GetLapTelemetryParams
 		var i Telemetrytick
 		if err := rows.Scan(
 			&i.SessionID,
-			&i.TrackName,
-			&i.TrackID,
 			&i.LapID,
 			&i.SessionNum,
-			&i.SessionType,
 			&i.SessionName,
+			&i.TrackName,
+			&i.SessionType,
 			&i.CarID,
+			&i.TrackID,
 			&i.Gear,
 			&i.PlayerCarPosition,
 			&i.Speed,

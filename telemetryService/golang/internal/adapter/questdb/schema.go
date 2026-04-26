@@ -22,13 +22,13 @@ func (s *Schema) CreateTableHTTP() error {
 	sql := `
 		    CREATE TABLE IF NOT EXISTS TelemetryTicks (
                 session_id SYMBOL CAPACITY 50000 INDEX,
-                track_name SYMBOL CAPACITY 100 INDEX,
-                track_id SYMBOL CAPACITY 100 INDEX,
-                lap_id SYMBOL CAPACITY 500,
+                lap_id INT INDEX,
                 session_num SYMBOL CAPACITY 20,
-                session_type SYMBOL CAPACITY 10 INDEX,
-                session_name SYMBOL CAPACITY 50 INDEX,
-                car_id SYMBOL CAPACITY 1000 INDEX,
+                session_name SYMBOL,
+                track_name SYMBOL,
+                session_type SYMBOL,
+                car_id SYMBOL,
+                track_id SYMBOL,
                 gear INT,
                 player_car_position INT,
                 speed DOUBLE,
@@ -81,22 +81,6 @@ func (s *Schema) CreateTableHTTP() error {
 			return err
 		}
 		time.Sleep(12 * time.Second)
-	}
-
-	return nil
-}
-
-func (s *Schema) AddIndexes() error {
-	indexes := []string{
-		"ALTER TABLE TelemetryTicks ADD INDEX session_lap_idx (session_id, lap_id);",
-		"ALTER TABLE TelemetryTicks ADD INDEX track_session_idx (track_name, session_id);",
-		"ALTER TABLE TelemetryTicks ADD INDEX session_time_idx (session_id, session_time);",
-	}
-
-	for _, idx := range indexes {
-		if err := s.execDDL(idx); err != nil {
-			return fmt.Errorf("failed to create index: %w", err)
-		}
 	}
 
 	return nil

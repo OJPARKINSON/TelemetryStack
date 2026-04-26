@@ -40,7 +40,10 @@ func main() {
 	log.Println("Sender pool created successfully")
 
 	config, err := pgxpool.ParseConfig(fmt.Sprintf("postgres://admin:quest@%s:%d/questdb?sslmode=disable", cfg.QuestDbHost, 8812))
-	config.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+	if err != nil {
+		log.Fatalf("pgx config fail: %v", err)
+	}
+	config.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
 
 	pgxPool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {

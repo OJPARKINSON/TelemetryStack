@@ -45,7 +45,7 @@ services:
     volumes:
       - questdb-data:/var/lib/questdb
     environment:
-      JAVA_OPTS: "-Xmx4g -Xms2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+      JAVA_OPTS: "-Xmx4g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
       QDB_SHARED_WORKER_COUNT: "8"
       QDB_HTTP_ENABLED: "true"
       QDB_PG_ENABLED: "true"
@@ -65,6 +65,14 @@ services:
       - "traefik.http.routers.questdb-local.middlewares=questdb-stripprefix"
       - "traefik.http.middlewares.questdb-stripprefix.stripprefix.prefixes=/questdb"
       - "traefik.http.services.questdb.loadbalancer.server.port=9000"
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8g
+        reservations:
+          cpus: '1'
+          memory: 1.5g
 
   telemetry-service:
     build:

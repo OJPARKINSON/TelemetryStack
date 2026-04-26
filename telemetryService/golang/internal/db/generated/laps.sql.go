@@ -16,15 +16,15 @@ SELECT DISTINCT lap_id FROM TelemetryTicks
 WHERE session_id = $1
 `
 
-func (q *Queries) ListLaps(ctx context.Context, sessionID pgtype.Text) ([]pgtype.Text, error) {
+func (q *Queries) ListLaps(ctx context.Context, sessionID pgtype.Text) ([]pgtype.Int4, error) {
 	rows, err := q.db.Query(ctx, listLaps, sessionID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []pgtype.Text
+	var items []pgtype.Int4
 	for rows.Next() {
-		var lap_id pgtype.Text
+		var lap_id pgtype.Int4
 		if err := rows.Scan(&lap_id); err != nil {
 			return nil, err
 		}

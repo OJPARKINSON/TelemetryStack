@@ -65,23 +65,26 @@ services:
       - questdb-data:/var/lib/questdb
       - ./config/questdb.conf:/root/.questdb/conf/server.conf:ro
     environment:
-      JAVA_OPTS: "-Xmx2g -Xms512m -XX:+UseG1GC"
-      QDB_SHARED_WORKER_COUNT: "3"
+      JAVA_OPTS: "-Xmx4g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+      QDB_SHARED_WORKER_COUNT: "8"
       QDB_HTTP_ENABLED: "true"
       QDB_PG_ENABLED: "true"
       QDB_METRICS_ENABLED: "true"
       QDB_LINE_TCP_ENABLED: "true"
       QDB_CAIRO_WAL_ENABLED_DEFAULT: "true"
+      QDB_CAIRO_COMMIT_LAG: "120000"
+      QDB_CAIRO_MAX_UNCOMMITTED_ROWS: "300000"
     networks:
       - telemetry-network
     deploy:
       resources:
         limits:
-          cpus: '1.5'
-          memory: 4g
+          cpus: '4'
+          memory: 8g
         reservations:
-          cpus: '0.5'
-          memory: 1g
+          cpus: '1'
+          memory: 1.5g
+
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9003"]
       interval: 5s

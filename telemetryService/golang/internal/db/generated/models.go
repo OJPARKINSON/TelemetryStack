@@ -10,13 +10,13 @@ import (
 
 type Telemetrytick struct {
 	SessionID          pgtype.Text      `json:"session_id"`
-	TrackName          pgtype.Text      `json:"track_name"`
-	TrackID            pgtype.Text      `json:"track_id"`
-	LapID              pgtype.Text      `json:"lap_id"`
+	LapID              pgtype.Int4      `json:"lap_id"`
 	SessionNum         pgtype.Text      `json:"session_num"`
-	SessionType        pgtype.Text      `json:"session_type"`
 	SessionName        pgtype.Text      `json:"session_name"`
+	TrackName          pgtype.Text      `json:"track_name"`
+	SessionType        pgtype.Text      `json:"session_type"`
 	CarID              pgtype.Text      `json:"car_id"`
+	TrackID            pgtype.Text      `json:"track_id"`
 	Gear               pgtype.Int4      `json:"gear"`
 	PlayerCarPosition  pgtype.Int4      `json:"player_car_position"`
 	Speed              pgtype.Float8    `json:"speed"`
