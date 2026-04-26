@@ -22,7 +22,7 @@ func (s *Schema) CreateTableHTTP() error {
 	sql := `
 		    CREATE TABLE IF NOT EXISTS TelemetryTicks (
                 session_id SYMBOL CAPACITY 50000 INDEX,
-                lap_id INT INDEX,
+                lap_id SYMBOL INDEX,
                 session_num SYMBOL CAPACITY 20,
                 session_name SYMBOL,
                 track_name SYMBOL,
