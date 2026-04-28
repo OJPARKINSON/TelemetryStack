@@ -4,6 +4,10 @@ A self-hosted telemetry pipeline for iRacing. Parses `.ibt` files, stores time-s
 
 Inspired by how professional motorsport teams process data: direct ingestion, time-series storage, and analysis tooling — no unnecessary infrastructure.
 
+## UI
+
+<img width="1511" height="810" alt="Screenshot 2026-04-26 at 14 35 47 copy" src="https://github.com/user-attachments/assets/11c883e3-3fbe-4812-99c2-8b865ef77d2d" />
+
 ## Architecture
 
 ```
