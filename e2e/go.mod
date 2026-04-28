@@ -1,6 +1,6 @@
 module github.com/ojparkinson/IRacing-Display/e2e
 
-go 1.25.4
+go 1.26.1
 
 require (
 	golang.org/x/text v0.35.0
