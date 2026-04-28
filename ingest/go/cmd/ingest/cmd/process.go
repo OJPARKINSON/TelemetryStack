@@ -32,12 +32,12 @@ var (
 var processCmd = &cobra.Command{
 	Use:   "ingest",
 	Short: "Process the telemetry data in the background",
-	Long: `Watch the telemetry directory and in the background process new telemetry files
-	
+	Long: `Watch the telemetry directory and in the background process new telemetry file
+
 	To clean the cache of sent file run with --fresh to upload all data in the dir again`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		log.Printf("Inside rootCmd Run with args: %v\n", args)
-		Process(args[0])
+		return Process(args[0])
 	},
 }
 
@@ -48,18 +48,18 @@ func init() {
 	processCmd.Flags().BoolVarP(&fresh, "fresh", "f", false, "will clean the local store of files that have been processed and start from fresh")
 }
 
-func Process(telemetryFolder string) {
-
+func Process(telemetryFolder string) error  {
 	startTime := time.Now()
 
 	// Initialize Zap logger
 	var err error
 	// Verbose mode: full development logging
 	logger, err = zap.NewDevelopment()
-
 	if err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
+		return err
 	}
+
 	defer logger.Sync()
 
 	// Load configuration
@@ -79,7 +79,7 @@ func Process(telemetryFolder string) {
 				logger.Error("pprof server failed",
 					zap.Error(err),
 					zap.String("action", "Check port 6060 is not in use"))
-			}
+				}
 		}()
 	}
 
@@ -90,6 +90,8 @@ func Process(telemetryFolder string) {
 				zap.Error(err),
 				zap.String("path", cpuProfile),
 				zap.String("action", "Check directory exists and has write permissions"))
+
+			return err
 		}
 		defer f.Close()
 
@@ -97,6 +99,7 @@ func Process(telemetryFolder string) {
 			logger.Fatal("Could not start CPU profile",
 				zap.Error(err),
 				zap.String("action", "Check file can be written"))
+			return err
 		}
 		defer pprof.StopCPUProfile()
 	}
@@ -121,6 +124,7 @@ func Process(telemetryFolder string) {
 		logger.Fatal("Telemetry directory does not exist",
 			zap.String("path", telemetryFolder),
 			zap.String("action", "Create directory or set IBT_DATA_DIR environment variable"))
+		return err
 	}
 
 	// Create worker pool
@@ -132,7 +136,7 @@ func Process(telemetryFolder string) {
 			zap.Error(err),
 			zap.String("path", telemetryFolder),
 			zap.String("action", "Check directory permissions and IBT files exist"))
-		return
+		return err
 	}
 	log.Printf("STARTUP: Found %d IBT files to process", expectedFiles)
 
@@ -141,7 +145,9 @@ func Process(telemetryFolder string) {
 		logger.Fatal("Failed to start worker pool",
 			zap.Error(err),
 			zap.String("action", "Check system resources and configuration"))
+		return err
 	}
+
 	defer func() {
 		if err := pool.Stop(); err != nil {
 			logger.Error("Error stopping worker pool",
@@ -160,6 +166,7 @@ func Process(telemetryFolder string) {
 				zap.Error(err),
 				zap.String("path", memProfile),
 				zap.String("action", "Check directory exists and has write permissions"))
+				return err
 		} else {
 			defer f.Close()
 			runtime.GC() // get up-to-date statistics
@@ -167,9 +174,12 @@ func Process(telemetryFolder string) {
 				logger.Error("Could not write memory profile",
 					zap.Error(err),
 					zap.String("action", "Check disk space and file permissions"))
+			return err
 			}
 		}
 	}
+
+	return nil
 }
 
 func discoverAndQueueFiles(ctx context.Context, pool *worker.WorkerPool, telemetryFolder string, cfg *config.Config, logger *zap.Logger) (int, error) {
