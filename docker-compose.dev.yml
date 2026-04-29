@@ -64,7 +64,7 @@ services:
       - "traefik.http.routers.questdb-local.tls=true"
       - "traefik.http.routers.questdb-local.middlewares=questdb-stripprefix"
       - "traefik.http.middlewares.questdb-stripprefix.stripprefix.prefixes=/questdb"
-      - "traefik.http.services.questdb.loadbalancer.server.port=9002"
+      - "traefik.http.services.questdb.loadbalancer.server.port=9000"
     deploy:
       resources:
         limits:
@@ -84,8 +84,8 @@ services:
       - telemetry-network
     environment:
       QUESTDB_URL: questdb:8812;username=admin;password=quest
-      QUESTDB_HOST: questdb
-      QUESTDB_PORT: 9002
+      QUESTDB_HOST: ${QUESTDB_HOST:-questdb}
+      QUESTDB_PORT: ${QUESTDB_HTTP_PORT:-9000}
       GOMAXPROCS: "0"       # Limit Go scheduler
       GOGC: "200"           # Less aggressive GC
     ports:
