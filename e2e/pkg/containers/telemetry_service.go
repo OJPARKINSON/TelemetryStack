@@ -29,7 +29,7 @@ func StartTelemetryService(t *testing.T, ctx context.Context, nw *testcontainers
 		testcontainers.WithEnv(map[string]string{
 			"QUESTDB_URL":      "questdb:8812;username=admin;password=quest",
 			"QUESTDB_HOST":     "questdb",
-			"QUESTDB_PORT":     "9000",
+			"QUESTDB_PORT":     "9002",
 			"SENDER_POOL_SIZE": "60",
 		}),
 		testcontainers.WithWaitStrategy(

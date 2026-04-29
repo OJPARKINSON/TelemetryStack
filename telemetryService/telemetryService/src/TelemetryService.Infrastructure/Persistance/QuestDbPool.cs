@@ -19,7 +19,7 @@ public class QuestDbSenderPooledObjectPolicy : IPooledObjectPolicy<ISender>
     public ISender Create()
     {
         var host = Environment.GetEnvironmentVariable("QUESTDB_HTTP_HOST") ?? "questdb";
-        var port = int.TryParse(Environment.GetEnvironmentVariable("QUESTDB_HTTP_PORT"), out var p) ? p : 9000;
+        var port = int.TryParse(Environment.GetEnvironmentVariable("QUESTDB_HTTP_PORT"), out var p) ? p : 9002;
 
         return Sender.New($"http::addr={host}:{port};auto_flush_rows=10000;request_timeout=60000;");
     }

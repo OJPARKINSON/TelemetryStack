@@ -255,7 +255,7 @@ GET /metrics
 📊 Initial Memory Usage: 0.15GB
 🔗 Initializing QuestDB connections:
    TCP Ingress: tcp::addr=questdb:9009
-   HTTP Schema: http://questdb:9000
+   HTTP Schema: http://questdb:9002
 🔧 Checking QuestDB schema optimization...
 ✅ TelemetryTicks table is already optimized
 🔌 Starting telemetry service subscriber...
@@ -338,13 +338,13 @@ docker logs telemetry-service | grep "RabbitMQ"
 #### QuestDB Write Errors
 ```bash
 # Check QuestDB HTTP interface
-curl http://localhost:9000/
+curl http://localhost:9002/
 
 # Verify TCP ingress port
 netstat -an | grep 9009
 
 # Check table structure
-curl "http://localhost:9000/exec?query=SHOW%20COLUMNS%20FROM%20TelemetryTicks"
+curl "http://localhost:9002/exec?query=SHOW%20COLUMNS%20FROM%20TelemetryTicks"
 ```
 
 ### Performance Tuning

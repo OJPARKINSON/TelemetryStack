@@ -57,7 +57,7 @@ services:
         soft: 1048576
         hard: 1048576
     ports:
-      - "9000:9000"
+      - "9002:9000"
       - "8812:8812"
       - "9009:9009"
       - "9003:9003"
@@ -102,7 +102,7 @@ services:
       - "traefik.http.routers.questdb-secure.entrypoints=websecure"
       - "traefik.http.routers.questdb-secure.tls.certresolver=tailscale"
       - "traefik.http.routers.questdb-secure.middlewares=questdb-stripprefix@file"
-      - "traefik.http.services.questdb.loadbalancer.server.port=9000"
+      - "traefik.http.services.questdb.loadbalancer.server.port=9002"
 
   telemetry-service:
     image: ghcr.io/ojparkinson/iracing-telemetryservice:latest
@@ -115,7 +115,7 @@ services:
     environment:
       QUESTDB_URL: questdb:8812;username=admin;password=quest
       QUESTDB_HOST: ${QUESTDB_HOST:-questdb}
-      QUESTDB_PORT: ${QUESTDB_HTTP_PORT:-9000}
+      QUESTDB_PORT: ${QUESTDB_HTTP_PORT:-9002}
       GOMAXPROCS: "4"
       SENDER_POOL_SIZE: "6"
     depends_on:

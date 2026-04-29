@@ -87,7 +87,7 @@ internal class Program
                 services.AddSingleton<QuestDbSchemaManager>(sp =>
                 {
                     var host = Environment.GetEnvironmentVariable("QUESTDB_HTTP_HOST") ?? "questdb";
-                    var port = Environment.GetEnvironmentVariable("QUESTDB_HTTP_PORT") ?? "9000";
+                    var port = Environment.GetEnvironmentVariable("QUESTDB_HTTP_PORT") ?? "9002";
                     var questDbUrl = $"{host}:{port}";
                     Console.WriteLine($"🔧 Initializing QuestDbSchemaManager with HTTP URL: http://{questDbUrl}");
                     return new QuestDbSchemaManager(questDbUrl);

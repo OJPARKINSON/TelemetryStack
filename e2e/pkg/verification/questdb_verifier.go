@@ -29,7 +29,7 @@ type column struct {
 }
 
 func GetRecordCount() (int, error) {
-	u, err := url.Parse("http://localhost:9000")
+	u, err := url.Parse("http://localhost:9002")
 	if err != nil {
 		return -1, fmt.Errorf("error parsing url, ", err)
 	}
@@ -72,7 +72,7 @@ func GetRecordCount() (int, error) {
 }
 
 func TunicateTable() error {
-	u, err := url.Parse("http://localhost:9000")
+	u, err := url.Parse("http://localhost:9002")
 	if err != nil {
 		return fmt.Errorf("error parsing url, ", err)
 	}

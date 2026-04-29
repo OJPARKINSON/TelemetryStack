@@ -38,7 +38,7 @@ services:
     container_name: questdb
     restart: unless-stopped
     ports:
-      - "9000:9000" 
+      - "9002:9000" 
       - "8812:8812" 
       - "9009:9009" 
       - "9003:9003" 
@@ -64,7 +64,7 @@ services:
       - "traefik.http.routers.questdb-local.tls=true"
       - "traefik.http.routers.questdb-local.middlewares=questdb-stripprefix"
       - "traefik.http.middlewares.questdb-stripprefix.stripprefix.prefixes=/questdb"
-      - "traefik.http.services.questdb.loadbalancer.server.port=9000"
+      - "traefik.http.services.questdb.loadbalancer.server.port=9002"
     deploy:
       resources:
         limits:
@@ -85,7 +85,7 @@ services:
     environment:
       QUESTDB_URL: questdb:8812;username=admin;password=quest
       QUESTDB_HOST: questdb
-      QUESTDB_PORT: 9000
+      QUESTDB_PORT: 9002
       GOMAXPROCS: "0"       # Limit Go scheduler
       GOGC: "200"           # Less aggressive GC
     ports:
