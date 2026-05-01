@@ -88,7 +88,7 @@ func (r *Repository) GetLapTelemetry(ctx context.Context, sessionID, lapID strin
 	return points, nil
 }
 
-func telemetryPointFromRow(row generated.Telemetrytick) domain.TelemetryPoint {
+func telemetryPointFromRow(row generated.GetLapTelemetryRow) domain.TelemetryPoint {
 	return domain.TelemetryPoint{
 		Speed:              row.Speed.Float64,
 		Throttle:           row.Throttle.Float64,

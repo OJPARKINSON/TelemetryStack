@@ -12,7 +12,14 @@ import (
 )
 
 const getLapTelemetry = `-- name: GetLapTelemetry :many
-SELECT session_id, lap_id, session_num, session_name, track_name, session_type, car_id, track_id, gear, player_car_position, speed, lap_dist_pct, session_time, lat, lon, lap_current_lap_time, laplastlaptime, lapdeltatobestlap, throttle, brake, steering_wheel_angle, rpm, velocity_x, velocity_y, velocity_z, fuel_level, alt, lat_accel, long_accel, vert_accel, pitch, roll, yaw, yaw_north, voltage, watertemp, lfpressure, rfpressure, lrpressure, rrpressure, lftempm, rftempm, lrtempm, rrtempm, timestamp FROM TelemetryTicks
+SELECT session_id, lap_id, session_num, track_name, session_time,
+         speed, throttle, brake, rpm, gear, lap_dist_pct,
+         steering_wheel_angle, lat, lon, alt,
+         velocity_x, velocity_y, velocity_z,
+         lat_accel, long_accel, vert_accel,
+         pitch, roll, yaw, yaw_north,
+         fuel_level, lap_current_lap_time, player_car_position,
+timestamp FROM TelemetryTicks
 WHERE session_name = 'RACE' AND session_id = $1 AND lap_id = $2
 ORDER BY timestamp ASC
 `
@@ -22,43 +29,66 @@ type GetLapTelemetryParams struct {
 	LapID     pgtype.Int4 `json:"lap_id"`
 }
 
-func (q *Queries) GetLapTelemetry(ctx context.Context, arg GetLapTelemetryParams) ([]Telemetrytick, error) {
+type GetLapTelemetryRow struct {
+	SessionID          pgtype.Text      `json:"session_id"`
+	LapID              pgtype.Int4      `json:"lap_id"`
+	SessionNum         pgtype.Text      `json:"session_num"`
+	TrackName          pgtype.Text      `json:"track_name"`
+	SessionTime        pgtype.Float8    `json:"session_time"`
+	Speed              pgtype.Float8    `json:"speed"`
+	Throttle           pgtype.Float8    `json:"throttle"`
+	Brake              pgtype.Float8    `json:"brake"`
+	Rpm                pgtype.Float8    `json:"rpm"`
+	Gear               pgtype.Int4      `json:"gear"`
+	LapDistPct         pgtype.Float8    `json:"lap_dist_pct"`
+	SteeringWheelAngle pgtype.Float8    `json:"steering_wheel_angle"`
+	Lat                pgtype.Float8    `json:"lat"`
+	Lon                pgtype.Float8    `json:"lon"`
+	Alt                pgtype.Float8    `json:"alt"`
+	VelocityX          pgtype.Float8    `json:"velocity_x"`
+	VelocityY          pgtype.Float8    `json:"velocity_y"`
+	VelocityZ          pgtype.Float8    `json:"velocity_z"`
+	LatAccel           pgtype.Float8    `json:"lat_accel"`
+	LongAccel          pgtype.Float8    `json:"long_accel"`
+	VertAccel          pgtype.Float8    `json:"vert_accel"`
+	Pitch              pgtype.Float8    `json:"pitch"`
+	Roll               pgtype.Float8    `json:"roll"`
+	Yaw                pgtype.Float8    `json:"yaw"`
+	YawNorth           pgtype.Float8    `json:"yaw_north"`
+	FuelLevel          pgtype.Float8    `json:"fuel_level"`
+	LapCurrentLapTime  pgtype.Float8    `json:"lap_current_lap_time"`
+	PlayerCarPosition  pgtype.Int4      `json:"player_car_position"`
+	Timestamp          pgtype.Timestamp `json:"timestamp"`
+}
+
+func (q *Queries) GetLapTelemetry(ctx context.Context, arg GetLapTelemetryParams) ([]GetLapTelemetryRow, error) {
 	rows, err := q.db.Query(ctx, getLapTelemetry, arg.SessionID, arg.LapID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Telemetrytick
+	var items []GetLapTelemetryRow
 	for rows.Next() {
-		var i Telemetrytick
+		var i GetLapTelemetryRow
 		if err := rows.Scan(
 			&i.SessionID,
 			&i.LapID,
 			&i.SessionNum,
-			&i.SessionName,
 			&i.TrackName,
-			&i.SessionType,
-			&i.CarID,
-			&i.TrackID,
-			&i.Gear,
-			&i.PlayerCarPosition,
-			&i.Speed,
-			&i.LapDistPct,
 			&i.SessionTime,
-			&i.Lat,
-			&i.Lon,
-			&i.LapCurrentLapTime,
-			&i.Laplastlaptime,
-			&i.Lapdeltatobestlap,
+			&i.Speed,
 			&i.Throttle,
 			&i.Brake,
-			&i.SteeringWheelAngle,
 			&i.Rpm,
+			&i.Gear,
+			&i.LapDistPct,
+			&i.SteeringWheelAngle,
+			&i.Lat,
+			&i.Lon,
+			&i.Alt,
 			&i.VelocityX,
 			&i.VelocityY,
 			&i.VelocityZ,
-			&i.FuelLevel,
-			&i.Alt,
 			&i.LatAccel,
 			&i.LongAccel,
 			&i.VertAccel,
@@ -66,16 +96,9 @@ func (q *Queries) GetLapTelemetry(ctx context.Context, arg GetLapTelemetryParams
 			&i.Roll,
 			&i.Yaw,
 			&i.YawNorth,
-			&i.Voltage,
-			&i.Watertemp,
-			&i.Lfpressure,
-			&i.Rfpressure,
-			&i.Lrpressure,
-			&i.Rrpressure,
-			&i.Lftempm,
-			&i.Rftempm,
-			&i.Lrtempm,
-			&i.Rrtempm,
+			&i.FuelLevel,
+			&i.LapCurrentLapTime,
+			&i.PlayerCarPosition,
 			&i.Timestamp,
 		); err != nil {
 			return nil, err
