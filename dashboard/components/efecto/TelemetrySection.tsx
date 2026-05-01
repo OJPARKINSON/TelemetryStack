@@ -86,7 +86,7 @@ export default function TelemetrySection({
 						<p className="text-muted-foreground text-xs">Color by speed</p>
 					</div>
 					<div className="flex items-center gap-2">
-						<div className="h-1.5 w-20 rounded-full bg-gradient-to-r to-emerald-400 via-yellow-400 from-red-500" />
+						<div className="h-1.5 w-20 rounded-full bg-linear-to-r to-emerald-400 via-yellow-400 from-red-500" />
 						<p className="text-muted-foreground text-xs font-mono">
 							{minSpeed.toFixed(0)}
 						</p>
@@ -148,7 +148,7 @@ export default function TelemetrySection({
 						</p>
 					)}
 				</div>
-				<div className="flex-1 overflow-y-auto px-2 py-2">
+				<div className="h-full overflow-y-auto px-2 py-2">
 					{hasData ? (
 						<React.Suspense
 							fallback={

@@ -46,7 +46,7 @@ export default function SessionSelector({ sessions }: SessionSelectorProps) {
 			{sessions.map((session) => (
 				<Link
 					key={session.session_id}
-					to="/new/$sessionId"
+					to="/$sessionId"
 					params={{ sessionId: session.session_id }}
 					search={{ lapId: 1 }}
 					className="group flex items-center px-8 py-3.5 border-b border-border hover:bg-secondary/50 transition-colors"

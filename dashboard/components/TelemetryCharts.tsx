@@ -8,7 +8,6 @@ export type ChartConfig = {
 	color: string;
 	unit: string;
 	yDomain: number[];
-	height: number;
 };
 
 interface TelemetryChartsProps {
@@ -27,10 +26,9 @@ const TelemetryCharts = React.memo(function TelemetryCharts({
 			{
 				title: "Speed",
 				dataKey: "Speed",
-				color: "#ef4444",
+				color: "#f97316",
 				unit: "km/h",
 				yDomain: [0, 300],
-				height: 60,
 			},
 			{
 				title: "Throttle",
@@ -38,15 +36,13 @@ const TelemetryCharts = React.memo(function TelemetryCharts({
 				color: "#22c55e",
 				unit: "%",
 				yDomain: [0, 100],
-				height: 60,
 			},
 			{
 				title: "Brake",
 				dataKey: "Brake",
-				color: "#f97316",
+				color: "#ef4444",
 				unit: "%",
 				yDomain: [0, 100],
-				height: 60,
 			},
 			{
 				title: "Gear",
@@ -54,7 +50,6 @@ const TelemetryCharts = React.memo(function TelemetryCharts({
 				color: "#8b5cf6",
 				unit: "",
 				yDomain: [0, 8],
-				height: 50,
 			},
 			{
 				title: "RPM",
@@ -62,7 +57,6 @@ const TelemetryCharts = React.memo(function TelemetryCharts({
 				color: "#06b6d4",
 				unit: "",
 				yDomain: [0, 8000],
-				height: 50,
 			},
 			{
 				title: "Steering",
@@ -70,7 +64,6 @@ const TelemetryCharts = React.memo(function TelemetryCharts({
 				color: "#ec4899",
 				unit: "deg",
 				yDomain: [-3, 3],
-				height: 50,
 			},
 		],
 		[],
@@ -78,7 +71,7 @@ const TelemetryCharts = React.memo(function TelemetryCharts({
 
 	return (
 		// biome-ignore lint/a11y/noStaticElementInteractions: na
-		<div className="flex flex-col space-y-1" onMouseLeave={onMouseLeave}>
+		<div className="grid h-full space-y-1" onMouseLeave={onMouseLeave}>
 			{chartConfigs.map((config) => (
 				<TelemetryChart
 					onHover={onHover}
