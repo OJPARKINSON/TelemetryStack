@@ -30,17 +30,6 @@ func (r *Repository) ListSessions(ctx context.Context) (_ []domain.Session, err 
 
 	sessions := make([]domain.Session, len(rows))
 	for i, row := range rows {
-		var maxLapID int
-		switch v := row.MaxLapID.(type) {
-		case int:
-			maxLapID = v
-		case int32:
-			maxLapID = int(v)
-		case int64:
-			maxLapID = int(v)
-		case string:
-			maxLapID, _ = strconv.Atoi(v)
-		}
 
 		var lastUpdated time.Time
 		if v, ok := row.LastUpdated.(time.Time); ok {
@@ -53,7 +42,7 @@ func (r *Repository) ListSessions(ctx context.Context) (_ []domain.Session, err 
 			SessionID:   row.SessionID.String,
 			TrackName:   row.TrackName.String,
 			SessionName: row.SessionName.String,
-			MaxLapID:    maxLapID,
+			MaxLapID:    int(row.MaxLapID),
 			LastUpdated: lastUpdated,
 		}
 	}
@@ -71,7 +60,7 @@ func (r *Repository) ListLaps(ctx context.Context, sessionsID string) (_ []domai
 
 	laps := make([]domain.Lap, len(rows))
 	for i, row := range rows {
-		laps[i] = domain.Lap{LapID: int(row.Int32)}
+		laps[i] = domain.Lap{LapID: int(row)}
 	}
 	return laps, nil
 }

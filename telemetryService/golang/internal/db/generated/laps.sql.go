@@ -12,19 +12,20 @@ import (
 )
 
 const listLaps = `-- name: ListLaps :many
-SELECT DISTINCT lap_id FROM TelemetryTicks
+SELECT DISTINCT CAST(lap_id as int) FROM TelemetryTicks
 WHERE session_id = $1
+ORDER BY CAST(lap_id as INT)
 `
 
-func (q *Queries) ListLaps(ctx context.Context, sessionID pgtype.Text) ([]pgtype.Int4, error) {
+func (q *Queries) ListLaps(ctx context.Context, sessionID pgtype.Text) ([]int32, error) {
 	rows, err := q.db.Query(ctx, listLaps, sessionID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []pgtype.Int4
+	var items []int32
 	for rows.Next() {
-		var lap_id pgtype.Int4
+		var lap_id int32
 		if err := rows.Scan(&lap_id); err != nil {
 			return nil, err
 		}

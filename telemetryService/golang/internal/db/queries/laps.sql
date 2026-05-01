@@ -1,3 +1,4 @@
 -- name: ListLaps :many
-SELECT DISTINCT lap_id FROM TelemetryTicks
-WHERE session_id = $1;
+SELECT DISTINCT CAST(lap_id as int) FROM TelemetryTicks
+WHERE session_id = $1
+ORDER BY CAST(lap_id as INT);
