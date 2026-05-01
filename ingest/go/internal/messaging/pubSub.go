@@ -435,7 +435,7 @@ func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte) error {
 	startTime := time.Now()
 	dataReader := bytes.NewReader(data)
 
-	res, err := ps.client.Post(ps.config.IngestUrl, "application/x-protobuf", dataReader)
+	res, err := ps.client.Post(ps.config.ServerUrl+":8010/api/ingest", "application/x-protobuf", dataReader)
 	if err != nil {
 		log.Printf("Worker %d: Failed to publish batch %s: %v", ps.workerID, batch.BatchId, err)
 		ps.recordFailure()

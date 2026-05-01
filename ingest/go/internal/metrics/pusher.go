@@ -11,7 +11,7 @@ import (
 
 func StartPusher(pushgatewayURL string) {
 	instance := runtime.GOOS + "/" + runtime.GOARCH
-	pusher := push.New(pushgatewayURL, "ingest-service").
+	pusher := push.New(pushgatewayURL+":9091", "ingest-service").
 		Grouping("instance", instance).
 		Gatherer(prometheus.DefaultGatherer)
 

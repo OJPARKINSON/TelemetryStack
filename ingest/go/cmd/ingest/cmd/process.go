@@ -20,6 +20,7 @@ import (
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/metrics"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/processing"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/worker"
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -48,7 +49,12 @@ func init() {
 	processCmd.Flags().BoolVarP(&fresh, "fresh", "f", false, "will clean the local store of files that have been processed and start from fresh")
 }
 
-func Process(telemetryFolder string) error  {
+func Process(telemetryFolder string) error {
+	envErr := godotenv.Load()
+	if envErr != nil {
+		log.Fatal("Error loading .env file")
+	}
+
 	startTime := time.Now()
 
 	// Initialize Zap logger
@@ -71,7 +77,7 @@ func Process(telemetryFolder string) error  {
 	}
 
 	// Start metrics pusher
-	metrics.StartPusher(cfg.PushgatewayURL)
+	metrics.StartPusher(cfg.ServerUrl + "")
 
 	if os.Getenv("ENABLE_PPROF") == "true" {
 		go func() {
@@ -79,7 +85,7 @@ func Process(telemetryFolder string) error  {
 				logger.Error("pprof server failed",
 					zap.Error(err),
 					zap.String("action", "Check port 6060 is not in use"))
-				}
+			}
 		}()
 	}
 
@@ -166,7 +172,7 @@ func Process(telemetryFolder string) error  {
 				zap.Error(err),
 				zap.String("path", memProfile),
 				zap.String("action", "Check directory exists and has write permissions"))
-				return err
+			return err
 		} else {
 			defer f.Close()
 			runtime.GC() // get up-to-date statistics
@@ -174,7 +180,7 @@ func Process(telemetryFolder string) error  {
 				logger.Error("Could not write memory profile",
 					zap.Error(err),
 					zap.String("action", "Check disk space and file permissions"))
-			return err
+				return err
 			}
 		}
 	}

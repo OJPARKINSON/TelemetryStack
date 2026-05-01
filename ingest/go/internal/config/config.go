@@ -26,7 +26,7 @@ type Config struct {
 	PprofPort    string
 	MemoryTuning bool
 
-	IngestUrl string
+	ServerUrl string
 
 	BatchSizeRecords int
 
@@ -42,8 +42,6 @@ type Config struct {
 	R2AccessKeyID  string
 	R2SecretAccess string
 	R2BucketNme    string
-
-	PushgatewayURL string
 }
 
 func LoadConfig() *Config {
@@ -71,7 +69,7 @@ func LoadConfig() *Config {
 		PprofPort:    getEnv("PPROF_PORT", "6060"),
 		MemoryTuning: getEnvAsBool("MEMORY_TUNING", true),
 
-		IngestUrl: getEnv("INGEST_URL", "http://localhost:8010/api/ingest"),
+		ServerUrl: getEnv("SERVER_URL", "http://localhost"),
 
 		UseStructPipeline: getEnvAsBool("USE_STRUCT_PIPELINE", true),
 
@@ -85,9 +83,6 @@ func LoadConfig() *Config {
 		R2AccessKeyID:  getEnv("R2_ACCESS_KEY_ID", ""),
 		R2SecretAccess: getEnv("R2_SECRET_ACCESS_KEY", ""),
 		R2BucketNme:    getEnv("R2_BUCKET_NAME", ""),
-
-		PushgatewayURL: getEnv("PUSHGATEWAY_URL", "http://localhost:9091"),
-
 		// Data Directory - defaults to ./ibt_files/ for backward compatibility
 		// DataDirectory: getEnv("IBT_DATA_DIR", "./ibt_files/"),
 	}
