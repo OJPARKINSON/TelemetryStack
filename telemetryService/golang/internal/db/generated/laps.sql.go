@@ -12,9 +12,9 @@ import (
 )
 
 const listLaps = `-- name: ListLaps :many
-SELECT DISTINCT CAST(lap_id as int) FROM TelemetryTicks
+SELECT DISTINCT CAST(lap_id AS INT) AS lap_id FROM TelemetryTicks
 WHERE session_id = $1
-ORDER BY CAST(lap_id as INT)
+ORDER BY lap_id
 `
 
 func (q *Queries) ListLaps(ctx context.Context, sessionID pgtype.Text) ([]int32, error) {
