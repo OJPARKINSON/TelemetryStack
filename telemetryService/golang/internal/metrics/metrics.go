@@ -6,11 +6,38 @@ import (
 )
 
 var (
-	// Records received from RabbitMQ
+	// Records received from HTTP ingest
 	RecordsReceivedTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "telemetry_records_received_total",
 		Help: "Total number of telemetry records received from ingest",
 	})
+
+	HTTPRequestDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "telemetry_http_request_duration_seconds",
+		Help:    "HTTP request duration by endpoint, method, and status code",
+		Buckets: prometheus.ExponentialBuckets(0.001, 2, 14), // 1ms to ~16s
+	}, []string{"path", "method", "status"})
+
+	HTTPRequestsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "telemetry_http_requests_total",
+		Help: "Total HTTP requests by endpoint, method, and status code",
+	}, []string{"path", "method", "status"})
+
+	HTTPRequestsInFlight = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "telemetry_http_requests_in_flight",
+		Help: "Number of HTTP requests currently being served",
+	})
+
+	QuestDBQueryDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "telemetry_questdb_query_duration_seconds",
+		Help:    "QuestDB read query duration by operation",
+		Buckets: prometheus.ExponentialBuckets(0.001, 2, 14),
+	}, []string{"operation"})
+
+	QuestDBQueryErrors = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "telemetry_questdb_query_errors_total",
+		Help: "Total QuestDB read query errors by operation",
+	}, []string{"operation"})
 
 	// Records written to QuestDB
 	RecordsWrittenTotal = promauto.NewCounter(prometheus.CounterOpts{

@@ -29,6 +29,7 @@ func NewServer(addr string, sessions domain.SessionRepository, writer domain.Tel
 	})
 	app.Use(compressor.Handler)
 	app.Use(middleware.Logger)
+	app.Use(metricsMiddleware)
 
 	server := &Server{
 		sessions: sessions,

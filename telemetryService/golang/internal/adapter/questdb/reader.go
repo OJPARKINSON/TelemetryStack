@@ -9,9 +9,20 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/ojparkinson/telemetryService/internal/db/generated"
 	"github.com/ojparkinson/telemetryService/internal/domain"
+	"github.com/ojparkinson/telemetryService/internal/metrics"
 )
 
-func (r *Repository) ListSessions(ctx context.Context) ([]domain.Session, error) {
+func observeQuery(operation string, start time.Time, err error) {
+	metrics.QuestDBQueryDuration.WithLabelValues(operation).Observe(time.Since(start).Seconds())
+	if err != nil {
+		metrics.QuestDBQueryErrors.WithLabelValues(operation).Inc()
+	}
+}
+
+func (r *Repository) ListSessions(ctx context.Context) (_ []domain.Session, err error) {
+	start := time.Now()
+	defer func() { observeQuery("list_sessions", start, err) }()
+
 	rows, err := r.queries.ListSessions(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list sessions: %w", err)
@@ -49,7 +60,10 @@ func (r *Repository) ListSessions(ctx context.Context) ([]domain.Session, error)
 	return sessions, nil
 }
 
-func (r *Repository) ListLaps(ctx context.Context, sessionsID string) ([]domain.Lap, error) {
+func (r *Repository) ListLaps(ctx context.Context, sessionsID string) (_ []domain.Lap, err error) {
+	start := time.Now()
+	defer func() { observeQuery("list_laps", start, err) }()
+
 	rows, err := r.queries.ListLaps(ctx, pgtype.Text{String: sessionsID, Valid: true})
 	if err != nil {
 		return nil, fmt.Errorf("list laps: %w", err)
@@ -62,7 +76,10 @@ func (r *Repository) ListLaps(ctx context.Context, sessionsID string) ([]domain.
 	return laps, nil
 }
 
-func (r *Repository) GetLapTelemetry(ctx context.Context, sessionID, lapID string) ([]domain.TelemetryPoint, error) {
+func (r *Repository) GetLapTelemetry(ctx context.Context, sessionID, lapID string) (_ []domain.TelemetryPoint, err error) {
+	start := time.Now()
+	defer func() { observeQuery("get_lap_telemetry", start, err) }()
+
 	lapIDInt, err := strconv.ParseInt(lapID, 10, 32)
 	if err != nil {
 		return nil, fmt.Errorf("invalid lap_id: %w", err)
