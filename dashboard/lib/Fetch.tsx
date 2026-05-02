@@ -1,58 +1,5 @@
 import type { TelemetryDataPoint } from "./types";
 
-export const processIRacingDataWithGPS = (data: any) => {
-	const sortedData = [...data].sort((a, b) => {
-		const timeA = a.session_time !== undefined ? a.session_time : 0;
-		const timeB = b.session_time !== undefined ? b.session_time : 0;
-		return timeA - timeB;
-	});
-
-	const processedData: TelemetryDataPoint[] = sortedData.map((d, i) => ({
-		index: i,
-		time: d._time || i,
-		sessionTime: d.session_time || 0,
-
-		Speed: d.speed ? d.speed * 3.6 : 0,
-
-		RPM: d.rpm || 0,
-
-		Throttle: d.throttle ? d.throttle * 100 : 0,
-		Brake: d.brake ? d.brake * 100 : 0,
-
-		Gear: d.gear || 0,
-
-		LapDistPct: d.lap_dist_pct ? d.lap_dist_pct * 100 : 0,
-
-		SteeringWheelAngle: d.steering_wheel_angle || 0,
-
-		Lat: d.lat || 0,
-		Lon: d.lon || 0,
-
-		VelocityX: d.velocity_x || 0,
-		VelocityY: d.velocity_y || 0,
-		VelocityZ: d.velocity_z || 0,
-
-		FuelLevel: d.fuel_level || 0,
-		LapCurrentLapTime: d.lap_current_lap_time || 0,
-		PlayerCarPosition: d.player_car_position || 0,
-		TrackName: d.track_name || "",
-		SessionNum: d.session_num || "",
-
-		LatAccel: d.lat_accel || 0,
-		LongAccel: d.long_accel || 0,
-		VertAccel: d.vert_accel || 0,
-
-		Alt: d.alt || 0,
-
-		Pitch: d.pitch || 0,
-		Roll: d.roll || 0,
-		Yaw: d.yaw || 0,
-		YawNorth: d.yaw_north || 0,
-	}));
-
-	return processGPSTelemetryData(processedData);
-};
-
 interface TrackBounds {
 	minLat: number;
 	maxLat: number;
@@ -61,15 +8,22 @@ interface TrackBounds {
 }
 
 export interface TelemetryRes {
-	dataWithGPSCoordinates: null | any[];
+	dataWithGPSCoordinates: null | TelemetryDataPoint[];
 	trackBounds: TrackBounds | null;
 	processError: string | null;
 }
 
-const processGPSTelemetryData = (
-	telemetry: TelemetryDataPoint[],
+interface TelemetryEnvelope {
+	track_name?: string;
+	session_num?: string;
+	points?: any[];
+}
+
+export const processIRacingDataWithGPS = (
+	envelope: TelemetryEnvelope | null | undefined,
 ): TelemetryRes => {
-	if (!telemetry?.length) {
+	const rows = envelope?.points;
+	if (!rows?.length) {
 		return {
 			dataWithGPSCoordinates: [],
 			trackBounds: null,
@@ -77,18 +31,43 @@ const processGPSTelemetryData = (
 		};
 	}
 
-	try {
-		const validGPSData = telemetry.filter(
-			(point) =>
-				point.Lat &&
-				point.Lon &&
-				point.Lat !== 0 &&
-				point.Lon !== 0 &&
-				Math.abs(point.Lat) <= 90 &&
-				Math.abs(point.Lon) <= 180,
-		);
+	const trackName = envelope?.track_name ?? "";
+	const sessionNum = envelope?.session_num ?? "";
 
-		if (validGPSData.length === 0) {
+	try {
+		const points: TelemetryDataPoint[] = [];
+		for (let i = 0; i < rows.length; i++) {
+			const d = rows[i];
+			const lat = d.lat || 0;
+			const lon = d.lon || 0;
+			if (!lat || !lon || Math.abs(lat) > 90 || Math.abs(lon) > 180) continue;
+
+			points.push({
+				index: points.length,
+				time: d._time || points.length,
+				sessionTime: d.session_time || 0,
+				Speed: d.speed ? d.speed * 3.6 : 0,
+				RPM: d.rpm || 0,
+				Throttle: d.throttle ? d.throttle * 100 : 0,
+				Brake: d.brake ? d.brake * 100 : 0,
+				Gear: d.gear || 0,
+				LapDistPct: d.lap_dist_pct ? d.lap_dist_pct * 100 : 0,
+				SteeringWheelAngle: d.steering_wheel_angle || 0,
+				Lat: lat,
+				Lon: lon,
+				VelocityX: d.velocity_x || 0,
+				VelocityY: d.velocity_y || 0,
+				VelocityZ: d.velocity_z || 0,
+				FuelLevel: d.fuel_level || 0,
+				LapCurrentLapTime: d.lap_current_lap_time || 0,
+				PlayerCarPosition: d.player_car_position || 0,
+				TrackName: trackName,
+				SessionNum: sessionNum,
+				LatAccel: d.lat_accel || 0,
+			} as TelemetryDataPoint);
+		}
+
+		if (points.length === 0) {
 			return {
 				dataWithGPSCoordinates: [],
 				trackBounds: null,
@@ -96,82 +75,60 @@ const processGPSTelemetryData = (
 			};
 		}
 
-		const lats = validGPSData.map((p) => p.Lat);
-		const lons = validGPSData.map((p) => p.Lon);
+		// 5-point moving average over Lat/Lon/Speed using a running window.
+		// Endpoints (first/last 2) keep their original values, matching prior behaviour.
+		const n = points.length;
+		const origLat = new Float64Array(n);
+		const origLon = new Float64Array(n);
+		const origSpeed = new Float64Array(n);
+		for (let i = 0; i < n; i++) {
+			origLat[i] = points[i].Lat;
+			origLon[i] = points[i].Lon;
+			origSpeed[i] = points[i].Speed;
+		}
 
-		const trackBounds: TrackBounds = {
-			minLat: Math.min(...lats),
-			maxLat: Math.max(...lats),
-			minLon: Math.min(...lons),
-			maxLon: Math.max(...lons),
-		};
-
-		const speeds = validGPSData.map((p) => p.Speed).filter((s) => s > 0);
-		const minSpeed = Math.min(...speeds);
-		const maxSpeed = Math.max(...speeds);
-		const speedRange = maxSpeed - minSpeed;
-
-		const processedData = validGPSData.map((point, index) => {
-			let distanceFromPrev = 0;
-			if (index > 0) {
-				const prevPoint = validGPSData[index - 1];
-				distanceFromPrev = calculateGPSDistance(
-					prevPoint.Lat,
-					prevPoint.Lon,
-					point.Lat,
-					point.Lon,
-				);
-			}
-
-			let calculatedSpeed = point.Speed;
-			if (
-				!calculatedSpeed &&
-				index > 0 &&
-				point.sessionTime &&
-				validGPSData[index - 1].sessionTime
-			) {
-				const timeDiff =
-					point.sessionTime - validGPSData[index - 1].sessionTime;
-				if (timeDiff > 0) {
-					calculatedSpeed = (distanceFromPrev / timeDiff) * 3.6; // Convert m/s to km/h
+		if (n >= 5) {
+			let sumLat = 0;
+			let sumLon = 0;
+			let sumSpeed = 0;
+			let speedCount = 0;
+			// Prime initial window [0..4]
+			for (let i = 0; i < 5; i++) {
+				sumLat += origLat[i];
+				sumLon += origLon[i];
+				if (origSpeed[i]) {
+					sumSpeed += origSpeed[i];
+					speedCount++;
 				}
 			}
+			// Center index of the window starts at 2
+			for (let center = 2; center <= n - 3; center++) {
+				points[center].Lat = sumLat / 5;
+				points[center].Lon = sumLon / 5;
+				points[center].Speed =
+					speedCount > 0 ? sumSpeed / speedCount : origSpeed[center];
 
-			let heading = 0;
-			if (index > 0) {
-				const prevPoint = validGPSData[index - 1];
-				heading = calculateBearing(
-					prevPoint.Lat,
-					prevPoint.Lon,
-					point.Lat,
-					point.Lon,
-				);
+				// Slide window: drop center-2, add center+3 (if exists)
+				const out = center - 2;
+				const inIdx = center + 3;
+				if (inIdx < n) {
+					sumLat += origLat[inIdx] - origLat[out];
+					sumLon += origLon[inIdx] - origLon[out];
+					if (origSpeed[out]) {
+						sumSpeed -= origSpeed[out];
+						speedCount--;
+					}
+					if (origSpeed[inIdx]) {
+						sumSpeed += origSpeed[inIdx];
+						speedCount++;
+					}
+				}
 			}
-
-			const normalizedSpeed =
-				speedRange > 0 ? (point.Speed - minSpeed) / speedRange : 0;
-
-			const lateralAccel = Math.abs(point.LatAccel || 0);
-
-			return {
-				...point,
-				calculatedSpeed,
-				heading,
-				distanceFromPrev,
-				gpsValid: true,
-				originalIndex: index,
-				normalizedSpeed,
-				lateralAccel,
-			};
-		});
-
-		const smoothedData = smoothGPSData(processedData);
-
-		const dataWithSections = detectTrackSections(smoothedData);
+		}
 
 		return {
-			dataWithGPSCoordinates: dataWithSections,
-			trackBounds,
+			dataWithGPSCoordinates: points,
+			trackBounds: null,
 			processError: null,
 		};
 	} catch (error) {
@@ -184,110 +141,9 @@ const processGPSTelemetryData = (
 	}
 };
 
-function calculateGPSDistance(
-	lat1: number,
-	lon1: number,
-	lat2: number,
-	lon2: number,
-): number {
-	const R = 6371000;
-	const dLat = ((lat2 - lat1) * Math.PI) / 180;
-	const dLon = ((lon2 - lon1) * Math.PI) / 180;
-	const a =
-		Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-		Math.cos((lat1 * Math.PI) / 180) *
-			Math.cos((lat2 * Math.PI) / 180) *
-			Math.sin(dLon / 2) *
-			Math.sin(dLon / 2);
-	const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-	return R * c;
-}
-
-function calculateBearing(
-	lat1: number,
-	lon1: number,
-	lat2: number,
-	lon2: number,
-): number {
-	const dLon = ((lon2 - lon1) * Math.PI) / 180;
-	const lat1Rad = (lat1 * Math.PI) / 180;
-	const lat2Rad = (lat2 * Math.PI) / 180;
-
-	const y = Math.sin(dLon) * Math.cos(lat2Rad);
-	const x =
-		Math.cos(lat1Rad) * Math.sin(lat2Rad) -
-		Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
-
-	const bearing = (Math.atan2(y, x) * 180) / Math.PI;
-	return (bearing + 360) % 360;
-}
-
-function smoothGPSData(data: any[]): any[] {
-	const windowSize = 5;
-
-	return data.map((point, index) => {
-		const start = Math.max(0, index - Math.floor(windowSize / 2));
-		const end = Math.min(data.length, index + Math.floor(windowSize / 2) + 1);
-
-		const window = data.slice(start, end);
-
-		const avgLat = window.reduce((sum, p) => sum + p.Lat, 0) / window.length;
-		const avgLon = window.reduce((sum, p) => sum + p.Lon, 0) / window.length;
-
-		const speeds = window.filter((p) => p.Speed).map((p) => p.Speed);
-		const avgSpeed =
-			speeds.length > 0
-				? speeds.reduce((sum, s) => sum + s, 0) / speeds.length
-				: point.Speed;
-
-		return {
-			...point,
-			Lat: index < 2 || index > data.length - 3 ? point.Lat : avgLat,
-			Lon: index < 2 || index > data.length - 3 ? point.Lon : avgLon,
-			Speed: avgSpeed,
-		};
-	});
-}
-
-function detectTrackSections(data: any[]): any[] {
-	return data.map((point, index) => {
-		let sectionType = "straight";
-		let turnRadius = 0;
-
-		if (index >= 2 && index < data.length - 2) {
-			const prevHeading = data[index - 2].heading;
-			const nextHeading = data[index + 2].heading;
-
-			let headingChange = Math.abs(nextHeading - prevHeading);
-			if (headingChange > 180) {
-				headingChange = 360 - headingChange;
-			}
-
-			if (headingChange > 15) {
-				sectionType = "corner";
-
-				const avgSpeed = point.Speed || 0;
-				if (avgSpeed > 0 && headingChange > 0) {
-					const timeWindow = 4;
-					turnRadius =
-						(avgSpeed * timeWindow) / ((headingChange * Math.PI) / 180);
-				}
-			} else if (headingChange > 5) {
-				sectionType = "gentle_turn";
-			}
-		}
-
-		return {
-			...point,
-			sectionType,
-			turnRadius,
-		};
-	});
-}
-
 export const fetcher = async (url: string): Promise<any> => {
 	const controller = new AbortController();
-	const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+	const timeoutId = setTimeout(() => controller.abort(), 10000);
 
 	try {
 		const response = await fetch(url, {
@@ -323,7 +179,7 @@ export const fetcher = async (url: string): Promise<any> => {
 
 export const fetcherBR = async (url: string): Promise<any> => {
 	const controller = new AbortController();
-	const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+	const timeoutId = setTimeout(() => controller.abort(), 10000);
 
 	try {
 		const response = await fetch(url, {

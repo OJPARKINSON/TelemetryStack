@@ -12,16 +12,15 @@ import (
 )
 
 const getLapTelemetry = `-- name: GetLapTelemetry :many
-SELECT session_id, lap_id, session_num, track_name, session_time,
+SELECT session_num, track_name, session_time,
          speed, throttle, brake, rpm, gear, lap_dist_pct,
-         steering_wheel_angle, lat, lon, alt,
+         steering_wheel_angle, lat, lon,
          velocity_x, velocity_y, velocity_z,
-         lat_accel, long_accel, vert_accel,
-         pitch, roll, yaw, yaw_north,
-         fuel_level, lap_current_lap_time, player_car_position,
-timestamp FROM TelemetryTicks
+         lat_accel,
+         fuel_level, lap_current_lap_time, player_car_position
+FROM TelemetryTicks
 WHERE session_name = 'RACE' AND session_id = $1 AND lap_id = $2
-ORDER BY timestamp ASC
+ORDER BY session_time ASC
 `
 
 type GetLapTelemetryParams struct {
@@ -30,35 +29,25 @@ type GetLapTelemetryParams struct {
 }
 
 type GetLapTelemetryRow struct {
-	SessionID          pgtype.Text      `json:"session_id"`
-	LapID              pgtype.Int4      `json:"lap_id"`
-	SessionNum         pgtype.Text      `json:"session_num"`
-	TrackName          pgtype.Text      `json:"track_name"`
-	SessionTime        pgtype.Float8    `json:"session_time"`
-	Speed              pgtype.Float8    `json:"speed"`
-	Throttle           pgtype.Float8    `json:"throttle"`
-	Brake              pgtype.Float8    `json:"brake"`
-	Rpm                pgtype.Float8    `json:"rpm"`
-	Gear               pgtype.Int4      `json:"gear"`
-	LapDistPct         pgtype.Float8    `json:"lap_dist_pct"`
-	SteeringWheelAngle pgtype.Float8    `json:"steering_wheel_angle"`
-	Lat                pgtype.Float8    `json:"lat"`
-	Lon                pgtype.Float8    `json:"lon"`
-	Alt                pgtype.Float8    `json:"alt"`
-	VelocityX          pgtype.Float8    `json:"velocity_x"`
-	VelocityY          pgtype.Float8    `json:"velocity_y"`
-	VelocityZ          pgtype.Float8    `json:"velocity_z"`
-	LatAccel           pgtype.Float8    `json:"lat_accel"`
-	LongAccel          pgtype.Float8    `json:"long_accel"`
-	VertAccel          pgtype.Float8    `json:"vert_accel"`
-	Pitch              pgtype.Float8    `json:"pitch"`
-	Roll               pgtype.Float8    `json:"roll"`
-	Yaw                pgtype.Float8    `json:"yaw"`
-	YawNorth           pgtype.Float8    `json:"yaw_north"`
-	FuelLevel          pgtype.Float8    `json:"fuel_level"`
-	LapCurrentLapTime  pgtype.Float8    `json:"lap_current_lap_time"`
-	PlayerCarPosition  pgtype.Int4      `json:"player_car_position"`
-	Timestamp          pgtype.Timestamp `json:"timestamp"`
+	SessionNum         pgtype.Text   `json:"session_num"`
+	TrackName          pgtype.Text   `json:"track_name"`
+	SessionTime        pgtype.Float8 `json:"session_time"`
+	Speed              pgtype.Float8 `json:"speed"`
+	Throttle           pgtype.Float8 `json:"throttle"`
+	Brake              pgtype.Float8 `json:"brake"`
+	Rpm                pgtype.Float8 `json:"rpm"`
+	Gear               pgtype.Int4   `json:"gear"`
+	LapDistPct         pgtype.Float8 `json:"lap_dist_pct"`
+	SteeringWheelAngle pgtype.Float8 `json:"steering_wheel_angle"`
+	Lat                pgtype.Float8 `json:"lat"`
+	Lon                pgtype.Float8 `json:"lon"`
+	VelocityX          pgtype.Float8 `json:"velocity_x"`
+	VelocityY          pgtype.Float8 `json:"velocity_y"`
+	VelocityZ          pgtype.Float8 `json:"velocity_z"`
+	LatAccel           pgtype.Float8 `json:"lat_accel"`
+	FuelLevel          pgtype.Float8 `json:"fuel_level"`
+	LapCurrentLapTime  pgtype.Float8 `json:"lap_current_lap_time"`
+	PlayerCarPosition  pgtype.Int4   `json:"player_car_position"`
 }
 
 func (q *Queries) GetLapTelemetry(ctx context.Context, arg GetLapTelemetryParams) ([]GetLapTelemetryRow, error) {
@@ -71,8 +60,6 @@ func (q *Queries) GetLapTelemetry(ctx context.Context, arg GetLapTelemetryParams
 	for rows.Next() {
 		var i GetLapTelemetryRow
 		if err := rows.Scan(
-			&i.SessionID,
-			&i.LapID,
 			&i.SessionNum,
 			&i.TrackName,
 			&i.SessionTime,
@@ -85,21 +72,13 @@ func (q *Queries) GetLapTelemetry(ctx context.Context, arg GetLapTelemetryParams
 			&i.SteeringWheelAngle,
 			&i.Lat,
 			&i.Lon,
-			&i.Alt,
 			&i.VelocityX,
 			&i.VelocityY,
 			&i.VelocityZ,
 			&i.LatAccel,
-			&i.LongAccel,
-			&i.VertAccel,
-			&i.Pitch,
-			&i.Roll,
-			&i.Yaw,
-			&i.YawNorth,
 			&i.FuelLevel,
 			&i.LapCurrentLapTime,
 			&i.PlayerCarPosition,
-			&i.Timestamp,
 		); err != nil {
 			return nil, err
 		}

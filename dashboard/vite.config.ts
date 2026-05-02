@@ -15,7 +15,7 @@ export default defineConfig({
 		cors: false,
 		proxy: {
 			"/api": {
-				target: process.env.API_URL ?? "http://omarchy.tail95aa0e.ts.net:8010/",
+				target: process.env.API_URL ?? "http://localhost:8010/",
 				changeOrigin: true,
 				secure: false,
 			},

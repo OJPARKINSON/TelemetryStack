@@ -54,6 +54,32 @@ func (s *Server) handleGetLaps(w http.ResponseWriter, r *http.Request) {
 
 }
 
+type telemetryPointWire struct {
+	SessionTime        float64 `json:"session_time"`
+	Speed              float64 `json:"speed"`
+	RPM                float64 `json:"rpm"`
+	Throttle           float64 `json:"throttle"`
+	Brake              float64 `json:"brake"`
+	Gear               uint32  `json:"gear"`
+	LapDistPct         float64 `json:"lap_dist_pct"`
+	SteeringWheelAngle float64 `json:"steering_wheel_angle"`
+	PlayerCarPosition  uint32  `json:"player_car_position"`
+	Lat                float64 `json:"lat"`
+	Lon                float64 `json:"lon"`
+	VelocityX          float64 `json:"velocity_x"`
+	VelocityY          float64 `json:"velocity_y"`
+	VelocityZ          float64 `json:"velocity_z"`
+	LatAccel           float64 `json:"lat_accel"`
+	LapCurrentLapTime  float64 `json:"lap_current_lap_time"`
+	FuelLevel          float64 `json:"fuel_level"`
+}
+
+type telemetryEnvelope struct {
+	TrackName  string               `json:"track_name"`
+	SessionNum string               `json:"session_num"`
+	Points     []telemetryPointWire `json:"points"`
+}
+
 // /api/sessions/123456/laps/1
 func (s *Server) handleGetTelemetry(w http.ResponseWriter, r *http.Request) {
 	sessionID := chi.URLParam(r, "sessionId")
@@ -70,8 +96,34 @@ func (s *Server) handleGetTelemetry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, 200, lapData)
+	envelope := telemetryEnvelope{Points: make([]telemetryPointWire, len(lapData))}
+	if len(lapData) > 0 {
+		envelope.TrackName = lapData[0].TrackName
+		envelope.SessionNum = lapData[0].SessionNum
+	}
+	for i, p := range lapData {
+		envelope.Points[i] = telemetryPointWire{
+			SessionTime:        p.SessionTime,
+			Speed:              p.Speed,
+			RPM:                p.RPM,
+			Throttle:           p.Throttle,
+			Brake:              p.Brake,
+			Gear:               p.Gear,
+			LapDistPct:         p.LapDistPct,
+			SteeringWheelAngle: p.SteeringWheelAngle,
+			PlayerCarPosition:  p.PlayerCarPosition,
+			Lat:                p.Lat,
+			Lon:                p.Lon,
+			VelocityX:          p.VelocityX,
+			VelocityY:          p.VelocityY,
+			VelocityZ:          p.VelocityZ,
+			LatAccel:           p.LatAccel,
+			LapCurrentLapTime:  p.LapCurrentLapTime,
+			FuelLevel:          p.FuelLevel,
+		}
+	}
 
+	respondJSON(w, 200, envelope)
 }
 
 // /api/sessions/123456/laps/1/geojson
