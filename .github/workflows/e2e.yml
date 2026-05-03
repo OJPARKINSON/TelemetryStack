@@ -7,9 +7,78 @@ on:
     branches: [ main ]
 
 permissions:
-  contents: read
+  contents: write
   packages: read
 
 jobs:
   display:
     runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: e2e/go.mod
+          cache-dependency-path: e2e/go.sum
+
+      - name: Run e2e tests
+        working-directory: e2e/tests
+        run: |
+          set -o pipefail
+          go test -run TestAllTicksAreStored -timeout 15m -v 2>&1 | tee test-output.log
+
+      - name: Extract P95 throughput
+        if: github.ref == 'refs/heads/main'
+        id: p95
+        working-directory: e2e/tests
+        run: |
+          # Pull the last "E2E P95:" line (5M_Records case wins if both ran).
+          line=$(grep -E "E2E P95:" test-output.log | tail -n 1 || true)
+          if [ -z "$line" ]; then
+            echo "No P95 line found in test output"
+            exit 1
+          fi
+          # Format: "  E2E P95:    123_456 rec/sec"
+          value=$(echo "$line" | sed -E 's/.*E2E P95:[[:space:]]+([0-9_\.]+).*/\1/' | tr '_' ',')
+          echo "value=$value" >> "$GITHUB_OUTPUT"
+          echo "Parsed P95 throughput: $value rec/sec"
+
+      - name: Publish badge
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          P95: ${{ steps.p95.outputs.value }}
+        run: |
+          set -e
+          mkdir -p /tmp/badges-branch
+          cd /tmp/badges-branch
+          git init -q
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch -q origin badges || true
+          if git rev-parse --verify origin/badges >/dev/null 2>&1; then
+            git checkout -q -b badges origin/badges
+          else
+            git checkout -q --orphan badges
+            git rm -rqf . || true
+          fi
+
+          cat > e2e-p95.json <<EOF
+          {
+            "schemaVersion": 1,
+            "label": "e2e p95",
+            "message": "${P95} rec/sec",
+            "color": "brightgreen"
+          }
+          EOF
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add e2e-p95.json
+          if git diff --cached --quiet; then
+            echo "Badge unchanged"
+          else
+            git commit -q -m "chore(badges): update e2e p95 badge"
+            git push -q origin badges
+          fi
