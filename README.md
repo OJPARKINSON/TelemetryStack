@@ -1,7 +1,7 @@
 # TelemetryStack
 
-[![Run e2e tests](https://github.com/OJPARKINSON/IRacing-Display/actions/workflows/e2e.yml/badge.svg?branch=main)](https://github.com/OJPARKINSON/IRacing-Display/actions/workflows/e2e.yml)
-[![e2e p95](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/OJPARKINSON/IRacing-Display/badges/e2e-p95.json)](https://github.com/OJPARKINSON/IRacing-Display/actions/workflows/e2e.yml)
+[![e2e test run](https://github.com/OJPARKINSON/IRacing-Display/actions/workflows/e2e.yml/badge.svg?branch=main)](https://github.com/OJPARKINSON/IRacing-Display/actions/workflows/e2e.yml)
+[![e2e throughput p95:](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/OJPARKINSON/IRacing-Display/badges/e2e-p95.json)](https://github.com/OJPARKINSON/IRacing-Display/actions/workflows/e2e.yml)
 
 A self-hosted telemetry pipeline for iRacing. Parses `.ibt` files, stores time-series data in QuestDB, and serves an interactive dashboard with synchronised track maps and telemetry charts — built to run on a Raspberry Pi 5.
 
