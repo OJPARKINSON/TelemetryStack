@@ -14,6 +14,7 @@ import (
 	"github.com/ojparkinson/IRacing-Display/e2e/pkg/containers"
 	mockPublisher "github.com/ojparkinson/IRacing-Display/e2e/pkg/publisher"
 	"github.com/ojparkinson/IRacing-Display/e2e/pkg/verification"
+	"github.com/testcontainers/testcontainers-go"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 	"golang.org/x/text/number"
@@ -28,15 +29,8 @@ func TestAllTicksAreStored(t *testing.T) {
 		short           bool
 	}{
 		{
-			name:            "500k_Records",
-			numBatches:      20,
-			recordsPerBatch: 25000,
-			maxWaitTime:     1 * time.Minute,
-			short:           true,
-		},
-		{
-			name:            "1M_Records",
-			numBatches:      40,
+			name:            "2.5M_Records",
+			numBatches:      100,
 			recordsPerBatch: 25000,
 			maxWaitTime:     2 * time.Minute,
 			short:           false, // swap back to true
@@ -58,6 +52,7 @@ func TestAllTicksAreStored(t *testing.T) {
 
 			ctx := context.Background()
 			network, _ := containers.CreateNetwork(ctx)
+			testcontainers.CleanupNetwork(t, network)
 
 			containers.SpinUpQuestDB(t, ctx, network)
 
@@ -112,6 +107,7 @@ func TestAllTicksAreStored(t *testing.T) {
 func TestFixedFilesProcessedSpeed(t *testing.T) {
 	ctx := context.Background()
 	network, _ := containers.CreateNetwork(ctx)
+	testcontainers.CleanupNetwork(t, network)
 
 	// Discover .ibt files
 	ibtPath, err := filepath.Abs("../../ingest/go/ibt_files")

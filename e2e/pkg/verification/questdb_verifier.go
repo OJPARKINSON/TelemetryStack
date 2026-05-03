@@ -119,17 +119,16 @@ func TunicateTable() error {
 
 func WaitForRecordCountWithMetrics(expectedCount int, timeout time.Duration) (*ThroughputMetrics, error) {
 	metrics := &ThroughputMetrics{
-		StartTime: time.Now(),
-		Samples:   []Sample{},
+		Samples: []Sample{},
 	}
 
 	deadline := time.Now().Add(timeout)
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
-	lastCount := 0
-	lastTime := time.Now()
-	firstMeasurement := true // Add this flag
+	var lastCount int
+	var lastTime time.Time
+	firstMeasurement := true
 
 	for {
 		now := time.Now()
@@ -138,12 +137,14 @@ func WaitForRecordCountWithMetrics(expectedCount int, timeout time.Duration) (*T
 			return nil, err
 		}
 
-		if firstMeasurement && count < 50000 { // Skip until meaningful data
+		if firstMeasurement {
+			metrics.StartTime = now
+			metrics.InitialCount = count
+			lastCount = count
+			lastTime = now
 			firstMeasurement = false
-			continue
-		}
-
-		if !firstMeasurement {
+			log.Printf("Starting monitoring - initial count: %d", count)
+		} else {
 			deltaRecords := count - lastCount
 			deltaTime := now.Sub(lastTime).Seconds()
 
@@ -161,9 +162,9 @@ func WaitForRecordCountWithMetrics(expectedCount int, timeout time.Duration) (*T
 			progress := float64(count) / float64(expectedCount) * 100
 			log.Printf("Progress: %d/%d (%.1f%%) | Throughput: %.0f rec/sec",
 				count, expectedCount, progress, instantThroughput)
-		} else {
-			firstMeasurement = false
-			log.Printf("Starting monitoring - initial count: %d", count)
+
+			lastCount = count
+			lastTime = now
 		}
 
 		if count >= expectedCount {
@@ -177,9 +178,6 @@ func WaitForRecordCountWithMetrics(expectedCount int, timeout time.Duration) (*T
 				count, expectedCount, timeout)
 		}
 
-		lastCount = count
-		lastTime = now
-
 		<-ticker.C
 	}
 }
@@ -187,6 +185,7 @@ func WaitForRecordCountWithMetrics(expectedCount int, timeout time.Duration) (*T
 type ThroughputMetrics struct {
 	StartTime    time.Time
 	EndTime      time.Time
+	InitialCount int
 	TotalRecords int
 	Samples      []Sample
 }
@@ -201,7 +200,11 @@ func (m *ThroughputMetrics) AvgThroughput() float64 {
 	if m.EndTime.IsZero() {
 		return 0
 	}
-	return float64(m.TotalRecords) / m.EndTime.Sub(m.StartTime).Seconds()
+	elapsed := m.EndTime.Sub(m.StartTime).Seconds()
+	if elapsed <= 0 {
+		return 0
+	}
+	return float64(m.TotalRecords-m.InitialCount) / elapsed
 }
 
 func (m *ThroughputMetrics) PeakThroughput() float64 {

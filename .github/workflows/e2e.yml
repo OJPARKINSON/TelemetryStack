@@ -1,0 +1,15 @@
+name: Run e2e tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  display:
+    runs-on: ubuntu-24.04-arm
