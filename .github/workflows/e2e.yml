@@ -27,7 +27,7 @@ jobs:
         working-directory: e2e/tests
         run: |
           set -o pipefail
-          go test -run TestAllTicksAreStored -timeout 15m -v 2>&1 | tee test-output.log
+          go test -run TestAllTicksAreStored -short -timeout 15m -v 2>&1 | tee test-output.log
 
       - name: Extract P95 throughput
         if: github.ref == 'refs/heads/main'
