@@ -16,7 +16,7 @@ message Telemetry {
     string track_name = 8;
     string track_id = 9;
     double steering_wheel_angle = 10;
-    double player_car_position = 11;
+    uint32 player_car_position = 11;
     double velocity_x = 12;
     double velocity_y = 13;
     double velocity_z = 14;

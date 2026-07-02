@@ -63,7 +63,7 @@ type telemetryPointWire struct {
 	Gear               uint32  `json:"gear"`
 	LapDistPct         float64 `json:"lap_dist_pct"`
 	SteeringWheelAngle float64 `json:"steering_wheel_angle"`
-	PlayerCarPosition  uint32  `json:"player_car_position"`
+	PlayerCarPosition  float64 `json:"player_car_position"`
 	Lat                float64 `json:"lat"`
 	Lon                float64 `json:"lon"`
 	VelocityX          float64 `json:"velocity_x"`
@@ -192,7 +192,7 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 
 		points := make([]*domain.TelemetryPoint, len(batch.Records))
 		for i, rec := range batch.Records {
-			p := domain.TelemetryPointFromProto(rec)
+			p := domain.TelemetryPointFromProto(rec, batch.SessionId, batch.CarId)
 			points[i] = &p
 		}
 

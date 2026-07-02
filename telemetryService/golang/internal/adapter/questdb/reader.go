@@ -105,7 +105,7 @@ func telemetryPointFromRow(row generated.GetLapTelemetryRow) domain.TelemetryPoi
 		LatAccel:           row.LatAccel.Float64,
 		FuelLevel:          row.FuelLevel.Float64,
 		LapCurrentLapTime:  row.LapCurrentLapTime.Float64,
-		PlayerCarPosition:  uint32(row.PlayerCarPosition.Int32),
+		PlayerCarPosition:  float64(row.PlayerCarPosition.Int32),
 		TrackName:          row.TrackName.String,
 		SessionNum:         row.SessionNum.String,
 		SessionTime:        row.SessionTime.Float64,

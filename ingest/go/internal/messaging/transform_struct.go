@@ -30,7 +30,6 @@ func TransformStructBatch(ticks []*ibt.TelemetryTick) ([]*Telemetry, error) {
 			SessionTime:        tick.SessionTime,
 			PlayerCarPosition:  tick.PlayerCarPosition,
 			FuelLevel:          tick.FuelLevel,
-			CarId:              strconv.Itoa(int(tick.PlayerCarIdx)),
 			SessionNum:         strconv.Itoa(int(tick.SessionNum)),
 			Alt:                tick.Alt,
 			LatAccel:           tick.LatAccel,
@@ -55,12 +54,10 @@ func TransformStructBatch(ticks []*ibt.TelemetryTick) ([]*Telemetry, error) {
 			RRtempM:            tick.RRtempM,
 
 			// Session metadata
-			SessionId:   tick.SessionID,
 			SessionType: tick.SessionType,
 			SessionName: tick.SessionName,
 			TrackName:   tick.TrackName,
 			TrackId:     fmt.Sprintf("%d", tick.TrackID),
-			WorkerId:    uint32(tick.WorkerID),
 
 			TickTime: timestamppb.New(tick.TickTime),
 		}

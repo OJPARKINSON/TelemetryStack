@@ -261,28 +261,18 @@ func (ps *PubSub) transformRecord(record map[string]interface{}) *Telemetry {
 		}
 	}
 
-	carID := ""
-	if val, ok := record["PlayerCarIdx"]; ok {
-		if v, ok := val.(int); ok {
-			carID = strconv.Itoa(v)
-		}
-	}
-
 	tickTime := ps.sessionTime.Add(time.Duration(sessionTime * float64(time.Second)))
 
 	return &Telemetry{
 		LapId:              fmt.Sprintf("%d", lapID),
 		Speed:              getFloatValue(record, "Speed"),
 		LapDistPct:         getFloatValue(record, "LapDistPct"),
-		SessionId:          ps.sessionID,
 		SessionNum:         sessionNum,
 		SessionType:        sessionType,
 		SessionName:        sessionName,
 		SessionTime:        sessionTime,
-		CarId:              carID,
 		TrackName:          trackName,
 		TrackId:            trackID,
-		WorkerId:           uint32(ps.workerID),
 		SteeringWheelAngle: getFloatValue(record, "SteeringWheelAngle"),
 		PlayerCarPosition:  getFloatValue(record, "PlayerCarPosition"),
 		VelocityX:          getFloatValue(record, "VelocityX"),
@@ -333,15 +323,12 @@ func (ps *PubSub) AddStructRecords(ticks []*ibt.TelemetryTick) error {
 			LapId:              fmt.Sprintf("%d", tick.LapID),
 			Speed:              tick.Speed,
 			LapDistPct:         tick.LapDistPct,
-			SessionId:          ps.sessionID,
 			SessionNum:         strconv.Itoa(int(tick.SessionNum)),
 			SessionType:        tick.SessionType,
 			SessionName:        tick.SessionName,
 			SessionTime:        tick.SessionTime,
-			CarId:              strconv.Itoa(int(tick.PlayerCarIdx)),
 			TrackName:          strings.ReplaceAll(tick.TrackName, " ", "-"),
 			TrackId:            strconv.Itoa(tick.TrackID),
-			WorkerId:           uint32(ps.workerID),
 			SteeringWheelAngle: tick.SteeringWheelAngle,
 			PlayerCarPosition:  tick.PlayerCarPosition,
 			VelocityX:          tick.VelocityX,

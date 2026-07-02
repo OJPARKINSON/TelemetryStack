@@ -29,7 +29,7 @@ type TelemetryPoint struct {
 	Gear               uint32  `json:"gear"`
 	LapDistPct         float64 `json:"lap_dist_pct"`
 	SteeringWheelAngle float64 `json:"steering_wheel_angle"`
-	PlayerCarPosition  uint32  `json:"player_car_position"`
+	PlayerCarPosition  float64 `json:"player_car_position"`
 
 	// Position
 	Lat float64 `json:"lat"`
@@ -73,21 +73,22 @@ type TelemetryPoint struct {
 	RRtempM    float64 `json:"rr_temp_m"`
 }
 
-func TelemetryPointFromProto(rec *messaging.Telemetry) TelemetryPoint {
+func TelemetryPointFromProto(rec *messaging.Telemetry, sessionId, CarId string) TelemetryPoint {
 	ts := time.Now()
 	if rec.TickTime != nil {
 		ts = rec.TickTime.AsTime()
 	}
 
 	return TelemetryPoint{
-		SessionID:          rec.SessionId,
+		SessionID: sessionId,
+		CarID:     CarId,
+
 		TrackName:          rec.TrackName,
 		TrackID:            rec.TrackId,
 		LapID:              rec.LapId,
 		SessionNum:         rec.SessionNum,
 		SessionType:        rec.SessionType,
 		SessionName:        rec.SessionName,
-		CarID:              rec.CarId,
 		SessionTime:        rec.SessionTime,
 		Timestamp:          ts,
 		Speed:              rec.Speed,
