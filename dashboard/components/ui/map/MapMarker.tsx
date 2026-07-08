@@ -143,8 +143,10 @@ export function MapMarker({
 		marker.setPitchAlignment(markerOptions.pitchAlignment ?? "auto");
 	}
 
+	const contextValue = useMemo(() => ({ marker, map }), [marker, map]);
+
 	return (
-		<MarkerContext.Provider value={{ marker, map }}>
+		<MarkerContext.Provider value={contextValue}>
 			{children}
 		</MarkerContext.Provider>
 	);

@@ -13,16 +13,16 @@ type MarkerLabelProps = {
 	position?: "top" | "bottom";
 };
 
+const positionClasses = {
+	top: "bottom-full mb-1",
+	bottom: "top-full mt-1",
+};
+
 export function MarkerLabel({
 	children,
 	className,
 	position = "top",
 }: MarkerLabelProps) {
-	const positionClasses = {
-		top: "bottom-full mb-1",
-		bottom: "top-full mt-1",
-	};
-
 	return (
 		<div
 			className={cn(

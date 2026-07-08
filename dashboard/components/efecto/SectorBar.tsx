@@ -44,7 +44,7 @@ function useSectorTimes(data: TelemetryDataPoint[]): SectorTime[] {
 		if (lapData.length < 10) return [];
 
 		// Sort by LapDistPct for boundary lookup
-		const sorted = [...lapData].sort(
+		const sorted = lapData.toSorted(
 			(a, b) => a.LapDistPct - b.LapDistPct,
 		);
 

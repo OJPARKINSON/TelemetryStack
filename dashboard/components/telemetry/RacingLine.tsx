@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { useMap } from "../ui/map";
+import { useMap } from "../ui/map/MapContext";
 
 function RacingLine({
 	dataWithGPSCoordinates,

@@ -2,8 +2,10 @@ import React, { useMemo, useState } from "react";
 import type { TelemetryDataPoint } from "../../lib/types";
 import { HoverMarker } from "../telemetry/HoverMarker";
 import { MemoizedRacingLine } from "../telemetry/RacingLine";
-import type { MapStyleOption } from "../ui/map";
-import { MapControls, MapRoute, NewMap as MapUI } from "../ui/map";
+import type { MapStyleOption } from "../ui/map/Map";
+import { NewMap as MapUI } from "../ui/map/Map";
+import { MapControls } from "../ui/map/MapControls";
+import { MapRoute } from "../ui/map/MapRoute";
 import { SectorBar } from "./SectorBar";
 
 const ProfessionalTelemetryCharts = React.lazy(
@@ -59,10 +61,14 @@ export default function TelemetrySection({
 		[dataWithGPSCoordinates],
 	);
 
-	const speeds = useMemo(
-		() => dataWithGPSCoordinates.map((p) => p.Speed || 0).filter((s) => s > 0),
-		[dataWithGPSCoordinates],
-	);
+	const speeds = useMemo(() => {
+		const result: number[] = [];
+		for (const p of dataWithGPSCoordinates) {
+			const speed = p.Speed || 0;
+			if (speed > 0) result.push(speed);
+		}
+		return result;
+	}, [dataWithGPSCoordinates]);
 	const minSpeed = speeds.length > 0 ? Math.min(...speeds) : 0;
 	const maxSpeed = speeds.length > 0 ? Math.max(...speeds) : 0;
 

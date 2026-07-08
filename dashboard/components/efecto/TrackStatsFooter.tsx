@@ -23,7 +23,11 @@ export function TrackStatsFooter({ data }: TrackStatsFooterProps) {
 		const corners = data.filter((p) => p.sectionType === "corner");
 		const cornerPct = ((corners.length / data.length) * 100).toFixed(1);
 
-		const speeds = data.map((p) => p.Speed || 0).filter((s) => s > 0);
+		const speeds: number[] = [];
+		for (const p of data) {
+			const speed = p.Speed || 0;
+			if (speed > 0) speeds.push(speed);
+		}
 		const minSpeed = speeds.length > 0 ? Math.min(...speeds) : 0;
 		const maxSpeed = speeds.length > 0 ? Math.max(...speeds) : 0;
 

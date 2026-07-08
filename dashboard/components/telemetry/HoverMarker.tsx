@@ -1,5 +1,6 @@
 import React from "react";
-import { MapMarker, MarkerContent } from "../ui/map";
+import { MapMarker } from "../ui/map/MapMarker";
+import { MarkerContent } from "../ui/map/MarkerContent";
 
 export const HoverMarker = React.memo(function HoverMarker({
 	longitude,

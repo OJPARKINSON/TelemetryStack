@@ -19,12 +19,14 @@ function getTrackAbbrev(trackName: string): string {
 	return (words[0][0] + words[1][0]).toUpperCase();
 }
 
+const dateFormatter = new Intl.DateTimeFormat("en-US", {
+	month: "short",
+	day: "numeric",
+	year: "numeric",
+});
+
 function formatDate(dateStr: string): string {
-	return new Intl.DateTimeFormat("en-US", {
-		month: "short",
-		day: "numeric",
-		year: "numeric",
-	}).format(new Date(dateStr));
+	return dateFormatter.format(new Date(dateStr));
 }
 
 function formatRelativeTime(dateStr: string): string {
