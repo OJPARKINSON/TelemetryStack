@@ -1,10 +1,11 @@
+import type { FeatureCollection } from "geojson";
 import React, { useEffect } from "react";
 import { useMap } from "../ui/map/MapContext";
 
 function RacingLine({
 	dataWithGPSCoordinates,
 }: {
-	dataWithGPSCoordinates: GeoJSON.FeatureCollection;
+	dataWithGPSCoordinates: FeatureCollection;
 }) {
 	const { map, isLoaded } = useMap();
 

@@ -1,4 +1,6 @@
+import type { FeatureCollection } from "geojson";
 import React, { useMemo, useState } from "react";
+
 import type { TelemetryDataPoint } from "../../lib/types";
 import { HoverMarker } from "../telemetry/HoverMarker";
 import { MemoizedRacingLine } from "../telemetry/RacingLine";
@@ -36,7 +38,7 @@ const mapStyles = { light: darkTileStyle };
 
 interface TelemetrySectionProps {
 	dataWithGPSCoordinates: TelemetryDataPoint[];
-	racingLineData: GeoJSON.FeatureCollection | undefined;
+	racingLineData: FeatureCollection | undefined;
 	hoverCoordinates: { lon: number; lat: number } | null;
 	hoveredIndex: number | null;
 	onHover: (index: number | null) => void;

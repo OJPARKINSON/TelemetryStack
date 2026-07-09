@@ -1,6 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import type { FeatureCollection } from "geojson";
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
+
 import { DatabaseUnavailableError } from "../../components/efecto/ErrorStates";
 import { Header } from "../../components/efecto/Header";
 import { NewTelemetrySkeleton } from "../../components/efecto/Skeleton";
@@ -110,7 +112,7 @@ function SessionPageInner({
 	const { dataWithGPSCoordinates, trackInfo, hoverCoordinates } =
 		useTelemetryData(telemetryData, sessionId, hoveredIndex);
 
-	const { data: racingLineData } = useSWR<GeoJSON.FeatureCollection, Error>(
+	const { data: racingLineData } = useSWR<FeatureCollection, Error>(
 		`/api/sessions/${sessionId}/laps/${currentLapId}/geojson`,
 		fetcherBR,
 		{ keepPreviousData: true },
