@@ -64,11 +64,11 @@ export default function SessionPage() {
 	if (error) return <DatabaseUnavailableError />;
 
 	// First load only — show skeleton
-	if (isLoading && !telemetryData) return <NewTelemetrySkeleton />;
+	if (isLoading || !telemetryData) return <NewTelemetrySkeleton />;
 
 	return (
 		<SessionPageInner
-			telemetryData={telemetryData!}
+			telemetryData={telemetryData}
 			isValidating={isValidating}
 			sessionId={sessionId}
 			currentLapId={currentLapId}

@@ -1,7 +1,7 @@
 "use client";
 
 import type MapLibreGL from "maplibre-gl";
-import { useEffect, useId } from "react";
+import { useEffect, useEffectEvent, useId } from "react";
 
 import { useMap } from "./MapContext";
 
@@ -123,19 +123,23 @@ export function MapRoute({
 	}, [isLoaded, map, layerId, color, width, opacity, dashArray]);
 
 	// Handle click and hover events
+	const onClickEvent = useEffectEvent(() => onClick?.());
+	const onMouseEnterEvent = useEffectEvent(() => onMouseEnter?.());
+	const onMouseLeaveEvent = useEffectEvent(() => onMouseLeave?.());
+
 	useEffect(() => {
 		if (!isLoaded || !map || !interactive) return;
 
 		const handleClick = () => {
-			onClick?.();
+			onClickEvent();
 		};
 		const handleMouseEnter = () => {
 			map.getCanvas().style.cursor = "pointer";
-			onMouseEnter?.();
+			onMouseEnterEvent();
 		};
 		const handleMouseLeave = () => {
 			map.getCanvas().style.cursor = "";
-			onMouseLeave?.();
+			onMouseLeaveEvent();
 		};
 
 		map.on("click", layerId, handleClick);
@@ -147,15 +151,7 @@ export function MapRoute({
 			map.off("mouseenter", layerId, handleMouseEnter);
 			map.off("mouseleave", layerId, handleMouseLeave);
 		};
-	}, [
-		isLoaded,
-		map,
-		layerId,
-		onClick,
-		onMouseEnter,
-		onMouseLeave,
-		interactive,
-	]);
+	}, [isLoaded, map, layerId, interactive]);
 
 	return null;
 }

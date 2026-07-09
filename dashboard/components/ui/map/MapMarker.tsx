@@ -4,9 +4,10 @@ import MapLibreGL, { type MarkerOptions } from "maplibre-gl";
 import {
 	createContext,
 	type ReactNode,
-	useContext,
+	use,
 	useEffect,
 	useMemo,
+	useRef,
 } from "react";
 
 import { useMap } from "./MapContext";
@@ -16,10 +17,10 @@ type MarkerContextValue = {
 	map: MapLibreGL.Map | null;
 };
 
-export const MarkerContext = createContext<MarkerContextValue | null>(null);
+const MarkerContext = createContext<MarkerContextValue | null>(null);
 
 export function useMarkerContext() {
-	const context = useContext(MarkerContext);
+	const context = use(MarkerContext);
 	if (!context) {
 		throw new Error("Marker components must be used within MapMarker");
 	}
@@ -31,7 +32,7 @@ type MapMarkerProps = {
 	longitude: number;
 	/** Latitude coordinate for marker position */
 	latitude: number;
-	/** Marker subcomponents (MarkerContent, MarkerPopup, MarkerTooltip, MarkerLabel) */
+	/** Marker subcomponents (MarkerContent) */
 	children: ReactNode;
 	/** Callback when marker is clicked */
 	onClick?: (e: MouseEvent) => void;
@@ -62,7 +63,27 @@ export function MapMarker({
 }: MapMarkerProps) {
 	const { map } = useMap();
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: markerOptions changes on every re-render and should not be used as a hook
+	// Marker event handlers read the latest props via this ref so the
+	// mount-once marker below never calls stale closures.
+	const handlersRef = useRef({
+		onClick,
+		onMouseEnter,
+		onMouseLeave,
+		onDragStart,
+		onDrag,
+		onDragEnd,
+	});
+	handlersRef.current = {
+		onClick,
+		onMouseEnter,
+		onMouseLeave,
+		onDragStart,
+		onDrag,
+		onDragEnd,
+	};
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: marker is created once; position/options are synced during render below and handlers go through handlersRef
+	// eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-once instance; all reactive values are synced during render or read via handlersRef
 	const marker = useMemo(() => {
 		const markerInstance = new MapLibreGL.Marker({
 			...markerOptions,
@@ -70,9 +91,11 @@ export function MapMarker({
 			draggable,
 		}).setLngLat([longitude, latitude]);
 
-		const handleClick = (e: MouseEvent) => onClick?.(e);
-		const handleMouseEnter = (e: MouseEvent) => onMouseEnter?.(e);
-		const handleMouseLeave = (e: MouseEvent) => onMouseLeave?.(e);
+		const handleClick = (e: MouseEvent) => handlersRef.current.onClick?.(e);
+		const handleMouseEnter = (e: MouseEvent) =>
+			handlersRef.current.onMouseEnter?.(e);
+		const handleMouseLeave = (e: MouseEvent) =>
+			handlersRef.current.onMouseLeave?.(e);
 
 		markerInstance.getElement()?.addEventListener("click", handleClick);
 		markerInstance
@@ -84,15 +107,15 @@ export function MapMarker({
 
 		const handleDragStart = () => {
 			const lngLat = markerInstance.getLngLat();
-			onDragStart?.({ lng: lngLat.lng, lat: lngLat.lat });
+			handlersRef.current.onDragStart?.({ lng: lngLat.lng, lat: lngLat.lat });
 		};
 		const handleDrag = () => {
 			const lngLat = markerInstance.getLngLat();
-			onDrag?.({ lng: lngLat.lng, lat: lngLat.lat });
+			handlersRef.current.onDrag?.({ lng: lngLat.lng, lat: lngLat.lat });
 		};
 		const handleDragEnd = () => {
 			const lngLat = markerInstance.getLngLat();
-			onDragEnd?.({ lng: lngLat.lng, lat: lngLat.lat });
+			handlersRef.current.onDragEnd?.({ lng: lngLat.lng, lat: lngLat.lat });
 		};
 
 		markerInstance.on("dragstart", handleDragStart);

@@ -19,7 +19,7 @@ interface TelemetryEnvelope {
 	points?: any[];
 }
 
-export const processIRacingDataWithGPS = (
+const processIRacingDataWithGPS = (
 	envelope: TelemetryEnvelope | null | undefined,
 ): TelemetryRes => {
 	const rows = envelope?.points;

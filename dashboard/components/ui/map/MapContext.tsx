@@ -1,7 +1,7 @@
 "use client";
 
 import type MapLibreGL from "maplibre-gl";
-import { createContext, useContext } from "react";
+import { createContext, use } from "react";
 
 export type MapContextValue = {
 	map: MapLibreGL.Map | null;
@@ -11,7 +11,7 @@ export type MapContextValue = {
 export const MapContext = createContext<MapContextValue | null>(null);
 
 export function useMap() {
-	const context = useContext(MapContext);
+	const context = use(MapContext);
 	if (!context) {
 		throw new Error("useMap must be used within a Map component");
 	}
