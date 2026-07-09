@@ -1,10 +1,17 @@
-﻿using System.CommandLine;
+﻿using Ingest.Cli;
+using Ingest.Ibt;
+using Ingest.Ibt.Headers;
 
-var rootCmd = new RootCommand("process");
+var opts = ProcessCommand.Parse(args);
 
-var telemetryDirPath = new Option<string>("--path", "-p")
+var ibtFiles = Directory.GetFiles(opts.Path);
+
+foreach (string ibt in ibtFiles)
 {
-    Description = "Path to the IRacing Telemetry folder"
-};
+    Console.WriteLine($"{ibt}");
+    using IbtFile file = new(ibt);
+    IbtHeaders headers = IbtHeaders.Parse(file.Span);
+    TickParser parser = new(headers);
 
-Console.WriteLine("Welcome to telemetry stack ingest service!");
+    Console.WriteLine(headers);
+}
