@@ -1,27 +1,26 @@
-  FROM golang:1.26-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 ARG TARGETARCH
 
-  WORKDIR /build
+WORKDIR /build
 
-  COPY go.mod go.sum ./
-  RUN go mod download
+COPY go.mod go.sum ./
+RUN go mod download
 
-  COPY . .
+COPY . .
 
-  RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
-      -o telemetry-service \
-      -trimpath \
-      -ldflags="-w -s" \
-      ./cmd/telemetry-service
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
+  -o telemetry-service \
+  -trimpath \
+  -ldflags="-w -s" \
+  ./cmd/telemetry-service
 
-  FROM gcr.io/distroless/static:nonroot
+FROM gcr.io/distroless/static:nonroot
 
-  # Copy binary to root of distroless image
-  COPY --from=builder /build/telemetry-service /telemetry-service
+COPY --from=builder /build/telemetry-service /telemetry-service
 
-  USER nonroot:nonroot
+USER nonroot:nonroot
 
-  EXPOSE 8010
+EXPOSE 8010
 
-  ENTRYPOINT ["/telemetry-service"]
+ENTRYPOINT ["/telemetry-service"]
