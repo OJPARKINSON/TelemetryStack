@@ -5,6 +5,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <UserSecretsId>6c137246-91e9-4b76-833e-41e014c6571f</UserSecretsId>
   </PropertyGroup>
 

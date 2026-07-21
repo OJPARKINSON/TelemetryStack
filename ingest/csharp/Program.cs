@@ -6,12 +6,18 @@ var opts = ProcessCommand.Parse(args);
 
 var ibtFiles = Directory.GetFiles(opts.Path);
 
-foreach (string ibt in ibtFiles)
+foreach (string ibtRelPath in ibtFiles)
 {
-    Console.WriteLine($"{ibt}");
-    using IbtFile file = new(ibt);
+    Console.WriteLine($"Filename: {ibtRelPath}");
+    using IbtFile file = new(ibtRelPath);
     IbtHeaders headers = IbtHeaders.Parse(file.Span);
     TickParser parser = new(headers);
 
-    Console.WriteLine(headers);
+    var tick = new TelemetryTick();
+    while (parser.Next(ref tick, file.Span))
+    {
+        Console.WriteLine($"parser {parser.ToString()}");
+    }
+
+
 }
