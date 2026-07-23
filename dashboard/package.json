@@ -8,6 +8,7 @@
 		"build": "tsc -b && vite build",
 		"test:build": "tsc --noEmit",
 		"lighthouse": "lhci autorun",
+    "serve": "vite preview",
 		"test": "playwright test",
 		"test:headed": "playwright test --headed",
 		"test:debug": "playwright test --debug",
