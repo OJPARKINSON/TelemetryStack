@@ -78,7 +78,7 @@ func (s *Schema) CreateTableHTTP() error {
                 timestamp TIMESTAMP
             ) TIMESTAMP(timestamp) PARTITION BY DAY
             WAL
-            WITH maxUncommittedRows=50000
+            WITH maxUncommittedRows=500000, o3MaxLag=300000000us
             DEDUP UPSERT KEYS(timestamp, session_id);
 	`
 
