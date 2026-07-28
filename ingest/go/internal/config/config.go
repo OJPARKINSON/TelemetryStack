@@ -34,14 +34,6 @@ type Config struct {
 
 	// Data directory configuration
 	DataDirectory string
-
-	CFAccountID    string
-	CFD1DatabaseID string
-	CFApiToken     string
-	R2AccountID    string
-	R2AccessKeyID  string
-	R2SecretAccess string
-	R2BucketNme    string
 }
 
 func LoadConfig() *Config {
@@ -75,16 +67,6 @@ func LoadConfig() *Config {
 
 		// Record Processing
 		BatchSizeRecords: getEnvAsInt("BATCH_SIZE_RECORDS", 24000),
-
-		CFAccountID:    getEnv("CF_ACCOUNT_ID", ""),
-		CFD1DatabaseID: getEnv("CF_D1_DATABASE_ID", ""),
-		CFApiToken:     getEnv("CF_API_TOKEN", ""),
-		R2AccountID:    getEnv("R2_ACCOUNT_ID", ""),
-		R2AccessKeyID:  getEnv("R2_ACCESS_KEY_ID", ""),
-		R2SecretAccess: getEnv("R2_SECRET_ACCESS_KEY", ""),
-		R2BucketNme:    getEnv("R2_BUCKET_NAME", ""),
-		// Data Directory - defaults to ./ibt_files/ for backward compatibility
-		// DataDirectory: getEnv("IBT_DATA_DIR", "./ibt_files/"),
 	}
 }
 

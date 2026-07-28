@@ -129,7 +129,7 @@ func Process(telemetryFolder string) error {
 	if _, err := os.Stat(telemetryFolder); os.IsNotExist(err) {
 		logger.Fatal("Telemetry directory does not exist",
 			zap.String("path", telemetryFolder),
-			zap.String("action", "Create directory or set IBT_DATA_DIR environment variable"))
+			zap.String("action", "Create directory or set path attribute"))
 		return err
 	}
 
