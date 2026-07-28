@@ -117,7 +117,8 @@ services:
       QUESTDB_HOST: ${QUESTDB_HOST:-questdb}
       QUESTDB_PORT: ${QUESTDB_HTTP_PORT:-9000}
       GOMAXPROCS: "4"
-      SENDER_POOL_SIZE: "6"
+      SENDER_POOL_SIZE: "1"
+      WORKER_COUNT: "1"
     depends_on:
       questdb:
         condition: service_healthy
