@@ -22,17 +22,12 @@ type Config struct {
 
 	GoMaxProcs int
 
-	EnablePprof  bool
-	PprofPort    string
-	MemoryTuning bool
-
 	ServerUrl string
 
 	BatchSizeRecords int
 
-	UseStructPipeline bool
+	DryRun bool
 
-	// Data directory configuration
 	DataDirectory string
 }
 
@@ -56,16 +51,10 @@ func LoadConfig() *Config {
 
 		GoMaxProcs: getEnvAsInt("GOMAXPROCS", cpuCount),
 
-		// Development & Monitoring
-		EnablePprof:  getEnvAsBool("ENABLE_PPROF", false),
-		PprofPort:    getEnv("PPROF_PORT", "6060"),
-		MemoryTuning: getEnvAsBool("MEMORY_TUNING", true),
-
 		ServerUrl: getEnv("SERVER_URL", "http://localhost"),
 
-		UseStructPipeline: getEnvAsBool("USE_STRUCT_PIPELINE", true),
+		DryRun: getEnvAsBool("DRY_RUN", false),
 
-		// Record Processing
 		BatchSizeRecords: getEnvAsInt("BATCH_SIZE_RECORDS", 24000),
 	}
 }
