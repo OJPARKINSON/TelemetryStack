@@ -17,17 +17,6 @@ func NewSchema(host string, port int) *Schema {
 	return &Schema{host: host, port: port}
 }
 
-// CREATE TABLE IF NOT EXISTS TelemetryTicks (
-//     session_id TEXT,
-//     lap_id INT,
-//     session_num TEXT,
-//     session_name TEXT,
-//     track_name TEXT,
-//     session_type TEXT,
-//     car_id TEXT,
-//     track_id TEXT,
-//     gear INT,
-
 func (s *Schema) CreateTableHTTP() error {
 	sql := `
 		    CREATE TABLE IF NOT EXISTS TelemetryTicks (
