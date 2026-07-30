@@ -5,13 +5,15 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"runtime/pprof"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -77,37 +79,8 @@ func Process(telemetryFolder string) error {
 	}
 
 	// Start metrics pusher
-	metrics.StartPusher(cfg.ServerUrl + "")
-
-	if os.Getenv("ENABLE_PPROF") == "true" {
-		go func() {
-			if err := http.ListenAndServe(":6060", nil); err != nil {
-				logger.Error("pprof server failed",
-					zap.Error(err),
-					zap.String("action", "Check port 6060 is not in use"))
-			}
-		}()
-	}
-
-	if cpuProfile := os.Getenv("CPU_PROFILE"); cpuProfile != "" {
-		f, err := os.Create(cpuProfile)
-		if err != nil {
-			logger.Fatal("Could not create CPU profile",
-				zap.Error(err),
-				zap.String("path", cpuProfile),
-				zap.String("action", "Check directory exists and has write permissions"))
-
-			return err
-		}
-		defer f.Close()
-
-		if err := pprof.StartCPUProfile(f); err != nil {
-			logger.Fatal("Could not start CPU profile",
-				zap.Error(err),
-				zap.String("action", "Check file can be written"))
-			return err
-		}
-		defer pprof.StopCPUProfile()
+	if !cfg.DryRun {
+		metrics.StartPusher(cfg.ServerUrl + "")
 	}
 
 	// Setup context and signal handling
@@ -188,9 +161,26 @@ func Process(telemetryFolder string) error {
 	return nil
 }
 
+var timestampRegEx = regexp.MustCompile(`(\d{4}-\d{2}-\d{2}) (\d{2}-\d{2}-\d{2})`)
+
+func parseTimestamp(filename string) (time.Time, error) {
+	matching := timestampRegEx.FindStringSubmatch(filename)
+	if matching == nil {
+		return time.Time{}, fmt.Errorf("no timestamp found in %q", filename)
+	}
+	raw := matching[1] + "T" + matching[2] + "Z"
+	return time.Parse("2006-01-02T15-04-05Z", raw)
+}
+
 func discoverAndQueueFiles(ctx context.Context, pool *worker.WorkerPool, telemetryFolder string, cfg *config.Config, logger *zap.Logger) (int, error) {
 	directory := processing.NewDir(telemetryFolder, cfg, logger)
 	files := directory.WatchDir()
+
+	sort.Slice(files, func(a, b int) bool {
+		ta, _ := parseTimestamp(files[a].Name())
+		tb, _ := parseTimestamp(files[b].Name())
+		return ta.Before(tb)
+	})
 
 	filesQueued := 0
 	for _, file := range files {
@@ -200,15 +190,22 @@ func discoverAndQueueFiles(ctx context.Context, pool *worker.WorkerPool, telemet
 		default:
 		}
 
-		fileName := file.Name()
+		info, _ := file.Info()
+		fileName := info.Name()
 
 		if !strings.Contains(fileName, ".ibt") {
+			continue
+		}
+
+		workItemTimestamp, err := parseTimestamp(file.Name())
+		if err != nil {
 			continue
 		}
 
 		workItem := worker.WorkItem{
 			FilePath:   filepath.Join(telemetryFolder, fileName),
 			FileInfo:   file,
+			FileDate:   workItemTimestamp,
 			RetryCount: 0,
 		}
 

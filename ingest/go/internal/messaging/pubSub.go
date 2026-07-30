@@ -393,24 +393,29 @@ func (ps *PubSub) publishWorker() {
 		select {
 		case req := <-ps.publishQueue:
 			log.Printf("Worker %d: Processing batch %s from async queue", ps.workerID, req.batch.BatchId)
-			err := ps.doPublish(req.batch, req.data)
-			if err != nil {
-				log.Printf("Worker %d: ERROR publishing batch %s asynchronously: %v",
-					ps.workerID, req.batch.BatchId, err)
-			} else {
-				log.Printf("Worker %d: Successfully published batch %s", ps.workerID, req.batch.BatchId)
-			}
-			req.errCh <- err
-		case <-ps.publishDone:
-			log.Printf("Worker %d: Draining %d remaining batches from queue", ps.workerID, len(ps.publishQueue))
-			for len(ps.publishQueue) > 0 {
-				req := <-ps.publishQueue
+			if !ps.config.DryRun {
 				err := ps.doPublish(req.batch, req.data)
 				if err != nil {
-					log.Printf("Worker %d: ERROR publishing batch %s during shutdown: %v",
+					log.Printf("Worker %d: ERROR publishing batch %s asynchronously: %v",
 						ps.workerID, req.batch.BatchId, err)
+				} else {
+					log.Printf("Worker %d: Successfully published batch %s", ps.workerID, req.batch.BatchId)
 				}
 				req.errCh <- err
+			}
+		case <-ps.publishDone:
+			log.Printf("Worker %d: Draining %d remaining batches from queue", ps.workerID, len(ps.publishQueue))
+
+			for len(ps.publishQueue) > 0 {
+				if !ps.config.DryRun {
+					req := <-ps.publishQueue
+					err := ps.doPublish(req.batch, req.data)
+					if err != nil {
+						log.Printf("Worker %d: ERROR publishing batch %s during shutdown: %v",
+							ps.workerID, req.batch.BatchId, err)
+					}
+					req.errCh <- err
+				}
 			}
 			return
 		}
@@ -519,8 +524,10 @@ func (ps *PubSub) Close() error {
 	ps.isShuttingDown.Store(true)
 
 	// Flush any remaining batches
-	if err := ps.FlushBatch(); err != nil {
-		log.Printf("Worker %d: Error flushing final batch: %v", ps.workerID, err)
+	if !ps.config.DryRun {
+		if err := ps.FlushBatch(); err != nil {
+			log.Printf("Worker %d: Error flushing final batch: %v", ps.workerID, err)
+		}
 	}
 
 	// Signal async publisher to shut down
