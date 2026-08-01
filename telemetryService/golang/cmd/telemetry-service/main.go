@@ -55,7 +55,10 @@ func main() {
 
 	ingestQueue := queue.NewQueue(repo)
 
-	ingestQueue.Start()
+	ingestQueue.StartRouter()
+	for i := 0; i < ingestQueue.Workers; i++ {
+		ingestQueue.StartWorker(i)
+	}
 	log.Println("Telemetry queue created successfully")
 
 	apiServer := api.NewServer(":8010", repo, ingestQueue)
