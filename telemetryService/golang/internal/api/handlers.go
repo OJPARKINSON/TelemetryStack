@@ -191,9 +191,9 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 		}
 
 		points := make([]*domain.TelemetryPoint, len(batch.Records))
-		for i, rec := range batch.Records {
-			p := domain.TelemetryPointFromProto(rec, batch.SessionId, batch.CarId)
-			points[i] = &p
+		for i, record := range batch.Records {
+			singlePoint := domain.TelemetryPointFromProto(record, batch.SessionId, batch.CarId)
+			points[i] = &singlePoint
 		}
 
 		err = s.writer.WriteBatch(r.Context(), points)

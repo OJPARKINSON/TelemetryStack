@@ -42,7 +42,6 @@ type WorkerPool struct {
 
 	workerMetrics []WorkerMetrics
 
-	// Data loss monitoring
 	totalPublishFailures      atomic.Int32
 	totalPersistedBatches     int
 	totalCircuitBreakerEvents int
@@ -59,7 +58,6 @@ type PoolMetrics struct {
 	QueueDepth            int
 	WorkerMetrics         []WorkerMetrics
 
-	// Data loss tracking
 	totalPublishFailures atomic.Int32
 	PersistedBatches     int
 	CircuitBreakerEvents int
@@ -99,17 +97,15 @@ func NewWorkerPool(cfg *config.Config, logger *zap.Logger) *WorkerPool {
 }
 
 func (wp *WorkerPool) Start() error {
-	eg, ctx := errgroup.WithContext(wp.ctx)
-	wp.eg = eg
+	errorGroup, ctx := errgroup.WithContext(wp.ctx)
+	wp.eg = errorGroup
 	wp.ctx = ctx
 
-	// Start result collector
 	wp.eg.Go(func() error {
 		wp.resultCollector()
 		return nil
 	})
 
-	// Start error collector
 	wp.eg.Go(func() error {
 		wp.errorCollector()
 		return nil
@@ -297,7 +293,6 @@ func (wp *WorkerPool) handleError(workError WorkError) {
 	wp.mu.Unlock()
 
 	if workError.Retry && workError.RetryCount < wp.config.MaxRetries {
-		// Try to get FileInfo for retry
 		fileInfo, err := os.Stat(workError.FilePath)
 		if err != nil {
 			wp.logger.Error("Cannot retry file",
@@ -307,7 +302,6 @@ func (wp *WorkerPool) handleError(workError WorkError) {
 			return
 		}
 
-		// Convert to DirEntry for compatibility
 		dirEntry := &dirEntryFromFileInfo{fileInfo}
 
 		retryItem := WorkItem{
@@ -319,7 +313,6 @@ func (wp *WorkerPool) handleError(workError WorkError) {
 		time.AfterFunc(wp.config.RetryDelay, func() {
 			select {
 			case wp.fileQueue <- retryItem:
-				// Retry scheduled - no log needed
 			case <-wp.ctx.Done():
 			}
 		})
