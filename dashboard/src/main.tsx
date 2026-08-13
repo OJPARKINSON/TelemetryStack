@@ -1,9 +1,10 @@
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import ReactDOM from "react-dom/client";
-import "./styles.css";
 import { routeTree } from "./routeTree.gen";
 
-// Set up a Router instance
+import "./styles.css";
+import { ThemeProvider } from "next-themes";
+
 const router = createRouter({
 	routeTree,
 	defaultPreload: "intent",
@@ -11,7 +12,6 @@ const router = createRouter({
 	basepath: import.meta.env.BASE_URL.replace(/\/$/, "") || "/",
 });
 
-// Register things for typesafety
 declare module "@tanstack/react-router" {
 	interface Register {
 		router: typeof router;
@@ -22,5 +22,9 @@ const rootElement = document.getElementById("app")!;
 
 if (!rootElement.innerHTML) {
 	const root = ReactDOM.createRoot(rootElement);
-	root.render(<RouterProvider router={router} />);
+	root.render(
+		<ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+			<RouterProvider router={router} />
+		</ThemeProvider>,
+	);
 }
