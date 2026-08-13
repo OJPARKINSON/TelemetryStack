@@ -23,11 +23,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 512m
+          cpus: '1'
+          memory: 1g
         reservations:
-          cpus: '0.1'
-          memory: 128m
+          cpus: '0.25'
+          memory: 256m
     healthcheck:
       test: [ "CMD", "traefik", "healthcheck" ]
       interval: 30s
@@ -65,8 +65,8 @@ services:
       - questdb-data:/var/lib/questdb
       - ./config/questdb.conf:/root/.questdb/conf/server.conf:ro
     environment:
-      JAVA_OPTS: "-Xmx4g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
-      QDB_SHARED_WORKER_COUNT: "8"
+      JAVA_OPTS: "-Xmx12g -Xms4g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+      QDB_SHARED_WORKER_COUNT: "6"
       QDB_HTTP_ENABLED: "true"
       QDB_PG_ENABLED: "true"
       QDB_METRICS_ENABLED: "true"
@@ -79,11 +79,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '4'
-          memory: 8g
+          cpus: '6'
+          memory: 16g
         reservations:
-          cpus: '1'
-          memory: 1.5g
+          cpus: '2'
+          memory: 4g
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9003"]
@@ -116,20 +116,20 @@ services:
       QUESTDB_URL: questdb:8812;username=admin;password=quest
       QUESTDB_HOST: ${QUESTDB_HOST:-questdb}
       QUESTDB_PORT: ${QUESTDB_HTTP_PORT:-9000}
-      GOMAXPROCS: "4"
-      SENDER_POOL_SIZE: "1"
-      QUEUE_WORKERS: "1"
+      GOMAXPROCS: "3"
+      SENDER_POOL_SIZE: "4"
+      QUEUE_WORKERS: "4"
     depends_on:
       questdb:
         condition: service_healthy
     deploy:
       resources:
         limits:
-          cpus: '1.25'
-          memory: 3g
+          cpus: '3'
+          memory: 4g
         reservations:
-          cpus: '0.25'
-          memory: 512m
+          cpus: '0.5'
+          memory: 768m
     labels:
       - "traefik.enable=true"
       # HTTP
@@ -151,8 +151,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 512m
+          cpus: '1'
+          memory: 1g
     labels:
       - "traefik.enable=true"
       # HTTP
@@ -191,11 +191,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 768m
+          cpus: '1'
+          memory: 1.5g
         reservations:
-          cpus: '0.1'
-          memory: 128m
+          cpus: '0.25'
+          memory: 256m
     labels:
       - "traefik.enable=true"
       # HTTP
@@ -217,6 +217,11 @@ services:
       - "9091:9091"
     networks:
       - telemetry-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256m
 
   prometheus:
     image: prom/prometheus:v2.47.2
@@ -240,11 +245,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 1g
+          cpus: '1'
+          memory: 2g
         reservations:
-          cpus: '0.1'
-          memory: 256m
+          cpus: '0.25'
+          memory: 512m
     labels:
       - "traefik.enable=true"
       # HTTP
@@ -277,8 +282,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: 0.2
-          memory: 128m
+          cpus: 0.3
+          memory: 256m
 
   # Optional: Watchtower for auto-updates (can be disabled)
   watchtower:

@@ -1,5 +1,7 @@
 # TelemetryService
 
+> **Note:** This is the legacy/alternate C# consumer, kept as an alternative implementation. The current production path is the Go telemetry service (`telemetryService/golang/`) receiving data directly over HTTP/gRPC — RabbitMQ was removed from that path (see root `README.md` roadmap). This document describes the RabbitMQ-based C# consumer as it stands.
+
 High-performance C# telemetry processing service for IRacing data. Consumes Protocol Buffer messages from RabbitMQ and persists to QuestDB with automatic schema optimization and memory-aware processing.
 
 ## Quick Start
@@ -362,7 +364,5 @@ curl "http://localhost:9002/exec?query=SHOW%20COLUMNS%20FROM%20TelemetryTicks"
 - Monitor QuestDB partition sizes for query performance
 - Add custom indexes for specific query patterns
 - Adjust `maxUncommittedRows` for write performance vs. memory
-
-For detailed architecture information, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 protoc --go_out=. --go_opt=paths=source_relative telemetry.proto

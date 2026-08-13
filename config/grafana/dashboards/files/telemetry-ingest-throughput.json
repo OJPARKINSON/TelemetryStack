@@ -1,0 +1,182 @@
+{
+  "id": null,
+  "uid": "telemetry-ingest-throughput",
+  "title": "Telemetry Ingest & Throughput",
+  "tags": ["telemetry", "ingest", "questdb", "throughput"],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "id": 1, "title": "Overview", "type": "row" },
+    {
+      "id": 2, "title": "Records In (rate)", "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "expr": "sum(rate(telemetry_records_received_total[1m]))", "legendFormat": "records/s", "refId": "A" }],
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "options": { "colorMode": "value", "graphMode": "area", "textMode": "value_and_name" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }, "unit": "ops" } }
+    },
+    {
+      "id": 3, "title": "Records Out (rate)", "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "expr": "sum(rate(telemetry_records_written_total[1m]))", "legendFormat": "records/s", "refId": "A" }],
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "options": { "colorMode": "value", "graphMode": "area", "textMode": "value_and_name" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }, "unit": "ops" } }
+    },
+    {
+      "id": 4, "title": "DB Write Errors (rate)", "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "expr": "sum(rate(telemetry_db_write_errors_total[5m]))", "legendFormat": "errors/s", "refId": "A" }],
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "options": { "colorMode": "background", "graphMode": "area", "textMode": "value_and_name" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.01 }] }, "unit": "ops" } }
+    },
+    {
+      "id": 5, "title": "Queue Depth (current)", "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "expr": "telemetry_queue_depth", "legendFormat": "depth", "refId": "A" }],
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "options": { "colorMode": "value", "graphMode": "area", "textMode": "value_and_name" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }, { "color": "yellow", "value": 50 }, { "color": "red", "value": 200 }] }, "unit": "short" } }
+    },
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 }, "id": 10, "title": "Ingest Pipeline", "type": "row" },
+    {
+      "id": 11, "title": "Records In vs Out (rate)", "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [
+        { "expr": "rate(telemetry_records_received_total[1m])", "legendFormat": "received/s", "refId": "A" },
+        { "expr": "rate(telemetry_records_written_total[1m])", "legendFormat": "written/s", "refId": "B" }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" }, "unit": "ops" } }
+    },
+    {
+      "id": 12, "title": "Queue Depth Over Time", "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "expr": "telemetry_queue_depth", "legendFormat": "depth", "refId": "A" }],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 20, "lineWidth": 2, "showPoints": "never" }, "unit": "short" } }
+    },
+    {
+      "id": 13, "title": "Enqueue Wait (backpressure)", "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, rate(telemetry_queue_enqueue_duration_seconds_bucket[5m]))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, rate(telemetry_queue_enqueue_duration_seconds_bucket[5m]))", "legendFormat": "p95", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, rate(telemetry_queue_enqueue_duration_seconds_bucket[5m]))", "legendFormat": "p99", "refId": "C" }
+      ],
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 14 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" }, "unit": "s" } }
+    },
+    {
+      "id": 14, "title": "Batch Size (records/batch)", "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, rate(telemetry_batch_size_records_bucket[5m]))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, rate(telemetry_batch_size_records_bucket[5m]))", "legendFormat": "p95", "refId": "B" }
+      ],
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 14 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" }, "unit": "short" } }
+    },
+    {
+      "id": 15, "title": "Batches Flushed / Coalesced (rate)", "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [
+        { "expr": "rate(telemetry_queue_batches_flushed_total[1m])", "legendFormat": "flushed/s", "refId": "A" },
+        { "expr": "rate(telemetry_queue_coalesced_batches_total[1m])", "legendFormat": "coalesced/s", "refId": "B" }
+      ],
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 14 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" }, "unit": "ops" } }
+    },
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 }, "id": 20, "title": "QuestDB Write Path", "type": "row" },
+    {
+      "id": 21, "title": "DB Write Batch Latency", "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, rate(telemetry_db_write_duration_seconds_bucket[5m]))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, rate(telemetry_db_write_duration_seconds_bucket[5m]))", "legendFormat": "p95", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, rate(telemetry_db_write_duration_seconds_bucket[5m]))", "legendFormat": "p99", "refId": "C" }
+      ],
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 23 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" }, "unit": "s" } }
+    },
+    {
+      "id": 22, "title": "WAL Apply Rate (rows/sec)", "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "expr": "questdb_wal_apply_rows_per_second", "legendFormat": "rows/s", "refId": "A" }],
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 23 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" }, "unit": "ops" } }
+    },
+    {
+      "id": 23, "title": "Commits (rate)", "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "expr": "rate(questdb_commits_total[1m])", "legendFormat": "commits/s", "refId": "A" }],
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 23 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" }, "unit": "ops" } }
+    },
+    {
+      "id": 24, "title": "QuestDB JVM Heap", "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [
+        { "expr": "questdb_memory_jvm_total", "legendFormat": "committed", "refId": "A" },
+        { "expr": "questdb_memory_jvm_max", "legendFormat": "max", "refId": "B" },
+        { "expr": "questdb_memory_jvm_total - questdb_memory_jvm_free", "legendFormat": "used", "refId": "C" }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 31 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" }, "unit": "bytes" } }
+    },
+    {
+      "id": 25, "title": "QuestDB Connections (Line/PGWire/HTTP)", "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [
+        { "expr": "questdb_line_tcp_connections", "legendFormat": "line-tcp", "refId": "A" },
+        { "expr": "questdb_pg_wire_connections", "legendFormat": "pg-wire", "refId": "B" },
+        { "expr": "questdb_http_connections", "legendFormat": "http", "refId": "C" }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" }, "unit": "short" } }
+    },
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 39 }, "id": 30, "title": "Ingest Endpoint Latency", "type": "row" },
+    {
+      "id": 31, "title": "POST /api/ingest Latency", "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(telemetry_http_request_duration_seconds_bucket{path=\"/api/ingest\"}[5m])) by (le))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum(rate(telemetry_http_request_duration_seconds_bucket{path=\"/api/ingest\"}[5m])) by (le))", "legendFormat": "p95", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, sum(rate(telemetry_http_request_duration_seconds_bucket{path=\"/api/ingest\"}[5m])) by (le))", "legendFormat": "p99", "refId": "C" }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" }, "unit": "s" } }
+    },
+    {
+      "id": 32, "title": "Ingest Request Rate & Status", "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "targets": [{ "expr": "sum(rate(telemetry_http_requests_total{path=\"/api/ingest\"}[1m])) by (status)", "legendFormat": "{{status}}", "refId": "A" }],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 20, "lineWidth": 1, "showPoints": "never", "stacking": { "mode": "normal" } }, "unit": "reqps" } }
+    }
+  ],
+  "templating": { "list": [] },
+  "schemaVersion": 39,
+  "version": 1
+}
