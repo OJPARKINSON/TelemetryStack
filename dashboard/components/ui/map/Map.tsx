@@ -2,7 +2,6 @@
 
 import MapLibreGL from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useTheme } from "next-themes";
 import {
 	forwardRef,
 	type ReactNode,
@@ -36,6 +35,21 @@ const defaultStyles = {
 	light: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
 };
 
+function usePrefersDark() {
+	const [dark, setDark] = useState(
+		() =>
+			typeof window !== "undefined" &&
+			window.matchMedia("(prefers-color-scheme: dark)").matches,
+	);
+	useEffect(() => {
+		const mq = window.matchMedia("(prefers-color-scheme: dark)");
+		const onChange = (e: MediaQueryListEvent) => setDark(e.matches);
+		mq.addEventListener("change", onChange);
+		return () => mq.removeEventListener("change", onChange);
+	}, []);
+	return dark;
+}
+
 const DefaultLoader = () => (
 	<div className="absolute inset-0 flex items-center justify-center">
 		<div className="flex gap-1">
@@ -54,7 +68,7 @@ export const NewMap = forwardRef<MapRef, MapProps>(function MapFunc(
 	const [mapInstance, setMapInstance] = useState<MapLibreGL.Map | null>(null);
 	const [isLoaded, setIsLoaded] = useState(false);
 	const [isStyleLoaded, setIsStyleLoaded] = useState(false);
-	const { resolvedTheme } = useTheme();
+	const resolvedTheme = usePrefersDark() ? "dark" : "light";
 	const currentStyleRef = useRef<MapStyleOption | null>(null);
 	const styleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 

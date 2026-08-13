@@ -3,7 +3,6 @@ import ReactDOM from "react-dom/client";
 import { routeTree } from "./routeTree.gen";
 
 import "./styles.css";
-import { ThemeProvider } from "next-themes";
 
 const router = createRouter({
 	routeTree,
@@ -22,9 +21,5 @@ const rootElement = document.getElementById("app")!;
 
 if (!rootElement.innerHTML) {
 	const root = ReactDOM.createRoot(rootElement);
-	root.render(
-		<ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-			<RouterProvider router={router} />
-		</ThemeProvider>,
-	);
+	root.render(<RouterProvider router={router} />);
 }
