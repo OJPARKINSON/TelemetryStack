@@ -407,8 +407,8 @@ func (ps *PubSub) publishWorker() {
 			log.Printf("Worker %d: Draining %d remaining batches from queue", ps.workerID, len(ps.publishQueue))
 
 			for len(ps.publishQueue) > 0 {
+				req := <-ps.publishQueue
 				if !ps.config.DryRun {
-					req := <-ps.publishQueue
 					err := ps.doPublish(req.batch, req.data)
 					if err != nil {
 						log.Printf("Worker %d: ERROR publishing batch %s during shutdown: %v",
