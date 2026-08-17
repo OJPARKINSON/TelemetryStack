@@ -9,16 +9,6 @@
 		"test:build": "tsc --noEmit",
 		"lighthouse": "lhci autorun",
 		"serve": "vite preview",
-		"test": "playwright test",
-		"test:headed": "playwright test --headed",
-		"test:debug": "playwright test --debug",
-		"test:ui": "playwright test --ui",
-		"test:chromium": "playwright test --project=chromium",
-		"test:firefox": "playwright test --project=firefox",
-		"test:webkit": "playwright test --project=webkit",
-		"test:mobile": "playwright test --project='Mobile Chrome' --project='Mobile Safari'",
-		"test:report": "playwright show-report test-results/html",
-		"test:install": "playwright install",
 		"lint": "biome check --write"
 	},
 	"dependencies": {

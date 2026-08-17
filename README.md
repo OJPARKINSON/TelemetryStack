@@ -1,6 +1,5 @@
 # TelemetryStack
 
-[![e2e test run](https://github.com/OJPARKINSON/IRacing-Display/actions/workflows/e2e.yml/badge.svg?branch=main)](https://github.com/OJPARKINSON/IRacing-Display/actions/workflows/e2e.yml)
 [![e2e throughput p95:](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/OJPARKINSON/IRacing-Display/badges/e2e-p95.json)](https://github.com/OJPARKINSON/IRacing-Display/actions/workflows/e2e.yml)
 
 A self-hosted telemetry pipeline for iRacing. Parses `.ibt` files, stores time-series data in QuestDB, and serves an interactive dashboard with synchronised track maps and telemetry charts — built to run on a Raspberry Pi 5.
@@ -56,7 +55,6 @@ Inspired by how professional motorsport teams process data: direct ingestion, ti
 **Pipeline (Old queue benchmarks)**
 - 32MB / 16K record batches, worker pool defaults to CPU cores + 25%
 - QuestDB writes flush at 10K rows or every second
-- Memory-aware auto-pause at 5GB on Pi
 
 Run `make bench` in `ingest/go/` for your hardware numbers.
 
@@ -111,7 +109,6 @@ cd cloud && npx wrangler dev
 │   ├── golang/             # Go telemetry consumer and API server
 │   └── telemetryService/   # C# (.NET 8) alternative consumer
 ├── dashboard/              # Vite + React + TanStack Router frontend
-├── cloud/                  # Cloudflare Workers + D1 cloud variant
 ├── e2e/                    # End-to-end integration tests (Go)
 ├── config/                 # QuestDB, Prometheus, Grafana configs
 ├── traefik/                # Reverse proxy routing and TLS
@@ -136,7 +133,7 @@ All services accessible on both the local domain and via Tailscale (with TLS).
 ## Roadmap
 
 ### Now
-- [x] Remove RabbitMQ — replace with direct HTTP/gRPC ingestion
+- [x] Remove RabbitMQ — replace with direct HTTP ingestion
 - [ ] Handle session num 0 (practice sessions)
 - [ ] Track which `.ibt` files have already been ingested
 - [ ] Containerise the ingest CLI for e2e testing
