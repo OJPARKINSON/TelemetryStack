@@ -2,7 +2,6 @@ package queue
 
 import (
 	"context"
-	"errors"
 	"log"
 	"os"
 	"runtime"
@@ -15,7 +14,7 @@ import (
 	"github.com/ojparkinson/telemetryService/internal/metrics"
 )
 
-var ErrQueueFull = errors.New("ingest queue full")
+var ErrQueueFull = domain.ErrQueueFull
 
 const dayNanos = int64(24 * time.Hour)
 

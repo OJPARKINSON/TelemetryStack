@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"runtime"
 	"strconv"
@@ -24,6 +25,12 @@ type Config struct {
 
 	ServerUrl string
 
+	IngestURL string
+
+	Compression string
+
+	ShutdownTimeout time.Duration
+
 	BatchSizeRecords int
 
 	DryRun bool
@@ -35,6 +42,8 @@ func LoadConfig() *Config {
 	cpuCount := runtime.GOMAXPROCS(0)
 
 	workerCount := getEnvAsInt("WORKER_COUNT", cpuCount)
+
+	serverUrl := getEnv("SERVER_URL", "http://localhost")
 
 	return &Config{
 		WorkerCount:   workerCount,
@@ -51,7 +60,11 @@ func LoadConfig() *Config {
 
 		GoMaxProcs: getEnvAsInt("GOMAXPROCS", cpuCount),
 
-		ServerUrl: getEnv("SERVER_URL", "http://localhost"),
+		ServerUrl: serverUrl,
+		IngestURL: getEnv("INGEST_URL", serverUrl+":8010/api/ingest"),
+
+		Compression:     wireCompression(),
+		ShutdownTimeout: getEnvAsDuration("SHUTDOWN_TIMEOUT", 30*time.Second),
 
 		DryRun: getEnvAsBool("DRY_RUN", false),
 
@@ -91,4 +104,14 @@ func getEnvAsDuration(key string, fallback time.Duration) time.Duration {
 		}
 	}
 	return fallback
+}
+
+func wireCompression() string {
+	switch v := getEnv("WIRE_COMPRESSION", "zstd"); v {
+	case "zstd", "none":
+		return v
+	default:
+		log.Printf("config: unrecognised WIRE_COMPRESSION %q, sending uncompressed", v)
+		return "none"
+	}
 }

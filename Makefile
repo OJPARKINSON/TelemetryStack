@@ -1,4 +1,9 @@
-.PHONY: restart logs build-push build-push-dashboard build-push-telemetry
+.PHONY: build restart logs build-push build-push-dashboard build-push-telemetry
+
+build:
+	@cd ingest/go && go build -o bin/ingest ./cmd/ingest
+	@cd telemetryService/golang && go build -o bin/telemetry-service ./cmd/telemetry-service
+	@cd dashboard && pnpm build
 
 restart:
 	@echo "🚀 Restarting Docker services..."

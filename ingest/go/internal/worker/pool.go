@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -37,7 +38,7 @@ type WorkerPool struct {
 	metrics     PoolMetrics
 	mu          sync.Mutex
 
-	rabbitPool *messaging.ConnectionPool
+	httpClient *http.Client
 	logger     *zap.Logger
 
 	workerMetrics []WorkerMetrics
@@ -58,7 +59,7 @@ type PoolMetrics struct {
 	QueueDepth            int
 	WorkerMetrics         []WorkerMetrics
 
-	totalPublishFailures atomic.Int32
+	totalPublishFailures int32
 	PersistedBatches     int
 	CircuitBreakerEvents int
 	MemoryPressureEvents int
@@ -68,7 +69,7 @@ type PoolMetrics struct {
 func NewWorkerPool(cfg *config.Config, logger *zap.Logger) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	var rabbitPool *messaging.ConnectionPool
+	httpClient := messaging.NewHTTPClient(cfg)
 
 	workerMetrics := make([]WorkerMetrics, cfg.WorkerCount)
 	for i := range workerMetrics {
@@ -86,7 +87,7 @@ func NewWorkerPool(cfg *config.Config, logger *zap.Logger) *WorkerPool {
 		errorsChan:    make(chan WorkError, cfg.WorkerCount*2),
 		ctx:           ctx,
 		cancel:        cancel,
-		rabbitPool:    rabbitPool,
+		httpClient:    httpClient,
 		logger:        logger,
 		workerMetrics: workerMetrics,
 		metrics: PoolMetrics{
@@ -161,10 +162,7 @@ func (wp *WorkerPool) Stop() error {
 	messaging.WaitForAllPublishers()
 	wp.logger.Info("All publishers finished draining")
 
-	if wp.rabbitPool != nil {
-		wp.logger.Info("Closing connection pool")
-		wp.rabbitPool.Close()
-	}
+	wp.httpClient.CloseIdleConnections()
 
 	close(wp.resultsChan)
 	close(wp.errorsChan)
@@ -185,7 +183,7 @@ func (wp *WorkerPool) GetMetrics() PoolMetrics {
 	copy(metrics.WorkerMetrics, wp.workerMetrics)
 
 	// Copy data loss tracking metrics
-	metrics.totalPublishFailures = wp.totalPublishFailures
+	metrics.totalPublishFailures = wp.totalPublishFailures.Load()
 	metrics.PersistedBatches = wp.totalPersistedBatches
 	metrics.CircuitBreakerEvents = wp.totalCircuitBreakerEvents
 	metrics.MemoryPressureEvents = wp.totalMemoryPressureEvents
@@ -253,13 +251,13 @@ func (wp *WorkerPool) handleResult(result WorkResult) {
 	// Update Prometheus metrics
 	metrics.FilesProcessedTotal.Inc()
 	metrics.RecordsProcessedTotal.Add(float64(result.ProcessedCount))
-	metrics.BatchesSentTotal.Add(float64(result.BatchCount))
+	// BatchesSentTotal is incremented per flush in messaging; adding BatchCount here would double count.
 	metrics.FileProcessingDuration.Observe(result.Duration.Seconds())
 	metrics.QueueDepth.Set(float64(wp.metrics.QueueDepth))
 
 	// Aggregate messaging metrics from result if available
 	if result.MessagingMetrics != nil {
-		wp.totalPublishFailures.Add(result.MessagingMetrics.FailedBatches.Load())
+		wp.totalPublishFailures.Add(result.MessagingMetrics.FailedBatches)
 		wp.totalPersistedBatches += result.MessagingMetrics.PersistedBatches
 		if result.MessagingMetrics.CircuitBreakerOpen {
 			wp.totalCircuitBreakerEvents++

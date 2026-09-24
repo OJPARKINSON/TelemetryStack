@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -13,48 +14,27 @@ import (
 	"time"
 
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/config"
+	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/metrics"
 	"github.com/OJPARKINSON/ibt"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
-type ConnectionPool struct {
-	url      string
-	poolSize int
-	current  atomic.Uint32 // Lock-free round-robin counter
-	closing  atomic.Bool
-}
 
 var (
 	activePublishers  sync.WaitGroup
 	publisherShutdown atomic.Bool
 )
 
-func NewConnectionPool(url string, poolSize int) (*ConnectionPool, error) {
-	pool := &ConnectionPool{
-		url:      url,
-		poolSize: poolSize,
-	}
-
-	return pool, nil
-}
-
-func (p *ConnectionPool) Close() {
-	time.Sleep(500 * time.Millisecond)
-
-	p.closing.Store(true)
-}
-
 type PubSub struct {
-	pool        *ConnectionPool
+	client      *http.Client
 	sessionID   string
 	sessionTime time.Time
 	config      *config.Config
 	workerID    int
 	ctx         context.Context
+	cancel      context.CancelFunc
 
 	recordBatch []*Telemetry
-	batchPool   *BatchPool
 
 	totalBatches     int
 	totalRecords     int
@@ -79,15 +59,15 @@ type PubSub struct {
 	publishDone    chan struct{}
 	isShuttingDown atomic.Bool
 
-	mu sync.Mutex
-
-	client http.Client
+	mu        sync.Mutex
+	closeOnce sync.Once
 }
 
 type publishRequest struct {
-	batch *TelemetryBatch
-	data  []byte
-	errCh chan error
+	batch    *TelemetryBatch
+	data     []byte
+	encoding string
+	errCh    chan error
 }
 
 type PublishMetrics struct {
@@ -96,22 +76,22 @@ type PublishMetrics struct {
 	TotalBytes          int64
 	CurrentBatchSize    int
 	LastFlush           time.Time
-	FailedBatches       atomic.Int32
+	FailedBatches       int32
 	PersistedBatches    int
 	CircuitBreakerOpen  bool
-	ConsecutiveFailures atomic.Int32
+	ConsecutiveFailures int32
 }
 
-func NewPubSub(sessionId string, sessionTime time.Time, cfg *config.Config, pool *ConnectionPool, workerId int) *PubSub {
-	client := http.Client{Timeout: 30 * time.Second}
+func NewPubSub(sessionId string, sessionTime time.Time, cfg *config.Config, client *http.Client, workerId int) *PubSub {
+	// Cancelled by Close once the shutdown timeout expires, aborting in-flight requests and retry backoff.
+	ctx, cancel := context.WithCancel(context.Background())
 
 	ps := &PubSub{
-		pool:               pool,
 		sessionID:          sessionId,
 		sessionTime:        sessionTime,
 		config:             cfg,
-		ctx:                context.Background(),
-		batchPool:          NewBatchPool(cfg.WorkerCount),
+		ctx:                ctx,
+		cancel:             cancel,
 		batchSizeBytes:     cfg.BatchSizeBytes,
 		batchSizeRecords:   cfg.BatchSizeRecords,
 		lastFlush:          time.Now(),
@@ -138,59 +118,6 @@ func NewPubSub(sessionId string, sessionTime time.Time, cfg *config.Config, pool
 	return ps
 }
 
-func getFloatValue(record map[string]interface{}, key string) float64 {
-	if val, ok := record[key]; ok {
-		switch v := val.(type) {
-		case float64:
-			return v
-		case string:
-			f, err := strconv.ParseFloat(v, 64)
-			if err == nil {
-				return f
-			}
-		case int:
-			return float64(v)
-		case int64:
-			return float64(v)
-		case float32:
-			return float64(v)
-		}
-	}
-	return 0.0
-}
-
-func getIntValue(record map[string]interface{}, key string) uint32 {
-	if val, ok := record[key]; ok {
-		switch v := val.(type) {
-		case int:
-			return uint32(v)
-		case int64:
-			return uint32(v)
-		case float64:
-			return uint32(v)
-		case string:
-			i, err := strconv.Atoi(v)
-			if err == nil {
-				return uint32(i)
-			}
-		}
-	}
-	return 0
-}
-
-func (ps *PubSub) Exec(data []map[string]interface{}) error {
-	if len(data) == 0 {
-		return nil
-	}
-
-	for _, record := range data {
-		if err := ps.AddRecord(record); err != nil {
-			return fmt.Errorf("failed to add record to batch: %w", err)
-		}
-	}
-	return nil
-}
-
 func (ps *PubSub) recordFailure() {
 	ps.consecutiveFailures.Add(1)
 	ps.lastFailureTime = time.Now()
@@ -198,116 +125,6 @@ func (ps *PubSub) recordFailure() {
 
 func (ps *PubSub) recordSuccess() {
 	ps.consecutiveFailures.Store(0)
-}
-
-func (ps *PubSub) AddRecord(record map[string]interface{}) error {
-	ps.mu.Lock()
-	defer ps.mu.Unlock()
-
-	tick := ps.transformRecord(record)
-
-	ps.recordBatch = append(ps.recordBatch, tick)
-	ps.totalRecords++
-
-	estimatedSize := proto.Size(tick)
-	ps.totalBytes += int64(estimatedSize)
-
-	shouldFlush := len(ps.recordBatch) >= ps.batchSizeRecords ||
-		ps.totalBytes >= int64(ps.batchSizeBytes) ||
-		time.Since(ps.lastFlush) > time.Duration(ps.config.BatchTimeout)
-
-	if shouldFlush {
-		return ps.flushBatchInternal()
-	}
-
-	return nil
-}
-
-func (ps *PubSub) transformRecord(record map[string]interface{}) *Telemetry {
-	lapID := getIntValue(record, "Lap")
-	sessionTime := getFloatValue(record, "SessionTime")
-
-	sessionNum := ""
-	if val, ok := record["SessionNum"]; ok {
-		if v, ok := val.(int); ok {
-			sessionNum = strconv.Itoa(v)
-		}
-	}
-
-	sessionType := ""
-	if val, ok := record["sessionType"]; ok {
-		if v, ok := val.(int); ok {
-			sessionType = strconv.Itoa(v)
-		}
-	}
-
-	sessionName := ""
-	if val, ok := record["sessionName"]; ok {
-		if v, ok := val.(int); ok {
-			sessionName = strconv.Itoa(v)
-		}
-	}
-
-	trackName := ""
-	if val, ok := record["trackDisplayShortName"]; ok {
-		trackName = fmt.Sprintf("%v", val)
-		trackName = strings.ReplaceAll(trackName, " ", "-")
-	}
-
-	trackID := ""
-	if val, ok := record["trackID"]; ok {
-		if v, ok := val.(int); ok {
-			trackID = strconv.Itoa(v)
-		}
-	}
-
-	tickTime := ps.sessionTime.Add(time.Duration(sessionTime * float64(time.Second)))
-
-	return &Telemetry{
-		LapId:              fmt.Sprintf("%d", lapID),
-		Speed:              getFloatValue(record, "Speed"),
-		LapDistPct:         getFloatValue(record, "LapDistPct"),
-		SessionNum:         sessionNum,
-		SessionType:        sessionType,
-		SessionName:        sessionName,
-		SessionTime:        sessionTime,
-		TrackName:          trackName,
-		TrackId:            trackID,
-		SteeringWheelAngle: getFloatValue(record, "SteeringWheelAngle"),
-		PlayerCarPosition:  getFloatValue(record, "PlayerCarPosition"),
-		VelocityX:          getFloatValue(record, "VelocityX"),
-		VelocityY:          getFloatValue(record, "VelocityY"),
-		VelocityZ:          getFloatValue(record, "VelocityZ"),
-		FuelLevel:          getFloatValue(record, "FuelLevel"),
-		Throttle:           getFloatValue(record, "Throttle"),
-		Brake:              getFloatValue(record, "Brake"),
-		Rpm:                getFloatValue(record, "RPM"),
-		Lat:                getFloatValue(record, "Lat"),
-		Lon:                getFloatValue(record, "Lon"),
-		Gear:               getIntValue(record, "Gear"),
-		Alt:                getFloatValue(record, "Alt"),
-		LatAccel:           getFloatValue(record, "LatAccel"),
-		LongAccel:          getFloatValue(record, "LongAccel"),
-		VertAccel:          getFloatValue(record, "VertAccel"),
-		Pitch:              getFloatValue(record, "Pitch"),
-		Roll:               getFloatValue(record, "Roll"),
-		Yaw:                getFloatValue(record, "Yaw"),
-		YawNorth:           getFloatValue(record, "YawNorth"),
-		Voltage:            getFloatValue(record, "Voltage"),
-		LapLastLapTime:     getFloatValue(record, "LapLastLapTime"),
-		WaterTemp:          getFloatValue(record, "WaterTemp"),
-		LapDeltaToBestLap:  getFloatValue(record, "LapDeltaToBestLap"),
-		LapCurrentLapTime:  getFloatValue(record, "LapCurrentLapTime"),
-		LFpressure:         getFloatValue(record, "LFpressure"),
-		RFpressure:         getFloatValue(record, "RFpressure"),
-		LRpressure:         getFloatValue(record, "LRpressure"),
-		RRpressure:         getFloatValue(record, "RRpressure"),
-		LFtempM:            getFloatValue(record, "LFtempM"),
-		RFtempM:            getFloatValue(record, "RFtempM"),
-		LRtempM:            getFloatValue(record, "LRtempM"),
-		RRtempM:            getFloatValue(record, "RRtempM"),
-		TickTime:           timestamppb.New(tickTime.UTC()),
-	}
 }
 
 // AddStructRecords converts TelemetryTick structs directly to protobuf Telemetry
@@ -394,7 +211,7 @@ func (ps *PubSub) publishWorker() {
 		case req := <-ps.publishQueue:
 			log.Printf("Worker %d: Processing batch %s from async queue", ps.workerID, req.batch.BatchId)
 			if !ps.config.DryRun {
-				err := ps.doPublish(req.batch, req.data)
+				err := ps.doPublish(req.batch, req.data, req.encoding)
 				if err != nil {
 					log.Printf("Worker %d: ERROR publishing batch %s asynchronously: %v",
 						ps.workerID, req.batch.BatchId, err)
@@ -409,7 +226,7 @@ func (ps *PubSub) publishWorker() {
 			for len(ps.publishQueue) > 0 {
 				req := <-ps.publishQueue
 				if !ps.config.DryRun {
-					err := ps.doPublish(req.batch, req.data)
+					err := ps.doPublish(req.batch, req.data, req.encoding)
 					if err != nil {
 						log.Printf("Worker %d: ERROR publishing batch %s during shutdown: %v",
 							ps.workerID, req.batch.BatchId, err)
@@ -422,32 +239,84 @@ func (ps *PubSub) publishWorker() {
 	}
 }
 
-// doPublish performs the actual HTTP publish operation
-func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte) error {
-	startTime := time.Now()
-	dataReader := bytes.NewReader(data)
-
-	res, err := ps.client.Post(ps.config.ServerUrl+":8010/api/ingest", "application/x-protobuf", dataReader)
-	if err != nil {
-		log.Printf("Worker %d: Failed to publish batch %s: %v", ps.workerID, batch.BatchId, err)
-		ps.recordFailure()
-		ps.failedBatchCount.Add(1)
-		return err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode >= 200 && res.StatusCode < 300 {
-		ps.recordSuccess()
-		return nil
+// doPublish sends a marshalled, compressed batch, retrying 429s and 5xx with exponential backoff.
+func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte, encoding string) error {
+	attempts := ps.config.MaxRetries + 1
+	if attempts < 1 {
+		attempts = 1
 	}
 
-	log.Printf("Worker %d: Batch %s publish returned status %d", ps.workerID, batch.BatchId, res.StatusCode)
+	var lastErr error
+
+	for attempt := 0; attempt < attempts; attempt++ {
+		if attempt > 0 {
+			delay := ps.config.RetryDelay << (attempt - 1)
+			select {
+			case <-time.After(delay):
+			case <-ps.ctx.Done():
+				ps.recordFailure()
+				ps.failedBatchCount.Add(1)
+				return fmt.Errorf("batch %s: publish cancelled after %d attempts: %w",
+					batch.BatchId, attempt, ps.ctx.Err())
+			}
+		}
+
+		status, err := ps.attemptPublish(data, encoding)
+
+		switch {
+		case err == nil && status >= 200 && status < 300:
+			ps.recordSuccess()
+			return nil
+
+		case err != nil:
+			lastErr = err
+
+		default:
+			lastErr = fmt.Errorf("server returned %d %s", status, http.StatusText(status))
+			if !retryableStatus(status) {
+				ps.recordFailure()
+				ps.failedBatchCount.Add(1)
+				return fmt.Errorf("batch %s: %w", batch.BatchId, lastErr)
+			}
+		}
+	}
+
 	ps.recordFailure()
-
 	ps.failedBatchCount.Add(1)
+	return fmt.Errorf("batch %s: publish failed after %d attempts: %w", batch.BatchId, attempts, lastErr)
+}
 
-	log.Println("do publish took: ", time.Since(startTime))
-	return nil
+func (ps *PubSub) attemptPublish(data []byte, encoding string) (int, error) {
+	req, err := http.NewRequestWithContext(ps.ctx, http.MethodPost, ps.config.IngestURL, bytes.NewReader(data))
+	if err != nil {
+		return 0, err
+	}
+
+	req.Header.Set("Content-Type", "application/x-protobuf")
+	if encoding != "" {
+		req.Header.Set("Content-Encoding", encoding)
+	}
+	req.ContentLength = int64(len(data))
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(data)), nil
+	}
+
+	res, err := ps.client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+
+	// Drain before closing: Go only reuses a connection once its body is consumed.
+	// The limit caps how much a misbehaving server can make us read.
+	_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, 64<<10))
+	res.Body.Close()
+
+	return res.StatusCode, nil
+}
+
+// Other 4xx responses won't succeed on resend, so they aren't retried.
+func retryableStatus(status int) bool {
+	return status == http.StatusTooManyRequests || status >= 500
 }
 
 func (ps *PubSub) flushBatchInternal() error {
@@ -468,47 +337,46 @@ func (ps *PubSub) flushBatchInternal() error {
 		return fmt.Errorf("failed to marshal protobuf batch: %w\nAction: This is an internal error - check telemetry data validity", err)
 	}
 
-	// During shutdown, publish synchronously to avoid queuing delays
-	if ps.isShuttingDown.Load() {
-		err := ps.doPublish(batch, data)
+	payload, encoding, err := compressBatch(ps.config, data)
+	if err != nil {
+		return fmt.Errorf("failed to compress batch %s: %w", batch.BatchId, err)
+	}
+
+	metrics.BatchBytesUncompressed.Add(float64(len(data)))
+	metrics.BatchBytesWire.Add(float64(len(payload)))
+	metrics.BatchSizeBytes.Observe(float64(len(payload)))
+	metrics.BatchesSentTotal.Inc()
+
+	advance := func() {
 		ps.recordBatch = ps.recordBatch[:0]
 		ps.totalBytes = 0
 		ps.totalBatches++
 		ps.lastFlush = time.Now()
+	}
+
+	// During shutdown, publish synchronously to avoid queuing delays
+	if ps.isShuttingDown.Load() {
+		err := ps.doPublish(batch, payload, encoding)
+		advance()
 		return err
 	}
 
-	// Try async publishing first (non-blocking if queue has space)
 	req := &publishRequest{
-		batch: batch,
-		data:  data,
-		errCh: make(chan error, 1),
+		batch:    batch,
+		data:     payload,
+		encoding: encoding,
+		errCh:    make(chan error, 1),
 	}
 
+	// Blocks rather than publishing inline, so two batches from one session are never in flight at once.
 	select {
 	case ps.publishQueue <- req:
-		// Successfully queued for async publishing
-		// Clear batch immediately so parser can continue
-		ps.recordBatch = ps.recordBatch[:0]
-		ps.totalBytes = 0
-		ps.totalBatches++
-		ps.lastFlush = time.Now()
-
-		// Don't wait for result - let it publish async
-		// Errors are logged by the async worker
+		advance()
 		return nil
 
-	case <-time.After(100 * time.Millisecond):
-		// Queue is full/slow - do sync publish to avoid blocking parser too long
-		log.Printf("Worker %d: Publish queue full, falling back to sync publish", ps.workerID)
-		err := ps.doPublish(batch, data)
-
-		// Clear batch regardless of error (error is handled via persistence)
-		ps.recordBatch = ps.recordBatch[:0]
-		ps.totalBytes = 0
-		ps.totalBatches++
-		ps.lastFlush = time.Now()
-
+	case <-ps.publishDone:
+		err := ps.doPublish(batch, payload, encoding)
+		advance()
 		return err
 	}
 }
@@ -520,7 +388,13 @@ func (ps *PubSub) FlushBatch() error {
 }
 
 func (ps *PubSub) Close() error {
-	// Mark as shutting down to skip retries/delays
+	var err error
+	ps.closeOnce.Do(func() { err = ps.close() })
+	return err
+}
+
+func (ps *PubSub) close() error {
+	// Makes further flushes publish synchronously instead of via the queue.
 	ps.isShuttingDown.Store(true)
 
 	// Flush any remaining batches
@@ -543,13 +417,22 @@ func (ps *PubSub) Close() error {
 	select {
 	case <-done:
 		// Normal shutdown completed
-	case <-time.After(4 * time.Second):
-		// Timeout - queue taking too long, abandon remaining messages
-		// Silently continue - messages may be lost
+	case <-time.After(ps.shutdownTimeout()):
+		log.Printf("Worker %d: shutdown timed out, abandoning %d queued batches for session %s; re-ingest the file",
+			ps.workerID, len(ps.publishQueue), ps.sessionID)
 	}
+
+	ps.cancel()
 
 	// Close completes silently - stats available via GetMetrics()
 	return nil
+}
+
+func (ps *PubSub) shutdownTimeout() time.Duration {
+	if ps.config.ShutdownTimeout > 0 {
+		return ps.config.ShutdownTimeout
+	}
+	return 30 * time.Second
 }
 
 func (ps *PubSub) GetMetrics() PublishMetrics {
@@ -562,9 +445,9 @@ func (ps *PubSub) GetMetrics() PublishMetrics {
 		TotalBytes:          ps.totalBytes,
 		CurrentBatchSize:    len(ps.recordBatch),
 		LastFlush:           ps.lastFlush,
-		FailedBatches:       ps.failedBatchCount,
+		FailedBatches:       ps.failedBatchCount.Load(),
 		PersistedBatches:    ps.persistedBatches,
-		ConsecutiveFailures: ps.consecutiveFailures,
+		ConsecutiveFailures: ps.consecutiveFailures.Load(),
 	}
 }
 
@@ -576,7 +459,7 @@ func (ps *PubSub) GetDisplayMetrics() map[string]interface{} {
 		"batches_sent":   ps.totalBatches,
 		"records_send":   ps.totalRecords,
 		"queue_size":     len(ps.publishQueue),
-		"failed_batches": ps.failedBatchCount,
+		"failed_batches": ps.failedBatchCount.Load(),
 	}
 }
 

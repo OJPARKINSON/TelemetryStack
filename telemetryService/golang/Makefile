@@ -51,13 +51,13 @@ logs:
 # Build the service
 build:
 	@echo "🔨 Building telemetry service..."
-	@go build -o bin/telemetry-service ./main.go
+	@go build -o bin/telemetry-service ./cmd/telemetry-service
 	@echo "✅ Build complete!"
 
 # Run the service
 run:
 	@echo "🚀 Running telemetry service..."
-	@go run ./main.go
+	@go run ./cmd/telemetry-service
 
 # Run tests
 test:

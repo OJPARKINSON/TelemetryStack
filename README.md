@@ -1,7 +1,5 @@
 # TelemetryStack
 
-[![e2e throughput p95:](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/OJPARKINSON/IRacing-Display/badges/e2e-p95.json)](https://github.com/OJPARKINSON/IRacing-Display/actions/workflows/e2e.yml)
-
 A self-hosted telemetry pipeline for iRacing. Parses `.ibt` files, stores time-series data in QuestDB, and serves an interactive dashboard with synchronised track maps and telemetry charts — built to run on a Raspberry Pi 5.
 
 Inspired by how professional motorsport teams process data: direct ingestion, time-series storage, and analysis tooling — no unnecessary infrastructure.
@@ -43,7 +41,6 @@ Inspired by how professional motorsport teams process data: direct ingestion, ti
 | **Database** | QuestDB | Time-series storage optimised for high-throughput telemetry |
 | **Dashboard** | Vite + React + TanStack Router | Track maps (MapLibre), telemetry charts (Recharts), session browser |
 | **Infrastructure** | Traefik, Prometheus, Grafana | Reverse proxy, metrics, monitoring |
-| **Cloud** | Cloudflare Workers + D1 | Optional cloud deployment variant |
 
 ## Performance
 
@@ -83,19 +80,17 @@ make restart
 
 ```bash
 # Ingest — run on your PC where .ibt files are stored
-cd ingest/go && go run ./cmd/ingest go /path/to/ibt/files
+cd ingest/go && go run ./cmd/ingest --telemetryPath /path/to/ibt/files
 
 # Dashboard — local dev server
 cd dashboard && pnpm install && pnpm dev
-
-# Cloud deployment
-cd cloud && npx wrangler dev
 ```
 
 ### Makefile Targets
 
 | Target | Description |
 |---|---|
+| `make build` | Build ingest CLI, telemetry service and dashboard |
 | `make restart` | Production: pull images and start |
 | `make restart-dev` | Dev: build from source and start |
 | `make restart-lite` | Dev: rebuild without wiping volumes |

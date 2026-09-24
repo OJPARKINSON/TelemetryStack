@@ -52,11 +52,6 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// func (s *Server) Shutdown(ctx context.Context) error {
-// 	s.logger.Println("Shutting down admin server...")
-// 	return s.app()
-// }
-
 func (s *Server) setupRoutes() {
 	s.app.Post("/api/ingest", s.handleIngest)
 

@@ -2,7 +2,10 @@ package domain
 
 import (
 	"context"
+	"errors"
 )
+
+var ErrQueueFull = errors.New("ingest queue full")
 
 type SessionRepository interface {
 	ListSessions(ctx context.Context) ([]Session, error)

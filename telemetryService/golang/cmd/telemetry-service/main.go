@@ -70,7 +70,6 @@ func main() {
 		}
 	}()
 
-	// Start Prometheus metrics server
 	go metrics.MetricsHandler()
 	log.Println("Starting to consume tick batches")
 

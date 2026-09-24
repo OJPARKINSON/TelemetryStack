@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,7 +20,7 @@ import (
 type FileProcessor struct {
 	config           *config.Config
 	workerID         int
-	pool             *messaging.ConnectionPool
+	client           *http.Client
 	progressCallback ProgressCallback
 }
 
@@ -31,11 +32,11 @@ type ProcessResult struct {
 	MessagingMetrics *messaging.PublishMetrics
 }
 
-func NewFileProcessor(cfg *config.Config, workerID int, pool *messaging.ConnectionPool) (*FileProcessor, error) {
+func NewFileProcessor(cfg *config.Config, workerID int, client *http.Client) (*FileProcessor, error) {
 	return &FileProcessor{
 		config:           cfg,
 		workerID:         workerID,
-		pool:             pool,
+		client:           client,
 		progressCallback: &NoOpProgressCallback{},
 	}, nil
 }
@@ -124,7 +125,7 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 			groupSessionID,
 			sessionTime,
 			fp.config,
-			fp.pool,
+			fp.client,
 			fp.workerID,
 		)
 
@@ -157,7 +158,7 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 			allMessagingMetrics.TotalBatches += metrics.TotalBatches
 			allMessagingMetrics.TotalRecords += metrics.TotalRecords
 			allMessagingMetrics.TotalBytes += metrics.TotalBytes
-			allMessagingMetrics.FailedBatches.Add(metrics.FailedBatches.Load())
+			allMessagingMetrics.FailedBatches += metrics.FailedBatches
 			allMessagingMetrics.PersistedBatches += metrics.PersistedBatches
 		}
 

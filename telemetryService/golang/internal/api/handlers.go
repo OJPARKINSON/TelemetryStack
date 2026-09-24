@@ -4,8 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
-	"fmt"
-	"io"
+	"errors"
 	"log"
 	"net/http"
 
@@ -175,35 +174,37 @@ func (s *Server) handleSyncLap(w http.ResponseWriter, r *http.Request) {
 
 // /api/ingest
 func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("Content-Type") == "application/x-protobuf" {
+	if !acceptableIngestContentType(r.Header.Get("Content-Type")) {
+		respondError(w, http.StatusUnsupportedMediaType, "expected application/x-protobuf")
+		return
+	}
 
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			respondError(w, 500, fmt.Sprintf("failed to read body: %w", err))
-			return
-		}
-		defer r.Body.Close()
+	body, ok := s.readIngestBody(w, r)
+	if !ok {
+		return
+	}
 
-		batch := &messaging.TelemetryBatch{}
-		if err := proto.Unmarshal(body, batch); err != nil {
-			respondError(w, http.StatusBadRequest, "Failed to fetch lap data")
-			return
-		}
+	batch := &messaging.TelemetryBatch{}
+	if err := proto.Unmarshal(body, batch); err != nil {
+		respondError(w, http.StatusBadRequest, "invalid protobuf body")
+		return
+	}
 
-		points := make([]*domain.TelemetryPoint, len(batch.Records))
-		for i, record := range batch.Records {
-			singlePoint := domain.TelemetryPointFromProto(record, batch.SessionId, batch.CarId)
-			points[i] = &singlePoint
-		}
+	points := make([]*domain.TelemetryPoint, len(batch.Records))
+	for i, record := range batch.Records {
+		singlePoint := domain.TelemetryPointFromProto(record, batch.SessionId, batch.CarId)
+		points[i] = &singlePoint
+	}
 
-		err = s.writer.WriteBatch(r.Context(), points)
-		if err != nil {
+	if err := s.writer.WriteBatch(r.Context(), points); err != nil {
+		if errors.Is(err, domain.ErrQueueFull) {
 			w.WriteHeader(http.StatusTooManyRequests)
 			return
 		}
-
-		w.WriteHeader(http.StatusAccepted)
-	} else {
+		s.logger.Printf("ingest: write batch: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
+
+	w.WriteHeader(http.StatusAccepted)
 }
