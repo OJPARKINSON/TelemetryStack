@@ -134,7 +134,10 @@ func (ps *PubSub) AddStructRecords(ticks []*ibt.TelemetryTick) error {
 	defer ps.mu.Unlock()
 
 	for _, tick := range ticks {
-		tickTime := ps.sessionTime.Add(time.Duration(tick.SessionTime * float64(time.Second)))
+		tickTime := tick.TickTime
+		if tickTime.Year() < 2000 { // no StartDate in the header (zero time or 1970)
+			tickTime = ps.sessionTime.Add(time.Duration(tick.SessionTime * float64(time.Second)))
+		}
 
 		record := &Telemetry{
 			LapId:              fmt.Sprintf("%d", tick.LapID),
