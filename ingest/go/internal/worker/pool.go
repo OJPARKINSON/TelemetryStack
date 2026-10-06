@@ -2,7 +2,9 @@ package worker
 
 import (
 	"context"
+	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/config"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/messaging"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/metrics"
+	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/processing"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
@@ -37,12 +40,12 @@ type WorkerPool struct {
 	metrics     PoolMetrics
 	mu          sync.Mutex
 
-	rabbitPool *messaging.ConnectionPool
+	httpClient *http.Client
 	logger     *zap.Logger
+	progress   processing.ProgressCallback
 
 	workerMetrics []WorkerMetrics
 
-	// Data loss monitoring
 	totalPublishFailures      atomic.Int32
 	totalPersistedBatches     int
 	totalCircuitBreakerEvents int
@@ -51,6 +54,7 @@ type WorkerPool struct {
 
 type PoolMetrics struct {
 	TotalFilesProcessed   int
+	TotalFilesFailed      int
 	TotalRecordsProcessed int
 	TotalBatchesProcessed int
 	TotalErrors           int
@@ -59,18 +63,21 @@ type PoolMetrics struct {
 	QueueDepth            int
 	WorkerMetrics         []WorkerMetrics
 
-	// Data loss tracking
-	totalPublishFailures atomic.Int32
+	totalPublishFailures int32
 	PersistedBatches     int
 	CircuitBreakerEvents int
 	MemoryPressureEvents int
 	DataLossRate         float64
 }
 
-func NewWorkerPool(cfg *config.Config, logger *zap.Logger) *WorkerPool {
+func NewWorkerPool(cfg *config.Config, logger *zap.Logger, progress processing.ProgressCallback) *WorkerPool {
+	if progress == nil {
+		progress = &processing.NoOpProgressCallback{}
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 
-	var rabbitPool *messaging.ConnectionPool
+	httpClient := messaging.NewHTTPClient(cfg)
 
 	workerMetrics := make([]WorkerMetrics, cfg.WorkerCount)
 	for i := range workerMetrics {
@@ -88,8 +95,9 @@ func NewWorkerPool(cfg *config.Config, logger *zap.Logger) *WorkerPool {
 		errorsChan:    make(chan WorkError, cfg.WorkerCount*2),
 		ctx:           ctx,
 		cancel:        cancel,
-		rabbitPool:    rabbitPool,
+		httpClient:    httpClient,
 		logger:        logger,
+		progress:      progress,
 		workerMetrics: workerMetrics,
 		metrics: PoolMetrics{
 			StartTime:     time.Now(),
@@ -99,17 +107,15 @@ func NewWorkerPool(cfg *config.Config, logger *zap.Logger) *WorkerPool {
 }
 
 func (wp *WorkerPool) Start() error {
-	eg, ctx := errgroup.WithContext(wp.ctx)
-	wp.eg = eg
+	errorGroup, ctx := errgroup.WithContext(wp.ctx)
+	wp.eg = errorGroup
 	wp.ctx = ctx
 
-	// Start result collector
 	wp.eg.Go(func() error {
 		wp.resultCollector()
 		return nil
 	})
 
-	// Start error collector
 	wp.eg.Go(func() error {
 		wp.errorCollector()
 		return nil
@@ -134,7 +140,8 @@ func (wp *WorkerPool) Start() error {
 	return nil
 }
 
-func (wp *WorkerPool) SubmitFile(item WorkItem) error {
+// SubmitFile blocks until the item is queued, ctx is cancelled or the pool stops.
+func (wp *WorkerPool) SubmitFile(ctx context.Context, item WorkItem) error {
 	select {
 	case wp.fileQueue <- item:
 		wp.mu.Lock()
@@ -142,6 +149,8 @@ func (wp *WorkerPool) SubmitFile(item WorkItem) error {
 		metrics.QueueDepth.Set(float64(wp.metrics.QueueDepth))
 		wp.mu.Unlock()
 		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	case <-wp.ctx.Done():
 		return wp.ctx.Err()
 	}
@@ -165,10 +174,7 @@ func (wp *WorkerPool) Stop() error {
 	messaging.WaitForAllPublishers()
 	wp.logger.Info("All publishers finished draining")
 
-	if wp.rabbitPool != nil {
-		wp.logger.Info("Closing connection pool")
-		wp.rabbitPool.Close()
-	}
+	wp.httpClient.CloseIdleConnections()
 
 	close(wp.resultsChan)
 	close(wp.errorsChan)
@@ -189,7 +195,7 @@ func (wp *WorkerPool) GetMetrics() PoolMetrics {
 	copy(metrics.WorkerMetrics, wp.workerMetrics)
 
 	// Copy data loss tracking metrics
-	metrics.totalPublishFailures = wp.totalPublishFailures
+	metrics.totalPublishFailures = wp.totalPublishFailures.Load()
 	metrics.PersistedBatches = wp.totalPersistedBatches
 	metrics.CircuitBreakerEvents = wp.totalCircuitBreakerEvents
 	metrics.MemoryPressureEvents = wp.totalMemoryPressureEvents
@@ -257,13 +263,13 @@ func (wp *WorkerPool) handleResult(result WorkResult) {
 	// Update Prometheus metrics
 	metrics.FilesProcessedTotal.Inc()
 	metrics.RecordsProcessedTotal.Add(float64(result.ProcessedCount))
-	metrics.BatchesSentTotal.Add(float64(result.BatchCount))
+	// BatchesSentTotal is incremented per flush in messaging; adding BatchCount here would double count.
 	metrics.FileProcessingDuration.Observe(result.Duration.Seconds())
 	metrics.QueueDepth.Set(float64(wp.metrics.QueueDepth))
 
 	// Aggregate messaging metrics from result if available
 	if result.MessagingMetrics != nil {
-		wp.totalPublishFailures.Add(result.MessagingMetrics.FailedBatches.Load())
+		wp.totalPublishFailures.Add(result.MessagingMetrics.FailedBatches)
 		wp.totalPersistedBatches += result.MessagingMetrics.PersistedBatches
 		if result.MessagingMetrics.CircuitBreakerOpen {
 			wp.totalCircuitBreakerEvents++
@@ -296,40 +302,41 @@ func (wp *WorkerPool) handleError(workError WorkError) {
 	wp.metrics.QueueDepth--
 	wp.mu.Unlock()
 
+	failErr := workError.Error
 	if workError.Retry && workError.RetryCount < wp.config.MaxRetries {
-		// Try to get FileInfo for retry
 		fileInfo, err := os.Stat(workError.FilePath)
-		if err != nil {
-			wp.logger.Error("Cannot retry file",
-				zap.String("file_path", workError.FilePath),
-				zap.Error(err),
-				zap.String("action", "Check file exists and has read permissions"))
+		if err == nil {
+			retryItem := WorkItem{
+				FilePath:   workError.FilePath,
+				FileInfo:   &dirEntryFromFileInfo{fileInfo},
+				RetryCount: workError.RetryCount + 1,
+			}
+			time.AfterFunc(wp.config.RetryDelay, func() {
+				select {
+				case wp.fileQueue <- retryItem:
+				case <-wp.ctx.Done():
+				}
+			})
 			return
 		}
-
-		// Convert to DirEntry for compatibility
-		dirEntry := &dirEntryFromFileInfo{fileInfo}
-
-		retryItem := WorkItem{
-			FilePath:   workError.FilePath,
-			FileInfo:   dirEntry,
-			RetryCount: workError.RetryCount + 1,
-		}
-
-		time.AfterFunc(wp.config.RetryDelay, func() {
-			select {
-			case wp.fileQueue <- retryItem:
-				// Retry scheduled - no log needed
-			case <-wp.ctx.Done():
-			}
-		})
-	} else {
-		wp.logger.Error("File processing failed",
+		// The file vanished since the failed attempt; it has to count as failed or waitForCompletion never finishes.
+		wp.logger.Error("Cannot retry file",
 			zap.String("file_path", workError.FilePath),
-			zap.Int("attempts", workError.RetryCount+1),
-			zap.Error(workError.Error),
-			zap.String("action", "Check file format is valid IBT or investigate error above"))
+			zap.Error(err),
+			zap.String("action", "Check file exists and has read permissions"))
+		failErr = err
 	}
+
+	// Report before counting: waitForCompletion returns as soon as the counts add up, which would drop this row.
+	wp.progress.OnFileFailed(filepath.Base(workError.FilePath), failErr)
+	wp.mu.Lock()
+	wp.metrics.TotalFilesFailed++
+	wp.mu.Unlock()
+	wp.logger.Error("File processing failed",
+		zap.String("file_path", workError.FilePath),
+		zap.Int("attempts", workError.RetryCount+1),
+		zap.Error(failErr),
+		zap.String("action", "Check file format is valid IBT or investigate error above"))
 }
 
 func (wp *WorkerPool) logFinalMetrics() {

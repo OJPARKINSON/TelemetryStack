@@ -50,7 +50,7 @@ func (wp *WorkerPool) processWorkItem(ctx context.Context, workerID int, item Wo
 	filename := item.FileInfo.Name()
 	wp.UpdateWorkerStatus(workerID, filename, "PROCESSING")
 
-	processor, err := processing.NewFileProcessor(wp.config, workerID, wp.rabbitPool)
+	processor, err := processing.NewFileProcessor(wp.config, workerID, wp.httpClient)
 
 	if err != nil {
 		wp.logger.Error("Failed to create file processor",
@@ -69,6 +69,7 @@ func (wp *WorkerPool) processWorkItem(ctx context.Context, workerID int, item Wo
 		return
 	}
 	defer processor.Close()
+	processor.SetProgressCallback(wp.progress)
 
 	processCtx, processCancel := context.WithTimeout(ctx, wp.config.FileProcessTimeout)
 	defer processCancel()

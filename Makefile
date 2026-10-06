@@ -1,4 +1,9 @@
-.PHONY: restart logs build-push build-push-dashboard build-push-telemetry
+.PHONY: build restart logs build-push build-push-dashboard build-push-telemetry
+
+build:
+	@cd ingest/go && go build -o bin/ingest ./cmd/ingest
+	@cd telemetryService/golang && go build -o bin/telemetry-service ./cmd/telemetry-service
+	@cd dashboard && pnpm build
 
 restart:
 	@echo "🚀 Restarting Docker services..."
@@ -16,7 +21,7 @@ restart-dev:
 
 restart-lite:
 	@echo "🚀 Restarting Dashboard..."
-	@docker compose --file docker-compose.dev.yml build --no-cache 
+	@docker compose --file docker-compose.dev.yml build
 	@docker compose --file docker-compose.dev.yml up -d
 	@echo "✅ Done! Check logs with: make logs"
 
@@ -36,7 +41,7 @@ restart-dev-p:
 
 restart-lite-p:
 	@echo "🚀 Restarting Dashboard..."
-	@podman compose --file docker-compose.dev.yml build --no-cache
+	@podman compose --file docker-compose.dev.yml build
 	@podman compose --file docker-compose.dev.yml up -d
 	@echo "✅ Done! Check logs with: make logs"
 

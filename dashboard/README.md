@@ -1,103 +1,47 @@
-# Next.js Telemetry Dashboard Setup
+# Dashboard
 
-This document explains how to set up and run the Next.js telemetry dashboard that connects to InfluxDB.
+Vite + React 19 + TanStack Router frontend for browsing iRacing telemetry sessions — synchronised track maps (MapLibre) and telemetry charts (Recharts), reading from the Go telemetry service's REST API over QuestDB.
 
-## Project Structure
+## Stack
 
-Ensure your project has the following structure:
+- **Vite** — build tool / dev server
+- **React 19 + TanStack Router** — app shell and routing
+- **MapLibre GL** — track map rendering and racing-line overlays
+- **Recharts** — telemetry charts (speed, throttle, brake, etc.)
+- **SWR** — data fetching against the telemetry service API
+- **Tailwind CSS** — styling
+- **Biome** — lint/format
+- **Playwright** — end-to-end tests
 
-```
-/
-├── app/
-│   ├── api/
-│   │   ├── health/
-│   │   │   └── route.ts
-│   │   ├── laps/
-│   │   │   └── route.ts
-│   │   ├── sessions/
-│   │   │   └── route.ts
-│   │   └── telemetry/
-│   │       └── route.ts
-│   └── page.tsx
-├── lib/
-│   └── influxdb.ts
-├── .env.influxdb-admin-token
-├── .env.influxdb-admin-username
-├── .env.influxdb-admin-password
-├── Dockerfile
-├── docker-compose.yml
-├── next.config.js
-├── package.json
-└── tsconfig.json
+## Development
+
+```bash
+pnpm install
+pnpm dev          # starts on :3000
 ```
 
-## Steps to Set Up
+The dev server expects the telemetry service API to be reachable (see the root `README.md` for running the full stack via `make restart-dev`, or point at a running instance via env config).
 
-1. **Install Dependencies**:
+## Scripts
 
-   ```bash
-   npm install
-   ```
+| Command | Description |
+|---|---|
+| `pnpm dev` | Start dev server |
+| `pnpm build` | Type-check and build for production |
+| `pnpm test:build` | Type-check only (`tsc --noEmit`) |
+| `pnpm test` | Run Playwright e2e tests |
+| `pnpm test:ui` | Playwright UI mode |
+| `pnpm lighthouse` | Run Lighthouse CI audits |
+| `pnpm lint` | Biome check + write |
 
-2. **Set Environment Variables**:
+## Docker
 
-   - Create the necessary secret files:
-     - `.env.influxdb-admin-token`
-     - `.env.influxdb-admin-username`
-     - `.env.influxdb-admin-password`
-   - Or update `docker-compose.yml` to use different secret sources
+```bash
+docker build -t dashboard .
+```
 
-3. **Build and Run with Docker**:
+Built and served as part of the root `docker-compose.yml` / `docker-compose.dev.yml`, routed via Traefik at `/dashboard`.
 
-   ```bash
-   docker-compose up -d
-   ```
+## Docs
 
-4. **Access the Dashboard**:
-   - Open your browser to `http://localhost:3000`
-
-## Troubleshooting
-
-### Module Resolution Issues
-
-If you encounter module resolution errors:
-
-1. Make sure your `tsconfig.json` has the correct paths configuration:
-
-   ```json
-   "paths": {
-     "@/*": ["./*"]
-   }
-   ```
-
-2. Verify that the import paths in API routes are correct:
-
-   ```typescript
-   import { getInfluxDBClient, influxConfig } from "../../../lib/influxdb";
-   ```
-
-3. Try restarting the Next.js development server or rebuilding the Docker container.
-
-### InfluxDB Connection Issues
-
-If the dashboard can't connect to InfluxDB:
-
-1. Check that InfluxDB is running:
-
-   ```bash
-   docker-compose ps
-   ```
-
-2. Verify that the InfluxDB credentials are correct
-3. Ensure that the bucket and organization exist in your InfluxDB instance
-4. Check the network connectivity between containers
-
-## Customizing the Dashboard
-
-To add more features to the dashboard:
-
-1. Add new API endpoints in the `/app/api/` directory
-2. Update the UI components in `page.tsx`
-3. Add new visualization components as needed
-
-Refer to the Next.js and InfluxDB documentation for more advanced customizations.
+See [`docs/RACING_LINE.md`](docs/RACING_LINE.md) for design notes on the racing-line map/chart sync feature.

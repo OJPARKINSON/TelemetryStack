@@ -1,4 +1,4 @@
-.PHONY: help restart logs test test-v test-short coverage coverage-html bench bench-mmap bench-parser bench-struct bench-tick bench-all bench-save clean-test
+.PHONY: help restart logs test test-ingest test-v test-short coverage coverage-html bench bench-mmap bench-parser bench-struct bench-tick bench-all bench-save clean-test
 
 # Default target
 .DEFAULT_GOAL := help
@@ -11,7 +11,8 @@ help:
 	@echo "    make logs           - Follow Docker logs"
 	@echo ""
 	@echo "  Testing Commands:"
-	@echo "    make test           - Run all tests with race detector"
+	@echo "    make test           - Run ibt submodule tests with race detector"
+	@echo "    make test-ingest    - Run this module's own tests (internal/...)"
 	@echo "    make test-v         - Run tests (verbose)"
 	@echo "    make test-short     - Run short tests only"
 	@echo "    make coverage       - Generate test coverage report"
@@ -42,8 +43,14 @@ logs:
 
 # Testing targets
 test:
-	@echo "🧪 Running all tests..."
+	@echo "🧪 Running ibt submodule tests..."
 	@cd ibt && go test -v -race -timeout 30s ./...
+
+# The targets above test the ibt submodule; this one tests this module.
+# The corpus codec measurement is opt-in via WIRE_CODECS (see internal/processing/codec_test.go).
+test-ingest:
+	@echo "🧪 Running ingest tests..."
+	@go test ./internal/... -race
 
 test-v:
 	@echo "🧪 Running all tests (verbose)..."

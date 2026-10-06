@@ -10,6 +10,7 @@ import (
 type WorkItem struct {
 	FilePath   string
 	FileInfo   os.DirEntry
+	FileDate   time.Time
 	RetryCount int
 }
 
@@ -34,16 +35,16 @@ type WorkError struct {
 }
 
 type WorkerMetrics struct {
-	WorkerID         int
-	FilesProcessed   int
-	TotalRecords     int64
-	TotalBatches     int64
-	ProcessingTime   time.Duration
-	LastActivity     time.Time
-	ErrorCount       int
-	CurrentFile      string
-	Status           string
-	ProcessingRate   float64
-	AvgTimePerFile   time.Duration
-	TotalFileTime    time.Duration
+	WorkerID       int
+	FilesProcessed int
+	TotalRecords   int64
+	TotalBatches   int64
+	ProcessingTime time.Duration
+	LastActivity   time.Time
+	ErrorCount     int
+	CurrentFile    string
+	Status         string
+	ProcessingRate float64
+	AvgTimePerFile time.Duration
+	TotalFileTime  time.Duration
 }

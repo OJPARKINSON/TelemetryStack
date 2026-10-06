@@ -1,0 +1,24 @@
+{
+      admin off          # no admin API on :2019
+      auto_https off     # Traefik does TLS
+      persist_config off
+}
+
+:8080 {
+      root * /srv
+
+      # SPA: real file if it exists, otherwise the app shell
+      try_files {path} /index.html
+
+      # Precompressed .br/.gz from the Vite build; on-the-fly zstd/gzip for the rest
+      file_server {
+              precompressed br gzip
+      }
+      encode zstd gzip
+
+      # Hashed assets cache forever; everything else (index.html, SPA routes) revalidates
+      @assets path /assets/*
+      @notassets not path /assets/*
+      header @assets Cache-Control "public, max-age=31536000, immutable"
+      header @notassets Cache-Control "no-cache"
+}

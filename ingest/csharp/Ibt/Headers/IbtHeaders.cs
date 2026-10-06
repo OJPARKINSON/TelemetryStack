@@ -8,7 +8,7 @@ public sealed record IbtHeaders(
 {
     public static IbtHeaders Parse(ReadOnlySpan<byte> file)
     {
-        Console.WriteLine(file.ToString());
+        Console.WriteLine($"file size: {file.Length}");
         var telemetry = TelemetryHeader.Parse(file.Slice(0, TelemetryHeader.Size));
         var disk = DiskHeader.Parse(file.Slice(TelemetryHeader.Size, DiskHeader.Size));
         var vars = VarHeader.ParseAll(file, telemetry.NumVars, telemetry.VarHeaderOffset);

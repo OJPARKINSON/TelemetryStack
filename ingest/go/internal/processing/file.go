@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,7 +20,7 @@ import (
 type FileProcessor struct {
 	config           *config.Config
 	workerID         int
-	pool             *messaging.ConnectionPool
+	client           *http.Client
 	progressCallback ProgressCallback
 }
 
@@ -31,11 +32,11 @@ type ProcessResult struct {
 	MessagingMetrics *messaging.PublishMetrics
 }
 
-func NewFileProcessor(cfg *config.Config, workerID int, pool *messaging.ConnectionPool) (*FileProcessor, error) {
+func NewFileProcessor(cfg *config.Config, workerID int, client *http.Client) (*FileProcessor, error) {
 	return &FileProcessor{
 		config:           cfg,
 		workerID:         workerID,
-		pool:             pool,
+		client:           client,
 		progressCallback: &NoOpProgressCallback{},
 	}, nil
 }
@@ -71,14 +72,19 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 
 	groups := stubs.Group()
 
-	// Pre-count total records for progress tracking
+	// Pre-count ticks for progress tracking; each tick becomes one wire record.
+	// iRacing only records while the player is in the car, so ticks / tick rate is time on track.
 	totalExpectedRecords := 0
+	var onTrack time.Duration
 	for _, group := range groups {
-		totalExpectedRecords += len(group)
+		for _, stub := range group {
+			h := stub.Headers()
+			totalExpectedRecords += h.DiskHeader.RecordCount
+			onTrack += time.Duration(h.DiskHeader.RecordCount) * time.Second / time.Duration(h.TelemetryHeader.TickRate)
+		}
 	}
 
-	// Notify progress callback that file processing is starting
-	fp.progressCallback.OnFileStart(fileName, totalExpectedRecords)
+	fp.progressCallback.OnFileStart(fileName, totalExpectedRecords, onTrack)
 
 	totalRecords := 0
 	totalBatches := 0
@@ -124,13 +130,13 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 			groupSessionID,
 			sessionTime,
 			fp.config,
-			fp.pool,
+			fp.client,
 			fp.workerID,
 		)
+		pubSub.OnPublished = func(n int) { fp.progressCallback.OnBatchSent(fileName, n) }
 
 		// Create telemetry processor with the correct SubSessionID
 		processor := NewProcessor(pubSub, groupNumber, fp.config, fp.workerID, groupSessionID)
-		processor.SetProgressCallback(fp.progressCallback, fileName)
 		processors = append(processors, processor)
 
 		if err := ibt.Process(ctx, group, processor); err != nil {
@@ -157,7 +163,7 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 			allMessagingMetrics.TotalBatches += metrics.TotalBatches
 			allMessagingMetrics.TotalRecords += metrics.TotalRecords
 			allMessagingMetrics.TotalBytes += metrics.TotalBytes
-			allMessagingMetrics.FailedBatches.Add(metrics.FailedBatches.Load())
+			allMessagingMetrics.FailedBatches += metrics.FailedBatches
 			allMessagingMetrics.PersistedBatches += metrics.PersistedBatches
 		}
 

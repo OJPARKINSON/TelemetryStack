@@ -9,6 +9,8 @@ public sealed class TickParser
     public TickParser(IbtHeaders headers, IEnumerable<string>? whitelist = null) { }
     public bool Next(ref TelemetryTick tick, ReadOnlySpan<byte> file)
     {
+
+
         return false;
     }
 

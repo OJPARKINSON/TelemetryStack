@@ -433,7 +433,7 @@
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
       "id": 40,
-      "title": "Ingest Pipeline",
+      "title": "Go Runtime",
       "type": "row"
     },
     {
@@ -442,7 +442,7 @@
         "defaults": {
           "color": { "mode": "palette-classic" },
           "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
-          "unit": "ops"
+          "unit": "short"
         }
       },
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 33 },
@@ -451,18 +451,13 @@
         "legend": { "displayMode": "list", "placement": "bottom" },
         "tooltip": { "mode": "multi" }
       },
-      "title": "Records / sec",
+      "title": "Goroutines",
       "type": "timeseries",
       "targets": [
         {
-          "expr": "rate(telemetry_records_received_total[1m])",
-          "legendFormat": "received/s",
+          "expr": "go_goroutines{job=\"telemetry-service\"}",
+          "legendFormat": "goroutines",
           "refId": "A"
-        },
-        {
-          "expr": "rate(telemetry_records_written_total[1m])",
-          "legendFormat": "written/s",
-          "refId": "B"
         }
       ]
     },
@@ -472,7 +467,7 @@
         "defaults": {
           "color": { "mode": "palette-classic" },
           "custom": { "fillOpacity": 20, "lineWidth": 2, "showPoints": "never" },
-          "unit": "short"
+          "unit": "bytes"
         }
       },
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 33 },
@@ -481,13 +476,18 @@
         "legend": { "displayMode": "list", "placement": "bottom" },
         "tooltip": { "mode": "multi" }
       },
-      "title": "Queue Depth",
+      "title": "Heap In Use / RSS",
       "type": "timeseries",
       "targets": [
         {
-          "expr": "telemetry_queue_depth",
-          "legendFormat": "depth",
+          "expr": "go_memstats_heap_inuse_bytes{job=\"telemetry-service\"}",
+          "legendFormat": "heap in use",
           "refId": "A"
+        },
+        {
+          "expr": "process_resident_memory_bytes{job=\"telemetry-service\"}",
+          "legendFormat": "RSS",
+          "refId": "B"
         }
       ]
     },
@@ -497,7 +497,7 @@
         "defaults": {
           "color": { "mode": "palette-classic" },
           "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
-          "unit": "short"
+          "unit": "s"
         }
       },
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 33 },
@@ -506,44 +506,12 @@
         "legend": { "displayMode": "list", "placement": "bottom" },
         "tooltip": { "mode": "multi" }
       },
-      "title": "Batch Size p95",
+      "title": "GC Pause Duration",
       "type": "timeseries",
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, rate(telemetry_batch_size_records_bucket[5m]))",
-          "legendFormat": "records/batch p95",
-          "refId": "A"
-        }
-      ]
-    },
-
-    {
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 },
-      "id": 50,
-      "title": "Logs",
-      "type": "row"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 42 },
-      "id": 51,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "showCommonLabels": false,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
-      },
-      "title": "Telemetry Service Logs",
-      "type": "logs",
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{container=\"telemetry-service\"}",
-          "queryType": "range",
+          "expr": "rate(go_gc_duration_seconds_sum{job=\"telemetry-service\"}[5m])",
+          "legendFormat": "pause time/s",
           "refId": "A"
         }
       ]

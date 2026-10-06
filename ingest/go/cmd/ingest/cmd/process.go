@@ -5,13 +5,17 @@ package cmd
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"io/fs"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"runtime/pprof"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -19,35 +23,15 @@ import (
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/config"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/metrics"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/processing"
+	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/ui"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/worker"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/joho/godotenv"
-	"github.com/spf13/cobra"
 	"go.uber.org/zap"
+	"golang.org/x/term"
 )
 
-var (
-	fresh  bool
-	logger *zap.Logger
-)
-
-var processCmd = &cobra.Command{
-	Use:   "ingest",
-	Short: "Process the telemetry data in the background",
-	Long: `Watch the telemetry directory and in the background process new telemetry file
-
-	To clean the cache of sent file run with --fresh to upload all data in the dir again`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		log.Printf("Inside rootCmd Run with args: %v\n", args)
-		return Process(args[0])
-	},
-}
-
-func init() {
-	processCmd.Flags().BoolVarP(&display, "display", "d", true, "terminal display of the ingest process")
-	processCmd.Flags().StringVarP(&telemetryPath, "telemetryPath", "p", "", "path to IRacing telemetry folder")
-
-	processCmd.Flags().BoolVarP(&fresh, "fresh", "f", false, "will clean the local store of files that have been processed and start from fresh")
-}
+var logger *zap.Logger
 
 func Process(telemetryFolder string) error {
 	envErr := godotenv.Load()
@@ -57,10 +41,15 @@ func Process(telemetryFolder string) error {
 
 	startTime := time.Now()
 
-	// Initialize Zap logger
+	// Full logs only in verbose mode; otherwise just errors.
+	logCfg := zap.NewDevelopmentConfig()
+	if !verbose {
+		logCfg.Level = zap.NewAtomicLevelAt(zap.ErrorLevel)
+		logCfg.DisableStacktrace = true
+		log.SetOutput(io.Discard)
+	}
 	var err error
-	// Verbose mode: full development logging
-	logger, err = zap.NewDevelopment()
+	logger, err = logCfg.Build()
 	if err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 		return err
@@ -77,37 +66,8 @@ func Process(telemetryFolder string) error {
 	}
 
 	// Start metrics pusher
-	metrics.StartPusher(cfg.ServerUrl + "")
-
-	if os.Getenv("ENABLE_PPROF") == "true" {
-		go func() {
-			if err := http.ListenAndServe(":6060", nil); err != nil {
-				logger.Error("pprof server failed",
-					zap.Error(err),
-					zap.String("action", "Check port 6060 is not in use"))
-			}
-		}()
-	}
-
-	if cpuProfile := os.Getenv("CPU_PROFILE"); cpuProfile != "" {
-		f, err := os.Create(cpuProfile)
-		if err != nil {
-			logger.Fatal("Could not create CPU profile",
-				zap.Error(err),
-				zap.String("path", cpuProfile),
-				zap.String("action", "Check directory exists and has write permissions"))
-
-			return err
-		}
-		defer f.Close()
-
-		if err := pprof.StartCPUProfile(f); err != nil {
-			logger.Fatal("Could not start CPU profile",
-				zap.Error(err),
-				zap.String("action", "Check file can be written"))
-			return err
-		}
-		defer pprof.StopCPUProfile()
+	if !cfg.DryRun {
+		metrics.StartPusher(cfg.ServerUrl + "")
 	}
 
 	// Setup context and signal handling
@@ -129,24 +89,43 @@ func Process(telemetryFolder string) error {
 	if _, err := os.Stat(telemetryFolder); os.IsNotExist(err) {
 		logger.Fatal("Telemetry directory does not exist",
 			zap.String("path", telemetryFolder),
-			zap.String("action", "Create directory or set IBT_DATA_DIR environment variable"))
+			zap.String("action", "Create directory or set path attribute"))
 		return err
 	}
 
-	// Create worker pool
-	pool := worker.NewWorkerPool(cfg, logger)
+	items := discoverFiles(telemetryFolder, cfg, logger)
+	files := uiFiles(items)
+	log.Printf("STARTUP: Found %d IBT files to process", len(items))
 
-	expectedFiles, err := discoverAndQueueFiles(ctx, pool, telemetryFolder, cfg, logger)
-	if err != nil {
-		logger.Error("File discovery failed",
-			zap.Error(err),
-			zap.String("path", telemetryFolder),
-			zap.String("action", "Check directory permissions and IBT files exist"))
-		return err
+	// Progress view: TUI on a terminal, plain lines when piped, nothing in verbose mode.
+	var reporter *ui.Reporter
+	poolLogger := logger
+	uiDone := make(chan struct{})
+	switch {
+	case verbose:
+		close(uiDone)
+	case term.IsTerminal(int(os.Stdout.Fd())):
+		program := tea.NewProgram(ui.NewModel(files, cancel))
+		reporter = ui.NewTUIReporter(program)
+		poolLogger = zap.NewNop() // nothing may log while the TUI owns the terminal; failed rows show in it instead
+		go func() {
+			defer close(uiDone)
+			if _, err := program.Run(); err != nil {
+				fmt.Fprintln(os.Stderr, "progress view:", err)
+			}
+		}()
+	default:
+		reporter = ui.NewPlainReporter(os.Stdout, files)
+		close(uiDone)
 	}
-	log.Printf("STARTUP: Found %d IBT files to process", expectedFiles)
 
-	// Start worker pool
+	var progress processing.ProgressCallback
+	if reporter != nil {
+		progress = reporter
+	}
+	pool := worker.NewWorkerPool(cfg, poolLogger, progress)
+
+	// Start workers first so a backlog larger than the queue drains instead of blocking the submit loop.
 	if err := pool.Start(); err != nil {
 		logger.Fatal("Failed to start worker pool",
 			zap.Error(err),
@@ -161,8 +140,27 @@ func Process(telemetryFolder string) error {
 		}
 	}()
 
+	expectedFiles, err := queueFiles(ctx, pool, items)
+	if err != nil {
+		if reporter != nil {
+			reporter.Done(time.Since(startTime), true)
+		}
+		<-uiDone
+		if ctx.Err() != nil {
+			return nil // interrupted while queueing
+		}
+		logger.Error("Queueing files failed",
+			zap.Error(err),
+			zap.String("path", telemetryFolder))
+		return err
+	}
+
 	// Wait for completion
 	waitForCompletion(ctx, pool, startTime, expectedFiles)
+	if reporter != nil {
+		reporter.Done(time.Since(startTime), ctx.Err() != nil)
+	}
+	<-uiDone
 
 	// Write memory profile if MEM_PROFILE environment variable is set
 	if memProfile := os.Getenv("MEM_PROFILE"); memProfile != "" {
@@ -188,38 +186,61 @@ func Process(telemetryFolder string) error {
 	return nil
 }
 
-func discoverAndQueueFiles(ctx context.Context, pool *worker.WorkerPool, telemetryFolder string, cfg *config.Config, logger *zap.Logger) (int, error) {
-	directory := processing.NewDir(telemetryFolder, cfg, logger)
-	files := directory.WatchDir()
+var timestampRegEx = regexp.MustCompile(`(\d{4}-\d{2}-\d{2}) (\d{2}-\d{2}-\d{2})`)
 
-	filesQueued := 0
-	for _, file := range files {
-		select {
-		case <-ctx.Done():
-			return filesQueued, ctx.Err()
-		default:
-		}
+func parseTimestamp(filename string) (time.Time, error) {
+	matching := timestampRegEx.FindStringSubmatch(filename)
+	if matching == nil {
+		return time.Time{}, fmt.Errorf("no timestamp found in %q", filename)
+	}
+	raw := matching[1] + "T" + matching[2] + "Z"
+	return time.Parse("2006-01-02T15-04-05Z", raw)
+}
 
-		fileName := file.Name()
+// discoverFiles returns the .ibt files ready to upload as work items, oldest first.
+func discoverFiles(telemetryFolder string, cfg *config.Config, logger *zap.Logger) []worker.WorkItem {
+	entries := processing.NewDir(telemetryFolder, cfg, logger).WatchDir()
 
-		if !strings.Contains(fileName, ".ibt") {
+	items := make([]worker.WorkItem, 0, len(entries))
+	for _, entry := range entries {
+		if !strings.Contains(entry.Name(), ".ibt") {
 			continue
 		}
-
-		workItem := worker.WorkItem{
-			FilePath:   filepath.Join(telemetryFolder, fileName),
-			FileInfo:   file,
-			RetryCount: 0,
+		at, err := parseTimestamp(entry.Name())
+		if err != nil {
+			continue
 		}
-
-		if err := pool.SubmitFile(workItem); err != nil {
-			return filesQueued, err
+		info, err := entry.Info()
+		if err != nil {
+			continue
 		}
-
-		filesQueued++
+		items = append(items, worker.WorkItem{
+			FilePath: filepath.Join(telemetryFolder, entry.Name()),
+			FileInfo: fs.FileInfoToDirEntry(info),
+			FileDate: at,
+		})
 	}
+	sort.SliceStable(items, func(a, b int) bool { return items[a].FileDate.Before(items[b].FileDate) })
+	return items
+}
 
-	return filesQueued, nil
+func uiFiles(items []worker.WorkItem) []ui.File {
+	files := make([]ui.File, len(items))
+	for i, item := range items {
+		info, _ := item.FileInfo.Info()
+		files[i] = ui.File{Name: filepath.Base(item.FilePath), Size: info.Size()}
+	}
+	return files
+}
+
+// queueFiles submits items to the pool in order and returns how many were queued; it stops early when ctx is cancelled.
+func queueFiles(ctx context.Context, pool *worker.WorkerPool, items []worker.WorkItem) (int, error) {
+	for i, item := range items {
+		if err := pool.SubmitFile(ctx, item); err != nil {
+			return i, err
+		}
+	}
+	return len(items), nil
 }
 
 func waitForCompletion(ctx context.Context, pool *worker.WorkerPool, startTime time.Time, expectedFiles int) {
@@ -232,7 +253,7 @@ func waitForCompletion(ctx context.Context, pool *worker.WorkerPool, startTime t
 			time.Sleep(20 * time.Millisecond)
 			metrics := pool.GetMetrics()
 
-			if metrics.QueueDepth == 0 && metrics.TotalFilesProcessed >= expectedFiles {
+			if metrics.QueueDepth == 0 && metrics.TotalFilesProcessed+metrics.TotalFilesFailed >= expectedFiles {
 				// Completion - metrics available via Prometheus, no log needed
 				return
 			}

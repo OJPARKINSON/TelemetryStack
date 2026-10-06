@@ -13,11 +13,12 @@ public readonly record struct DiskHeader(long StartDate, double StartTime, doubl
         int lapCount = Bytes.I32(b, 24);
         int recordCount = Bytes.I32(b, 28);
 
-        Console.WriteLine(startDate.ToString());
-        Console.WriteLine(startTime.ToString());
-        Console.WriteLine(endTime.ToString());
-        Console.WriteLine(lapCount.ToString());
-        Console.WriteLine(recordCount.ToString());
+
+        Console.WriteLine($"startDate: {DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(startDate).DateTime).ToLongDateString()}");
+        Console.WriteLine($"startTime: {TimeSpan.FromSeconds(startTime).ToString("hh':'mm':'ss")}");
+        Console.WriteLine($"endTime: {TimeSpan.FromSeconds(endTime).ToString("hh':'mm':'ss")}");
+        Console.WriteLine($"lapCount: {lapCount}");
+        Console.WriteLine($"recordCount: {recordCount}");
         return new DiskHeader(startDate, startTime, endTime, lapCount, recordCount);
     }
 }

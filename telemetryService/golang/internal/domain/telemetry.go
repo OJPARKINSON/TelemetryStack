@@ -74,9 +74,9 @@ type TelemetryPoint struct {
 }
 
 func TelemetryPointFromProto(rec *messaging.Telemetry, sessionId, CarId string) TelemetryPoint {
-	ts := time.Now()
+	timestamp := time.Now()
 	if rec.TickTime != nil {
-		ts = rec.TickTime.AsTime()
+		timestamp = rec.TickTime.AsTime()
 	}
 
 	return TelemetryPoint{
@@ -90,7 +90,6 @@ func TelemetryPointFromProto(rec *messaging.Telemetry, sessionId, CarId string) 
 		SessionType:        rec.SessionType,
 		SessionName:        rec.SessionName,
 		SessionTime:        rec.SessionTime,
-		Timestamp:          ts,
 		Speed:              rec.Speed,
 		RPM:                rec.Rpm,
 		Throttle:           rec.Throttle,
@@ -126,5 +125,6 @@ func TelemetryPointFromProto(rec *messaging.Telemetry, sessionId, CarId string) 
 		RFtempM:            rec.RFtempM,
 		LRtempM:            rec.LRtempM,
 		RRtempM:            rec.RRtempM,
+		Timestamp:          timestamp,
 	}
 }

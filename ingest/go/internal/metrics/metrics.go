@@ -32,8 +32,18 @@ var (
 
 	BatchSizeBytes = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name:    "ingest_batch_size_bytes",
-		Help:    "Size of batches sent to RabbitMQ in bytes",
+		Help:    "Size of batches put on the wire, in bytes (post-compression)",
 		Buckets: prometheus.ExponentialBuckets(1024*1024, 2, 8), // 1MB to 128MB
+	})
+
+	BatchBytesUncompressed = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "ingest_batch_bytes_uncompressed_total",
+		Help: "Total marshalled batch bytes before compression",
+	})
+
+	BatchBytesWire = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "ingest_batch_bytes_wire_total",
+		Help: "Total batch bytes actually sent over the network",
 	})
 
 	// Worker pool metrics

@@ -7,18 +7,20 @@
 		"dev": "vite --port 3000",
 		"build": "tsc -b && vite build",
 		"test:build": "tsc --noEmit",
-		"lighthouse": "lhci autorun",
-		"test": "playwright test",
-		"test:headed": "playwright test --headed",
-		"test:debug": "playwright test --debug",
-		"test:ui": "playwright test --ui",
-		"test:chromium": "playwright test --project=chromium",
-		"test:firefox": "playwright test --project=firefox",
-		"test:webkit": "playwright test --project=webkit",
-		"test:mobile": "playwright test --project='Mobile Chrome' --project='Mobile Safari'",
-		"test:report": "playwright show-report test-results/html",
-		"test:install": "playwright install",
+		"serve": "vite preview",
 		"lint": "biome check --write"
+	},
+	"devEngines": {
+		"packageManager": {
+			"name": "pnpm",
+			"version": "12.9.1",
+			"onFail": "download"
+		},
+		"runtime": {
+			"name": "node",
+			"version": "24.x",
+			"onFail": "download"
+		}
 	},
 	"dependencies": {
 		"@tailwindcss/postcss": "^4.3.2",
@@ -26,9 +28,9 @@
 		"@tanstack/react-router": "^1.170.17",
 		"@types/geojson": "^7946.0.16",
 		"autoprefixer": "^10.5.2",
+		"clsx": "^2.1.1",
 		"lucide-react": "^1.24.0",
-		"maplibre-gl": "^5.24.0",
-		"next-themes": "^0.4.6",
+		"maplibre-gl": "^6.11.2",
 		"react": "^19.2.7",
 		"react-dom": "^19.2.7",
 		"recharts": "^3.9.2",
@@ -37,7 +39,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.5.3",
-		"@tanstack/router-plugin": "^1.168.19",
+		"@tanstack/router-plugin": "^1.168.23",
 		"@types/node": "^26.1.1",
 		"@types/react": "^19.2.17",
 		"@types/react-dom": "^19",
@@ -45,7 +47,8 @@
 		"postcss": "^8.5.16",
 		"tailwindcss": "^4.3.2",
 		"typescript": "^7",
-		"vite": "npm:rolldown-vite@latest"
+		"vite": "^8.1.4",
+		"vite-plugin-compression2": "^2.5.3"
 	},
 	"engines": {
 		"node": ">=18.0.0",

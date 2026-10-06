@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"runtime"
 	"strconv"
@@ -22,32 +23,27 @@ type Config struct {
 
 	GoMaxProcs int
 
-	EnablePprof  bool
-	PprofPort    string
-	MemoryTuning bool
-
 	ServerUrl string
+
+	IngestURL string
+
+	Compression string
+
+	ShutdownTimeout time.Duration
 
 	BatchSizeRecords int
 
-	UseStructPipeline bool
+	DryRun bool
 
-	// Data directory configuration
 	DataDirectory string
-
-	CFAccountID    string
-	CFD1DatabaseID string
-	CFApiToken     string
-	R2AccountID    string
-	R2AccessKeyID  string
-	R2SecretAccess string
-	R2BucketNme    string
 }
 
 func LoadConfig() *Config {
 	cpuCount := runtime.GOMAXPROCS(0)
 
 	workerCount := getEnvAsInt("WORKER_COUNT", cpuCount)
+
+	serverUrl := getEnv("SERVER_URL", "http://localhost")
 
 	return &Config{
 		WorkerCount:   workerCount,
@@ -64,27 +60,15 @@ func LoadConfig() *Config {
 
 		GoMaxProcs: getEnvAsInt("GOMAXPROCS", cpuCount),
 
-		// Development & Monitoring
-		EnablePprof:  getEnvAsBool("ENABLE_PPROF", false),
-		PprofPort:    getEnv("PPROF_PORT", "6060"),
-		MemoryTuning: getEnvAsBool("MEMORY_TUNING", true),
+		ServerUrl: serverUrl,
+		IngestURL: getEnv("INGEST_URL", serverUrl+":8010/api/ingest"),
 
-		ServerUrl: getEnv("SERVER_URL", "http://localhost"),
+		Compression:     wireCompression(),
+		ShutdownTimeout: getEnvAsDuration("SHUTDOWN_TIMEOUT", 30*time.Second),
 
-		UseStructPipeline: getEnvAsBool("USE_STRUCT_PIPELINE", true),
+		DryRun: getEnvAsBool("DRY_RUN", false),
 
-		// Record Processing
 		BatchSizeRecords: getEnvAsInt("BATCH_SIZE_RECORDS", 24000),
-
-		CFAccountID:    getEnv("CF_ACCOUNT_ID", ""),
-		CFD1DatabaseID: getEnv("CF_D1_DATABASE_ID", ""),
-		CFApiToken:     getEnv("CF_API_TOKEN", ""),
-		R2AccountID:    getEnv("R2_ACCOUNT_ID", ""),
-		R2AccessKeyID:  getEnv("R2_ACCESS_KEY_ID", ""),
-		R2SecretAccess: getEnv("R2_SECRET_ACCESS_KEY", ""),
-		R2BucketNme:    getEnv("R2_BUCKET_NAME", ""),
-		// Data Directory - defaults to ./ibt_files/ for backward compatibility
-		// DataDirectory: getEnv("IBT_DATA_DIR", "./ibt_files/"),
 	}
 }
 
@@ -120,4 +104,14 @@ func getEnvAsDuration(key string, fallback time.Duration) time.Duration {
 		}
 	}
 	return fallback
+}
+
+func wireCompression() string {
+	switch v := getEnv("WIRE_COMPRESSION", "zstd"); v {
+	case "zstd", "none":
+		return v
+	default:
+		log.Printf("config: unrecognised WIRE_COMPRESSION %q, sending uncompressed", v)
+		return "none"
+	}
 }
