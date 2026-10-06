@@ -1,6 +1,6 @@
 "use client";
 
-import MapLibreGL, { type MarkerOptions } from "maplibre-gl";
+import * as MapLibreGL from "maplibre-gl";
 import {
 	createContext,
 	type ReactNode,
@@ -46,7 +46,7 @@ type MapMarkerProps = {
 	onDrag?: (lngLat: { lng: number; lat: number }) => void;
 	/** Callback when marker drag ends (requires draggable: true) */
 	onDragEnd?: (lngLat: { lng: number; lat: number }) => void;
-} & Omit<MarkerOptions, "element">;
+} & Omit<MapLibreGL.MarkerOptions, "element">;
 
 export function MapMarker({
 	longitude,

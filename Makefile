@@ -21,7 +21,7 @@ restart-dev:
 
 restart-lite:
 	@echo "🚀 Restarting Dashboard..."
-	@docker compose --file docker-compose.dev.yml build --no-cache 
+	@docker compose --file docker-compose.dev.yml build
 	@docker compose --file docker-compose.dev.yml up -d
 	@echo "✅ Done! Check logs with: make logs"
 
@@ -41,7 +41,7 @@ restart-dev-p:
 
 restart-lite-p:
 	@echo "🚀 Restarting Dashboard..."
-	@podman compose --file docker-compose.dev.yml build --no-cache
+	@podman compose --file docker-compose.dev.yml build
 	@podman compose --file docker-compose.dev.yml up -d
 	@echo "✅ Done! Check logs with: make logs"
 

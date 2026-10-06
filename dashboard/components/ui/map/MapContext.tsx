@@ -1,6 +1,6 @@
 "use client";
 
-import type MapLibreGL from "maplibre-gl";
+import type * as MapLibreGL from "maplibre-gl";
 import { createContext, use } from "react";
 
 export type MapContextValue = {

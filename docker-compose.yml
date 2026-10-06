@@ -146,23 +146,31 @@ services:
   telemetry-dashboard:
     image: ghcr.io/ojparkinson/iracing-display:latest
     restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     networks:
       - telemetry-network
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: 1g
+          cpus: '0.5'
+          memory: 128m
     labels:
       - "traefik.enable=true"
       # HTTP
       - "traefik.http.routers.telemetry-dashboard.rule=PathPrefix(`/dashboard`)"
       - "traefik.http.routers.telemetry-dashboard.entrypoints=web"
+      - "traefik.http.routers.telemetry-dashboard.middlewares=dashboard-stripprefix@file,security-headers@file"
       # HTTPS
       - "traefik.http.routers.telemetry-dashboard-secure.rule=Host(`${TAILSCALE_DOMAIN}`) && PathPrefix(`/dashboard`)"
       - "traefik.http.routers.telemetry-dashboard-secure.entrypoints=websecure"
       - "traefik.http.routers.telemetry-dashboard-secure.tls.certresolver=tailscale"
+      - "traefik.http.routers.telemetry-dashboard-secure.middlewares=dashboard-stripprefix@file,security-headers@file"
       - "traefik.http.services.telemetry-dashboard.loadbalancer.server.port=8080"
+      - "traefik.http.services.telemetry-dashboard.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.telemetry-dashboard.loadbalancer.healthcheck.interval=30s"
 
   grafana:
     image: dhi.io/grafana:12.3

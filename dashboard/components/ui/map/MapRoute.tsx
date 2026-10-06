@@ -1,6 +1,6 @@
 "use client";
 
-import type MapLibreGL from "maplibre-gl";
+import type * as MapLibreGL from "maplibre-gl";
 import { useEffect, useEffectEvent, useId } from "react";
 
 import { useMap } from "./MapContext";

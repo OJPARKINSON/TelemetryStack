@@ -110,7 +110,8 @@ services:
     labels:
       - "traefik.enable=true"
       # Dashboard main routes
-      - "traefik.http.routers.telemetry-dashboard-local.rule=Host(`${LOCAL_DOMAIN:-localhost}`) &&PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.telemetry-dashboard-local.rule=Host(`${LOCAL_DOMAIN:-localhost}`) && PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.telemetry-dashboard-local.middlewares=dashboard-stripprefix@file,security-headers@file"
       - "traefik.http.routers.telemetry-dashboard-local.entrypoints=web"
       # Service configuration
       - "traefik.http.services.telemetry-dashboard.loadbalancer.server.port=8080"
