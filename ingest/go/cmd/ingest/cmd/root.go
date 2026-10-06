@@ -9,7 +9,8 @@ import (
 
 var (
 	telemetryPath string
-	display       bool
+	verbose       bool
+	display       bool // deprecated no-op, kept so existing scripts passing -d still run
 )
 
 var rootCmd = &cobra.Command{
@@ -42,7 +43,11 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.Flags().BoolVarP(&display, "display", "d", false, "terminal display of the ingest process")
+	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "print debug logs instead of the progress view")
+	rootCmd.Flags().BoolVarP(&display, "display", "d", false, "")
+	if err := rootCmd.Flags().MarkDeprecated("display", "the progress view is now the default; use -v for debug logs"); err != nil {
+		panic(err)
+	}
 	rootCmd.Flags().StringVarP(&telemetryPath, "telemetryPath", "p", "", "path to IRacing telemetry folder")
 	if err := rootCmd.MarkFlagRequired("telemetryPath"); err != nil {
 		panic(err)

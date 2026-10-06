@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/config"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/messaging"
 	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/metrics"
+	"github.com/OJPARKINSON/IRacing-Display/ingest/go/internal/processing"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
@@ -40,6 +42,7 @@ type WorkerPool struct {
 
 	httpClient *http.Client
 	logger     *zap.Logger
+	progress   processing.ProgressCallback
 
 	workerMetrics []WorkerMetrics
 
@@ -51,6 +54,7 @@ type WorkerPool struct {
 
 type PoolMetrics struct {
 	TotalFilesProcessed   int
+	TotalFilesFailed      int
 	TotalRecordsProcessed int
 	TotalBatchesProcessed int
 	TotalErrors           int
@@ -66,7 +70,11 @@ type PoolMetrics struct {
 	DataLossRate         float64
 }
 
-func NewWorkerPool(cfg *config.Config, logger *zap.Logger) *WorkerPool {
+func NewWorkerPool(cfg *config.Config, logger *zap.Logger, progress processing.ProgressCallback) *WorkerPool {
+	if progress == nil {
+		progress = &processing.NoOpProgressCallback{}
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	httpClient := messaging.NewHTTPClient(cfg)
@@ -89,6 +97,7 @@ func NewWorkerPool(cfg *config.Config, logger *zap.Logger) *WorkerPool {
 		cancel:        cancel,
 		httpClient:    httpClient,
 		logger:        logger,
+		progress:      progress,
 		workerMetrics: workerMetrics,
 		metrics: PoolMetrics{
 			StartTime:     time.Now(),
@@ -131,7 +140,8 @@ func (wp *WorkerPool) Start() error {
 	return nil
 }
 
-func (wp *WorkerPool) SubmitFile(item WorkItem) error {
+// SubmitFile blocks until the item is queued, ctx is cancelled or the pool stops.
+func (wp *WorkerPool) SubmitFile(ctx context.Context, item WorkItem) error {
 	select {
 	case wp.fileQueue <- item:
 		wp.mu.Lock()
@@ -139,6 +149,8 @@ func (wp *WorkerPool) SubmitFile(item WorkItem) error {
 		metrics.QueueDepth.Set(float64(wp.metrics.QueueDepth))
 		wp.mu.Unlock()
 		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	case <-wp.ctx.Done():
 		return wp.ctx.Err()
 	}
@@ -290,37 +302,41 @@ func (wp *WorkerPool) handleError(workError WorkError) {
 	wp.metrics.QueueDepth--
 	wp.mu.Unlock()
 
+	failErr := workError.Error
 	if workError.Retry && workError.RetryCount < wp.config.MaxRetries {
 		fileInfo, err := os.Stat(workError.FilePath)
-		if err != nil {
-			wp.logger.Error("Cannot retry file",
-				zap.String("file_path", workError.FilePath),
-				zap.Error(err),
-				zap.String("action", "Check file exists and has read permissions"))
+		if err == nil {
+			retryItem := WorkItem{
+				FilePath:   workError.FilePath,
+				FileInfo:   &dirEntryFromFileInfo{fileInfo},
+				RetryCount: workError.RetryCount + 1,
+			}
+			time.AfterFunc(wp.config.RetryDelay, func() {
+				select {
+				case wp.fileQueue <- retryItem:
+				case <-wp.ctx.Done():
+				}
+			})
 			return
 		}
-
-		dirEntry := &dirEntryFromFileInfo{fileInfo}
-
-		retryItem := WorkItem{
-			FilePath:   workError.FilePath,
-			FileInfo:   dirEntry,
-			RetryCount: workError.RetryCount + 1,
-		}
-
-		time.AfterFunc(wp.config.RetryDelay, func() {
-			select {
-			case wp.fileQueue <- retryItem:
-			case <-wp.ctx.Done():
-			}
-		})
-	} else {
-		wp.logger.Error("File processing failed",
+		// The file vanished since the failed attempt; it has to count as failed or waitForCompletion never finishes.
+		wp.logger.Error("Cannot retry file",
 			zap.String("file_path", workError.FilePath),
-			zap.Int("attempts", workError.RetryCount+1),
-			zap.Error(workError.Error),
-			zap.String("action", "Check file format is valid IBT or investigate error above"))
+			zap.Error(err),
+			zap.String("action", "Check file exists and has read permissions"))
+		failErr = err
 	}
+
+	// Report before counting: waitForCompletion returns as soon as the counts add up, which would drop this row.
+	wp.progress.OnFileFailed(filepath.Base(workError.FilePath), failErr)
+	wp.mu.Lock()
+	wp.metrics.TotalFilesFailed++
+	wp.mu.Unlock()
+	wp.logger.Error("File processing failed",
+		zap.String("file_path", workError.FilePath),
+		zap.Int("attempts", workError.RetryCount+1),
+		zap.Error(failErr),
+		zap.String("action", "Check file format is valid IBT or investigate error above"))
 }
 
 func (wp *WorkerPool) logFinalMetrics() {

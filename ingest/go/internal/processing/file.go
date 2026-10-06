@@ -72,14 +72,19 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 
 	groups := stubs.Group()
 
-	// Pre-count total records for progress tracking
+	// Pre-count ticks for progress tracking; each tick becomes one wire record.
+	// iRacing only records while the player is in the car, so ticks / tick rate is time on track.
 	totalExpectedRecords := 0
+	var onTrack time.Duration
 	for _, group := range groups {
-		totalExpectedRecords += len(group)
+		for _, stub := range group {
+			h := stub.Headers()
+			totalExpectedRecords += h.DiskHeader.RecordCount
+			onTrack += time.Duration(h.DiskHeader.RecordCount) * time.Second / time.Duration(h.TelemetryHeader.TickRate)
+		}
 	}
 
-	// Notify progress callback that file processing is starting
-	fp.progressCallback.OnFileStart(fileName, totalExpectedRecords)
+	fp.progressCallback.OnFileStart(fileName, totalExpectedRecords, onTrack)
 
 	totalRecords := 0
 	totalBatches := 0
@@ -128,10 +133,10 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 			fp.client,
 			fp.workerID,
 		)
+		pubSub.OnPublished = func(n int) { fp.progressCallback.OnBatchSent(fileName, n) }
 
 		// Create telemetry processor with the correct SubSessionID
 		processor := NewProcessor(pubSub, groupNumber, fp.config, fp.workerID, groupSessionID)
-		processor.SetProgressCallback(fp.progressCallback, fileName)
 		processors = append(processors, processor)
 
 		if err := ibt.Process(ctx, group, processor); err != nil {

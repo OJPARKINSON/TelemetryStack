@@ -36,10 +36,6 @@ type loaderProcessor struct {
 	// Metrics tracking
 	totalProcessed int
 	totalBatches   int
-
-	// Progress tracking
-	progressCallback ProgressCallback
-	currentFile      string
 }
 
 // sessionInfo holds session metadata
@@ -63,27 +59,19 @@ type ProcessorMetrics struct {
 // NewProcessor creates a new telemetry processor
 func NewProcessor(pubSub *messaging.PubSub, groupNumber int, config *config.Config, workerID int, subSessionID string) *loaderProcessor {
 	return &loaderProcessor{
-		pubSub:           pubSub,
-		cache:            make([]*ibt.TelemetryTick, 0, config.BatchSizeRecords),
-		groupNumber:      groupNumber,
-		config:           config,
-		thresholdBytes:   config.BatchSizeBytes,
-		workerID:         workerID,
-		subSessionID:     subSessionID,
-		sessionMap:       make(map[int]sessionInfo),
-		progressCallback: &NoOpProgressCallback{},
+		pubSub:         pubSub,
+		cache:          make([]*ibt.TelemetryTick, 0, config.BatchSizeRecords),
+		groupNumber:    groupNumber,
+		config:         config,
+		thresholdBytes: config.BatchSizeBytes,
+		workerID:       workerID,
+		subSessionID:   subSessionID,
+		sessionMap:     make(map[int]sessionInfo),
 		tickPool: &sync.Pool{
 			New: func() any {
 				return &ibt.TelemetryTick{}
 			},
 		},
-	}
-}
-
-func (l *loaderProcessor) SetProgressCallback(callback ProgressCallback, filename string) {
-	if callback != nil {
-		l.progressCallback = callback
-		l.currentFile = filename
 	}
 }
 
@@ -155,9 +143,6 @@ func (l *loaderProcessor) loadBatch() error {
 
 	l.cache = l.cache[:0]
 	l.totalBatches++
-
-	// Report progress after batch is sent
-	l.progressCallback.OnBatchSent(l.currentFile, l.totalProcessed, l.totalBatches)
 
 	return nil
 }

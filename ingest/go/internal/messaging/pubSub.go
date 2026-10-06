@@ -61,6 +61,9 @@ type PubSub struct {
 
 	mu        sync.Mutex
 	closeOnce sync.Once
+
+	// OnPublished, if set, is called with the record count of each batch the server accepts.
+	OnPublished func(records int)
 }
 
 type publishRequest struct {
@@ -213,32 +216,36 @@ func (ps *PubSub) publishWorker() {
 		select {
 		case req := <-ps.publishQueue:
 			log.Printf("Worker %d: Processing batch %s from async queue", ps.workerID, req.batch.BatchId)
-			if !ps.config.DryRun {
-				err := ps.doPublish(req.batch, req.data, req.encoding)
-				if err != nil {
-					log.Printf("Worker %d: ERROR publishing batch %s asynchronously: %v",
-						ps.workerID, req.batch.BatchId, err)
-				} else {
-					log.Printf("Worker %d: Successfully published batch %s", ps.workerID, req.batch.BatchId)
-				}
-				req.errCh <- err
-			}
+			ps.handleQueued(req)
 		case <-ps.publishDone:
 			log.Printf("Worker %d: Draining %d remaining batches from queue", ps.workerID, len(ps.publishQueue))
 
 			for len(ps.publishQueue) > 0 {
-				req := <-ps.publishQueue
-				if !ps.config.DryRun {
-					err := ps.doPublish(req.batch, req.data, req.encoding)
-					if err != nil {
-						log.Printf("Worker %d: ERROR publishing batch %s during shutdown: %v",
-							ps.workerID, req.batch.BatchId, err)
-					}
-					req.errCh <- err
-				}
+				ps.handleQueued(<-ps.publishQueue)
 			}
 			return
 		}
+	}
+}
+
+// handleQueued publishes one queued batch; in dry-run it only reports the batch as sent.
+func (ps *PubSub) handleQueued(req *publishRequest) {
+	if ps.config.DryRun {
+		ps.published(req.batch)
+		return
+	}
+	err := ps.doPublish(req.batch, req.data, req.encoding)
+	if err != nil {
+		log.Printf("Worker %d: ERROR publishing batch %s: %v", ps.workerID, req.batch.BatchId, err)
+	} else {
+		log.Printf("Worker %d: Successfully published batch %s", ps.workerID, req.batch.BatchId)
+	}
+	req.errCh <- err
+}
+
+func (ps *PubSub) published(batch *TelemetryBatch) {
+	if ps.OnPublished != nil {
+		ps.OnPublished(len(batch.Records))
 	}
 }
 
@@ -269,6 +276,7 @@ func (ps *PubSub) doPublish(batch *TelemetryBatch, data []byte, encoding string)
 		switch {
 		case err == nil && status >= 200 && status < 300:
 			ps.recordSuccess()
+			ps.published(batch)
 			return nil
 
 		case err != nil:

@@ -14,7 +14,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// TestPublish_StatusCodeContract: non-2xx responses must surface as errors, not count as sent.
+// TestPublish_StatusCodeContract: non-2xx responses must surface as errors, not count as sent
+// (neither in the error nor in OnPublished, which drives the CLI progress bar).
 func TestPublish_StatusCodeContract(t *testing.T) {
 	tests := []struct {
 		status  int
@@ -40,8 +41,18 @@ func TestPublish_StatusCodeContract(t *testing.T) {
 			cfg := testConfig(srv.URL)
 			ps := newTestPubSub(t, cfg, srv.Client())
 			batch, data, encoding := testPayload(t, cfg, 10)
+			published := 0
+			ps.OnPublished = func(n int) { published += n }
 
 			err := ps.doPublish(batch, data, encoding)
+
+			want := 10
+			if tt.wantErr {
+				want = 0
+			}
+			if published != want {
+				t.Errorf("status %d: OnPublished reported %d records, want %d", tt.status, published, want)
+			}
 
 			if tt.wantErr {
 				if err == nil {
