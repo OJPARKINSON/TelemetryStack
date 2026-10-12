@@ -2,7 +2,7 @@
 area: dash
 ticket: 0001
 opened: 2026-10-12
-base: 195b13faf09356bf0dd9dea8112b0e518e7a120a
+base: 5dda901c395ced84a31b0ff5f797f4f1fe9ca840
 branch: 0001-dash-sector-zoom
 ---
 # 0001-dash-sector-zoom
