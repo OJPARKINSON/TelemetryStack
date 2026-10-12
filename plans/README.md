@@ -8,6 +8,8 @@
 
 ## Drafts
 
+- [columnar-data](drafts/columnar-data.md) — scope moving to columnar data; verify, review prior work, compare against ATLAS
+
 ## Gates
 
 | Area | Gate |
