@@ -2,11 +2,14 @@
 
 ## Next
 
-- [0002-columnar-data](next/0002-columnar-data.md) — measure columnar vs row-wise across the whole pipeline (ingest → QuestDB/blobs → API → dashboard) and compare with ATLAS, kdb+, MoTeC
 
 ## Open
 
+<<<<<<< HEAD
 - [0001-dash-sector-zoom](open/0001-dash-sector-zoom.md): Zoom on a sector, plus a per-track sectors table · PR #31
+=======
+- [0002-columnar-data](open/0002-columnar-data.md) — measure columnar vs row-wise across the whole pipeline (ingest → QuestDB/blobs → API → dashboard) and compare with ATLAS, kdb+, MoTeC
+>>>>>>> bb7eb24 (plans: dispatch 0002)
 
 ## Blocked on
 
