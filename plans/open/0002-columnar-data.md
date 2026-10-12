@@ -3,7 +3,7 @@ area: ingest
 opened: 2026-10-12
 base: 5dda901
 branch: 0002-columnar-data
-blocked-on: step 3 QuestDB Parquet run on the M4 podman stack (you)
+blocked-on: paused 2026-10-12 (you); was waiting on step 3 QuestDB Parquet run on the M4 podman stack
 ---
 # 0002-columnar-data
 

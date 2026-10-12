@@ -14,12 +14,16 @@
 ## Blocked on
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 - 0001-dash-sector-zoom: you (review findings in the plan, manual stack checks, merge PR #31)
 
 ## Drafts
 
 =======
 - 0002-columnar-data: BLOCKED on you running step 3 (QuestDB Parquet on the M4 podman stack); commands in learnings/columnar.md
+=======
+- 0002-columnar-data: PAUSED 2026-10-12. When resumed, still needs you to run step 3 (QuestDB Parquet on the M4 podman stack); commands in learnings/columnar.md
+>>>>>>> 73d8d03 (plans: park 0002)
 
 ## Drafts
 
