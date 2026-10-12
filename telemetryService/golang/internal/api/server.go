@@ -54,9 +54,11 @@ func (s *Server) Start() error {
 
 func (s *Server) setupRoutes() {
 	s.app.Post("/api/ingest", s.handleIngest)
+	s.app.Put("/api/tracks/{trackId}", s.handlePutTrack)
 
 	s.app.Get("/api/sessions", s.handleGetSessions)
 	s.app.Get("/api/sessions/{sessionId}/laps", s.handleGetLaps)
 	s.app.Get("/api/sessions/{sessionId}/laps/{lapId}", s.handleGetTelemetry)
 	s.app.Get("/api/sessions/{sessionId}/laps/{lapId}/geojson", s.handleGetTelemetryGeoJson)
+	s.app.Get("/api/sessions/{sessionId}/laps/{lapId}/track", s.handleGetLapTrack)
 }

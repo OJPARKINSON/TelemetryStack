@@ -17,7 +17,7 @@ import {
 	telemetryFetcher,
 } from "../../lib/Fetch";
 import { formatLapTime } from "../../lib/format";
-import type { TelemetryDataPoint } from "../../lib/types";
+import type { TelemetryDataPoint, TrackInfo } from "../../lib/types";
 
 export const Route = createFileRoute("/$sessionId")({
 	component: SessionPage,
@@ -120,6 +120,13 @@ function SessionPageInner({
 		{ keepPreviousData: true },
 	);
 
+	// 404 for laps ingested before the Tracks table existed.
+	const { data: track } = useSWR<TrackInfo, Error>(
+		`/api/sessions/${sessionId}/laps/${currentLapId}/track`,
+		fetcherBR,
+		{ keepPreviousData: true, shouldRetryOnError: false },
+	);
+
 	const data = dataWithGPSCoordinates as TelemetryDataPoint[];
 
 	const { avgSpeed, lastPoint, fuelLapsEstimate } = useMemo(() => {
@@ -207,6 +214,7 @@ function SessionPageInner({
 				<TelemetrySection
 					dataWithGPSCoordinates={data}
 					racingLineData={racingLineData}
+					sectorStartPct={track?.sector_start_pct}
 					hoverCoordinates={hoverCoordinates}
 					hoveredIndex={hoveredIndex}
 					onHover={handleChartHover}

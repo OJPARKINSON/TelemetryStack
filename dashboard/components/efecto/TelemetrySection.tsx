@@ -4,6 +4,7 @@ import React, { useMemo, useState } from "react";
 import type { TelemetryDataPoint } from "../../lib/types";
 import { HoverMarker } from "../telemetry/HoverMarker";
 import { MemoizedRacingLine } from "../telemetry/RacingLine";
+import { SectorZoom } from "../telemetry/SectorZoom";
 import type { MapStyleOption } from "../ui/map/Map";
 import { NewMap as MapUI } from "../ui/map/Map";
 import { MapControls } from "../ui/map/MapControls";
@@ -41,6 +42,7 @@ const mapStyles = { light: darkTileStyle };
 interface TelemetrySectionProps {
 	dataWithGPSCoordinates: TelemetryDataPoint[];
 	racingLineData: FeatureCollection | undefined;
+	sectorStartPct?: number[];
 	hoverCoordinates: { lon: number; lat: number } | null;
 	hoveredIndex: number | null;
 	onHover: (index: number | null) => void;
@@ -52,6 +54,7 @@ interface TelemetrySectionProps {
 export default function TelemetrySection({
 	dataWithGPSCoordinates,
 	racingLineData,
+	sectorStartPct,
 	hoverCoordinates,
 	hoveredIndex,
 	onHover,
@@ -59,6 +62,14 @@ export default function TelemetrySection({
 	loading = false,
 }: TelemetrySectionProps) {
 	const [activeSector, setActiveSector] = useState<number | null>(null);
+
+	// LapDistPct is 0-100, sector_start_pct is 0-1; the last sector ends at 100.
+	const sectorRange = useMemo((): [number, number] | null => {
+		const start =
+			activeSector === null ? undefined : sectorStartPct?.[activeSector];
+		if (activeSector === null || start === undefined) return null;
+		return [start * 100, (sectorStartPct?.[activeSector + 1] ?? 1) * 100];
+	}, [activeSector, sectorStartPct]);
 
 	const routeCoordinates = useMemo(
 		() =>
@@ -130,6 +141,7 @@ export default function TelemetrySection({
 							{racingLineData && (
 								<MemoizedRacingLine dataWithGPSCoordinates={racingLineData} />
 							)}
+							<SectorZoom points={dataWithGPSCoordinates} range={sectorRange} />
 							<MapControls showZoom showCompass />
 							{hoverCoordinates && (
 								<HoverMarker
@@ -148,6 +160,7 @@ export default function TelemetrySection({
 				</div>
 				<SectorBar
 					data={dataWithGPSCoordinates}
+					sectorStartPct={sectorStartPct}
 					activeSector={activeSector}
 					onSectorChange={setActiveSector}
 					loading={loading}

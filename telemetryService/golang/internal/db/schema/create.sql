@@ -47,3 +47,10 @@ CREATE TABLE IF NOT EXISTS TelemetryTicks (
     rRtempM DOUBLE PRECISION,
     timestamp TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS Tracks (
+    track_id TEXT,
+    track_name TEXT,
+    sector_start_pct TEXT,
+    ts TIMESTAMP
+);

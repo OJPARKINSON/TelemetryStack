@@ -10,7 +10,8 @@ interface SectorTime {
 
 interface SectorBarProps {
 	data: TelemetryDataPoint[];
-	activeSector: number | null; // null = full lap, 0/1/2 = S1/S2/S3
+	sectorStartPct?: number[]; // fractions 0..1, first = 0
+	activeSector: number | null; // null = full lap, 0 = S1, ...
 	onSectorChange: (sector: number | null) => void;
 	/** Show placeholder sector buttons so the row keeps its height. */
 	loading?: boolean;
@@ -23,9 +24,12 @@ function formatSectorTime(seconds: number): string {
 	return seconds.toFixed(2);
 }
 
-function useSectorTimes(data: TelemetryDataPoint[]): SectorTime[] {
+function useSectorTimes(
+	data: TelemetryDataPoint[],
+	sectorStartPct: number[] | undefined,
+): SectorTime[] {
 	return useMemo(() => {
-		if (data.length < 10) return [];
+		if (!sectorStartPct?.length || data.length < 10) return [];
 
 		// Data is sorted by session_time. Find where LapCurrentLapTime
 		// resets (drops significantly) — that's the true lap start.
@@ -45,17 +49,17 @@ function useSectorTimes(data: TelemetryDataPoint[]): SectorTime[] {
 		// Sort by LapDistPct for boundary lookup
 		const sorted = lapData.toSorted((a, b) => a.LapDistPct - b.LapDistPct);
 
-		const boundaries = [0, 33.33, 66.66, 100];
+		const boundaries = [...sectorStartPct.map((p) => p * 100), 100];
 		const sectors: SectorTime[] = [];
 
-		for (let i = 0; i < 3; i++) {
+		for (let i = 0; i < sectorStartPct.length; i++) {
 			const startPct = boundaries[i];
 			const endPct = boundaries[i + 1];
 
 			let startPoint = sorted[0];
 			let endPoint = sorted[sorted.length - 1];
-			let minStartDiff = Infinity;
-			let minEndDiff = Infinity;
+			let minStartDiff = Number.POSITIVE_INFINITY;
+			let minEndDiff = Number.POSITIVE_INFINITY;
 
 			for (const p of sorted) {
 				const sd = Math.abs(p.LapDistPct - startPct);
@@ -81,19 +85,17 @@ function useSectorTimes(data: TelemetryDataPoint[]): SectorTime[] {
 		}
 
 		return sectors;
-	}, [data]);
+	}, [data, sectorStartPct]);
 }
 
 export function SectorBar({
 	data,
+	sectorStartPct,
 	activeSector,
 	onSectorChange,
 	loading,
 }: SectorBarProps) {
-	const computed = useSectorTimes(data);
-	const sectors: Array<SectorTime | null> = loading
-		? [null, null, null]
-		: computed;
+	const sectors = useSectorTimes(data, sectorStartPct);
 
 	if (sectors.length === 0) return null;
 
@@ -114,8 +116,7 @@ export function SectorBar({
 				{sectors.map((sector, i) => (
 					<button
 						type="button"
-						// biome-ignore lint/suspicious/noArrayIndexKey: always exactly three fixed sectors
-						key={`S${i + 1}`}
+						key={sector.time}
 						disabled={!sector}
 						onClick={() => onSectorChange(i)}
 						className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
@@ -126,7 +127,9 @@ export function SectorBar({
 					>
 						<span
 							className="w-2 h-2 rounded-full"
-							style={{ backgroundColor: SECTOR_COLORS[i] }}
+							style={{
+								backgroundColor: SECTOR_COLORS[i % SECTOR_COLORS.length],
+							}}
 						/>
 						<span className="font-semibold">S{i + 1}</span>
 						<span className="font-mono">
