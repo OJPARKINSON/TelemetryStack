@@ -8,6 +8,8 @@
 
 ## Drafts
 
+- [0001-dash-sector-zoom](drafts/0001-dash-sector-zoom.md): Zoom on a sector, plus a per-track geometry table
+
 - [columnar-data](drafts/columnar-data.md) — scope moving to columnar data; verify, review prior work, compare against ATLAS
 
 ## Gates
