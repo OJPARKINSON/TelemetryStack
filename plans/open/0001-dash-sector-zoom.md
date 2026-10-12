@@ -4,6 +4,7 @@ ticket: 0001
 opened: 2026-10-12
 base: 5dda901c395ced84a31b0ff5f797f4f1fe9ca840
 branch: 0001-dash-sector-zoom
+pr: https://github.com/OJPARKINSON/TelemetryStack/pull/31
 ---
 # 0001-dash-sector-zoom
 
