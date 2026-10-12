@@ -6,7 +6,7 @@
 
 ## Open
 
-- [0001-dash-sector-zoom](open/0001-dash-sector-zoom.md): Zoom on a sector, plus a per-track sectors table
+- [0001-dash-sector-zoom](open/0001-dash-sector-zoom.md): Zoom on a sector, plus a per-track sectors table · PR #31
 
 ## Blocked on
 
