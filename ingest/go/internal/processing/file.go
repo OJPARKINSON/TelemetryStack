@@ -139,6 +139,11 @@ func (fp *FileProcessor) ProcessFile(ctx context.Context, telemetryFolder string
 		processor := NewProcessor(pubSub, groupNumber, fp.config, fp.workerID, groupSessionID)
 		processors = append(processors, processor)
 
+		// A missing track row must not fail the telemetry ingest.
+		if err := messaging.PutTrack(ctx, fp.client, fp.config, groupHeaders.SessionInfo); err != nil {
+			log.Printf("Failed to send track %d: %v", groupWeekendInfo.TrackID, err)
+		}
+
 		if err := ibt.Process(ctx, group, processor); err != nil {
 			// Try to flush this processor before returning error
 			if flushErr := processor.FlushPendingData(); flushErr != nil {

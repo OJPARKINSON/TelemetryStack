@@ -13,3 +13,9 @@ type Session struct {
 type Lap struct {
 	LapID int `json:"lap_id"`
 }
+
+type Track struct {
+	TrackID        string    `json:"track_id"`
+	TrackName      string    `json:"track_name"`
+	SectorStartPct []float64 `json:"sector_start_pct"` // fractions 0..1
+}

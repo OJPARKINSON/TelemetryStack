@@ -208,3 +208,87 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusAccepted)
 }
+
+type putTrackBody struct {
+	TrackName      string    `json:"track_name"`
+	SectorStartPct []float64 `json:"sector_start_pct"`
+}
+
+func validTrackID(id string) bool {
+	if id == "" {
+		return false
+	}
+	for _, c := range id {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func validSectorStarts(pcts []float64) bool {
+	if len(pcts) < 1 || len(pcts) > 64 || pcts[0] != 0 {
+		return false
+	}
+	for i, p := range pcts {
+		if p < 0 || p >= 1 || (i > 0 && p <= pcts[i-1]) {
+			return false
+		}
+	}
+	return true
+}
+
+// PUT /api/tracks/123
+func (s *Server) handlePutTrack(w http.ResponseWriter, r *http.Request) {
+	trackID := chi.URLParam(r, "trackId")
+	if !validTrackID(trackID) {
+		respondError(w, http.StatusBadRequest, "Invalid track ID")
+		return
+	}
+
+	var body putTrackBody
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&body); err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid JSON body")
+		return
+	}
+	if !validSectorStarts(body.SectorStartPct) {
+		respondError(w, http.StatusBadRequest, "Invalid sector_start_pct")
+		return
+	}
+
+	err := s.sessions.UpsertTrack(r.Context(), domain.Track{
+		TrackID:        trackID,
+		TrackName:      body.TrackName,
+		SectorStartPct: body.SectorStartPct,
+	})
+	if err != nil {
+		log.Println(err)
+		respondError(w, http.StatusInternalServerError, "Failed to store track")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// /api/sessions/123456/laps/1/track
+func (s *Server) handleGetLapTrack(w http.ResponseWriter, r *http.Request) {
+	sessionID := chi.URLParam(r, "sessionId")
+	lapID := chi.URLParam(r, "lapId")
+
+	trackID, err := s.sessions.GetLapTrackID(r.Context(), sessionID, lapID)
+	if err == nil {
+		var track domain.Track
+		track, err = s.sessions.GetTrack(r.Context(), trackID)
+		if err == nil {
+			respondJSON(w, http.StatusOK, track)
+			return
+		}
+	}
+
+	if errors.Is(err, domain.ErrNotFound) {
+		respondError(w, http.StatusNotFound, "Track not found")
+		return
+	}
+	log.Println(err)
+	respondError(w, http.StatusInternalServerError, "Failed to fetch track")
+}

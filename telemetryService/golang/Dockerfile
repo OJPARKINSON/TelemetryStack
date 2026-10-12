@@ -1,4 +1,4 @@
-FROM golang:1.26-alpine AS builder
+FROM golang:1.27.1-alpine AS builder
 
 ARG TARGETARCH
 
@@ -10,8 +10,8 @@ RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY . .
 
 RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
+  --mount=type=cache,target=/root/.cache/go-build \
+  CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
   -o telemetry-service \
   -trimpath \
   -ldflags="-w -s" \

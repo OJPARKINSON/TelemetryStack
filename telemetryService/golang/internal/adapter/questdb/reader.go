@@ -2,10 +2,13 @@ package questdb
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/ojparkinson/telemetryService/internal/db/generated"
 	"github.com/ojparkinson/telemetryService/internal/domain"
@@ -110,4 +113,63 @@ func telemetryPointFromRow(row generated.GetLapTelemetryRow) domain.TelemetryPoi
 		SessionNum:         row.SessionNum.String,
 		SessionTime:        row.SessionTime.Float64,
 	}
+}
+
+func (r *Repository) UpsertTrack(ctx context.Context, track domain.Track) (err error) {
+	start := time.Now()
+	defer func() { observeQuery("upsert_track", start, err) }()
+
+	sectors, err := json.Marshal(track.SectorStartPct)
+	if err != nil {
+		return fmt.Errorf("marshal sectors: %w", err)
+	}
+	err = r.queries.UpsertTrack(ctx, generated.UpsertTrackParams{
+		TrackID:        pgtype.Text{String: track.TrackID, Valid: true},
+		TrackName:      pgtype.Text{String: track.TrackName, Valid: true},
+		SectorStartPct: pgtype.Text{String: string(sectors), Valid: true},
+	})
+	if err != nil {
+		return fmt.Errorf("upsert track: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) GetTrack(ctx context.Context, trackID string) (_ domain.Track, err error) {
+	start := time.Now()
+	defer func() { observeQuery("get_track", start, err) }()
+
+	row, err := r.queries.GetTrack(ctx, pgtype.Text{String: trackID, Valid: true})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Track{}, domain.ErrNotFound
+	}
+	if err != nil {
+		return domain.Track{}, fmt.Errorf("get track: %w", err)
+	}
+
+	track := domain.Track{TrackID: row.TrackID.String, TrackName: row.TrackName.String}
+	if err := json.Unmarshal([]byte(row.SectorStartPct.String), &track.SectorStartPct); err != nil {
+		return domain.Track{}, fmt.Errorf("unmarshal sectors: %w", err)
+	}
+	return track, nil
+}
+
+func (r *Repository) GetLapTrackID(ctx context.Context, sessionID, lapID string) (_ string, err error) {
+	start := time.Now()
+	defer func() { observeQuery("get_lap_track_id", start, err) }()
+
+	lapIDInt, err := strconv.ParseInt(lapID, 10, 32)
+	if err != nil {
+		return "", fmt.Errorf("invalid lap_id: %w", err)
+	}
+	trackID, err := r.queries.GetLapTrackID(ctx, generated.GetLapTrackIDParams{
+		SessionID: pgtype.Text{String: sessionID, Valid: true},
+		LapID:     pgtype.Int4{Int32: int32(lapIDInt), Valid: true},
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", domain.ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("get lap track id: %w", err)
+	}
+	return trackID.String, nil
 }
