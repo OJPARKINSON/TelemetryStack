@@ -20,7 +20,11 @@ opened: 2026-10-12
 - telemetryService/golang/internal/adapter/questdb/schema.go: the `TelemetryTicks` schema. A new table is a one-way door.
 - No overlapping plans or open PRs. The only open PRs are dependabot ones.
 
+## Answers (2026-10-12)
+> One track would be a row in a track table
+> I dont have my own outline data uness it can be infered or we get it from else where
+> This isn't at the splitting stage yet
+
 ## Open questions
-- Is a separate per-track table the right store, or is there a better way, such as deriving the track shape from an existing reference lap? (The ask raises this itself.)
-- What does "track data" contain: the outline geometry, the sector boundaries, or both?
-- The scope crosses areas (ingest, telemetry service, dashboard). Should it be one plan, or split into a store plan and a zoom plan?
+- Where does the track outline come from: inferred from lap telemetry (e.g. Lat/Lon), or an external source?
+- What is a track row's key and columns (track id, sector boundaries, outline)?
