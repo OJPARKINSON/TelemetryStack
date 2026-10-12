@@ -2,7 +2,7 @@
 area: ingest
 opened: 2026-10-12
 ---
-# columnar-data
+# 0002-columnar-data
 
 ## The ask
 
