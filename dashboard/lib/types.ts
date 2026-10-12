@@ -1,3 +1,9 @@
+export interface TrackInfo {
+	track_id: string;
+	track_name: string;
+	sector_start_pct: number[];
+}
+
 export interface SessionInfo {
 	id: string;
 	bucket: string;

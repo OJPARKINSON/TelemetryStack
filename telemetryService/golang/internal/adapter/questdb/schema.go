@@ -18,7 +18,7 @@ func NewSchema(host string, port int) *Schema {
 }
 
 func (s *Schema) CreateTableHTTP() error {
-	sql := `
+	ticks := `
 		    CREATE TABLE IF NOT EXISTS TelemetryTicks (
                 session_id SYMBOL CAPACITY 50000 INDEX,
                 lap_id SYMBOL INDEX,
@@ -71,8 +71,24 @@ func (s *Schema) CreateTableHTTP() error {
             DEDUP UPSERT KEYS(timestamp, session_id);
 	`
 
+	// ts is always 1970-01-01: with the DEDUP key that makes one row per track_id.
+	// Giving ts a real value would break that guarantee.
+	tracks := `
+		    CREATE TABLE IF NOT EXISTS Tracks (
+                track_id SYMBOL,
+                track_name STRING,
+                sector_start_pct STRING,
+                ts TIMESTAMP
+            ) TIMESTAMP(ts) PARTITION BY YEAR
+            WAL
+            DEDUP UPSERT KEYS(ts, track_id);
+	`
+
 	for i := 0; i < 3; i++ {
-		err := s.execDDL(sql)
+		err := s.execDDL(ticks)
+		if err == nil {
+			err = s.execDDL(tracks)
+		}
 		if err == nil {
 			return nil
 		}

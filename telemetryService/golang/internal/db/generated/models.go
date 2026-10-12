@@ -55,3 +55,10 @@ type Telemetrytick struct {
 	Rrtempm            pgtype.Float8    `json:"rrtempm"`
 	Timestamp          pgtype.Timestamp `json:"timestamp"`
 }
+
+type Track struct {
+	TrackID        pgtype.Text      `json:"track_id"`
+	TrackName      pgtype.Text      `json:"track_name"`
+	SectorStartPct pgtype.Text      `json:"sector_start_pct"`
+	Ts             pgtype.Timestamp `json:"ts"`
+}
