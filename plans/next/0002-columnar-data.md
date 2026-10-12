@@ -13,6 +13,8 @@ opened: 2026-10-12
 - Which layer? > the whole pipeline including and or excluding questdb
 - What to verify? > That columnar still beats what we do now
 - Which systems to compare? > Any top level motorsports teams use (wec, f1)
+- Who runs the QuestDB step? > it's running now on m4 14c with 24gb ram but the containers have less resources set with podman
+- Is the dashboard in scope? > yeah whole pipline includes dashboard
 
 ## Overview
 
@@ -34,7 +36,7 @@ Every stage is row-wise today.
 | storage | QuestDB native columns (uncompressed, fixed width), WAL, `PARTITION BY DAY`, DEDUP(timestamp, session_id). 4 STRING columns repeat per-session constants on every row | `adapter/questdb/schema.go:22-71` |
 | read | SQL by session + lap, returns rows | `internal/db/queries/telemetry.sql:1-10` |
 | API | JSON `{points: [{session_time, speed, …}, …]}`, 17 keys repeated per point, gzip level 5 | `internal/api/handlers.go:56-125`, `server.go:26` |
-| dashboard | consumes the row array (Recharts and MapLibre take rows) | `dashboard/hooks/useTelemetryData`, `lib/Fetch.tsx` |
+| dashboard | `telemetryFetcher` → `res.json()` → `processIRacingDataWithGPS` loops the rows, filters bad lat/lon, rescales units into `TelemetryDataPoint` rows; Recharts and MapLibre take rows | `dashboard/lib/Fetch.tsx:22-60,217-225`, `hooks/useTelemetryData.ts` |
 
 Earlier work (all measurements, nothing shipped):
 
@@ -75,7 +77,9 @@ Industry facts found in round one (to verify and cite in step 4):
 
 - `learnings/columnar.md` exists with one table: each pipeline stage → today's measured bytes (and
   encode/decode time where relevant) → columnar's measured bytes → verdict (build / don't / later)
-  and why. Covers both "with QuestDB" and "without QuestDB (per-lap blobs)" storage.
+  and why. Covers both "with QuestDB" and "without QuestDB (per-lap blobs)" storage, through to the dashboard.
+- The dashboard stage has measured parse + transform time for one real lap: row JSON (today) vs
+  column JSON vs columnar blob, each ending in the same `TelemetryDataPoint[]`.
 - The columnar wire numbers from `wire-format.md` are re-measured on today's corpus and code, and
   the doc says whether 5.68x / 5.91x still hold (±5%).
 - An industry section compares ATLAS, kdb+, MoTeC, Pi Toolbox, WinTAX and a web lap-analysis tool on wire format,
@@ -85,7 +89,9 @@ Industry facts found in round one (to verify and cite in step 4):
 
 ## Not doing
 
-- Changing `telemetry.proto`, any wire format, the QuestDB schema, the API response or the dashboard.
+- Changing `telemetry.proto`, any wire format, the QuestDB schema, the API response or the dashboard's
+  production code. The dashboard gets a benchmark script only.
+- Swapping Recharts/MapLibre for column-native charting.
 - Implementing XOR/shuffle in production code.
 - Lossy encodings (dropping `SessionTime`, quantising lat/lon) — `wire-format.md` §2 lists them as next.
 - Re-litigating ordering (`ordered-ingest*.md`) or the zstd choice.
@@ -104,7 +110,7 @@ None. Measurement only; no wire, schema or response type changes. A follow-up pl
    columns float32 + shuffle + zstd, + XOR. Each decoded and compared bit-for-bit
    (`math.Float64bits`), so the encoder lives in the test file only. Report MB, B/tick, ratio,
    encode MB/s, and decode MB/s (not measured before; the server pays it).
-2. **Storage and read path, offline.** Same test file, same corpus, grouped per lap
+2. **Storage and API payload, offline.** Same test file, same corpus, grouped per lap
    (`tick.LapID`) instead of per batch:
    - per-lap columnar blob size (step 1 encoder, one lap per blob) → MB per session-hour;
    - QuestDB native bytes per row computed from `schema.go:22-71` column widths, current and slim
@@ -112,23 +118,44 @@ None. Measurement only; no wire, schema or response type changes. A follow-up pl
    - API payload per lap: today's `telemetryEnvelope` row JSON (copy the 17 fields from
      `handlers.go:56-80`) vs column JSON (`{"speed":[…], …}`) vs the blob, each after gzip level 5
      (matches `server.go:26`).
-3. **QuestDB Parquet partitions (needs a running QuestDB: your stop point).** Write the exact
-   commands in the doc for you to run: per-partition size before and after
-   `ALTER TABLE TelemetryTicks CONVERT PARTITION TO PARQUET …` on one ingested day, plus
-   `GetLapTelemetry` latency both ways. The agent does not start Docker.
-4. **Industry comparison.** Verify every round-one fact above from primary sources (Motion Applied
+   - When `COLUMNAR_OUT=<dir>` is set, write one median-length lap in all three forms
+     (`lap.rows.json`, `lap.cols.json`, `lap.blob`) for step 4.
+3. **QuestDB on your local stack (your stop point).** You run it on the M4 (14 cores, 24 GB) under
+   podman. The doc records the podman machine's CPU/RAM and the QuestDB container limits (compose
+   asks for 6 CPU / 16 GB, `docker-compose.yml:82-83`), since the containers get less than the host.
+   The agent writes the exact commands into the doc and does not start containers:
+   - partition size on disk before and after
+     `ALTER TABLE TelemetryTicks CONVERT PARTITION TO PARQUET LIST '<day>'` for one ingested day;
+   - `GetLapTelemetry` latency (`curl --compressed -w '%{time_total}'` on
+     `/api/sessions/{id}/laps/{lap}`, 20 runs, median) before and after the convert;
+   - response bytes on the wire for the same lap (`-w '%{size_download}'`), to check step 2's gzip estimate.
+4. **Dashboard parse + transform.** Add `dashboard/scripts/columnar-bench.mjs` (plain Node, no new
+   dependency), reading the three files from step 2. For each, time decode → `TelemetryDataPoint[]`
+   over 50 runs (median): row JSON goes through a copy of `processIRacingDataWithGPS`
+   (`lib/Fetch.tsx:22-60`); column JSON is parsed then zipped into the same rows; the blob is
+   un-zstd'd, un-shuffled into `Float32Array`s, then zipped. Assert all three produce identical rows.
+   Manual cross-check in Chrome: load one real lap and read `telemetryFetcher`'s time in the
+   Performance panel, so the Node numbers are anchored to the browser.
+   Note: the blob path needs zstd in the browser. If that means a dependency, record it as the
+   cost and measure the blob with gzip (`DecompressionStream`, built in) instead.
+5. **Industry comparison.** Verify every round-one fact above from primary sources (Motion Applied
    docs and published .proto, KX, MoTeC parsers). Search Pi Toolbox and WinTAX formats. Fill the
    comparison table: wire format, storage layout, analysis read path, columnar yes/no, source.
-5. **Write `learnings/columnar.md`** in the house style of `wire-format.md` (TL;DR bullets, tables,
-   Method). Link it from `wire-format.md` and `hosting-sizing.md`. Per-stage verdict.
+6. **Write `learnings/columnar.md`** in the house style of `wire-format.md` (TL;DR bullets, tables,
+   Method). Link it from `wire-format.md` and `hosting-sizing.md`. Per-stage verdict, ingest to
+   dashboard.
 
 ## Verification
 
 - `cd ingest/go && go vet ./... && go test -race ./internal/...` (the new test skips without the env var).
-- `WIRE_COLUMNAR=1 IBT_DIR=<corpus> go test ./internal/processing -run TestColumnar -v -timeout 30m`
+- `cd dashboard && pnpm test:build && pnpm exec biome check`.
+- `WIRE_COLUMNAR=1 IBT_DIR=<corpus> COLUMNAR_OUT=<dir> go test ./internal/processing -run TestColumnar -v -timeout 30m`
   prints every table in the doc; numbers in the doc match the output.
+- `node dashboard/scripts/columnar-bench.mjs <dir>` prints the dashboard table and passes its
+  identical-rows assertion.
 - Manual: the step 1 baseline row matches `TestWireCodecs`' zstd-fastest row (same bytes).
-- Manual: step 3 run by you on the Pi or local stack; numbers pasted in.
+- Manual: step 3 run by you on the M4 podman stack; numbers and container limits pasted in.
+- Manual: Chrome Performance panel time for one real lap is in the same range as the Node row-JSON number.
 - Manual: every industry claim has a link or says "unverified".
 
 ## Risks
@@ -136,11 +163,10 @@ None. Measurement only; no wire, schema or response type changes. A follow-up pl
 - Corpus may have changed since 2026-09-24 (the epoch fix re-ingest); compare B/tick, not totals.
 - Lap grouping: lap 0 / out-laps and offline `SubSessionID 0` sessions can skew per-lap sizes;
   report median and total.
+- Step 3 runs under podman limits on a laptop, not the Pi; quote it as relative (before/after),
+  not as absolute Pi latency.
 - Motion Applied's protobuf schema may need an account to view; then mark the ATLAS wire claim unverified.
 
 ## Open questions
 
-- Step 3 needs a live QuestDB with ingested data. Do you run it (on the Pi or locally), or do we
-  drop Parquet partitions from this plan and leave them as the estimate in `hosting-sizing.md`?
-- Is the dashboard's read path in scope for the verdict (column JSON → rows in the browser), or
-  does "whole pipeline" stop at the API payload?
+None.
