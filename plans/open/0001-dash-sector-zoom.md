@@ -2,6 +2,8 @@
 area: dash
 ticket: 0001
 opened: 2026-10-12
+base: 195b13faf09356bf0dd9dea8112b0e518e7a120a
+branch: 0001-dash-sector-zoom
 ---
 # 0001-dash-sector-zoom
 
@@ -102,7 +104,7 @@ export interface TrackInfo { track_id: string; track_name: string; sector_start_
 ```
 
 ## Steps
-1. **Service storage.** Add the `Tracks` DDL to `schema.go`, run in the same retry loop as the ticks DDL. Add the sqlc schema and `queries/tracks.sql` as above, then `sqlc generate` (your stop point; see Open questions). Add `UpsertTrack`, `GetTrack` and `GetLapTrackID` to `adapter/questdb/reader.go`, in the shape of `GetLapTelemetry` (`reader.go:68`), including `observeQuery`. `GetTrack` unmarshals the JSON string into `[]float64`. Map `pgx.ErrNoRows` to a `domain.ErrNotFound`.
+1. **Service storage.** Add the `Tracks` DDL to `schema.go`, run in the same retry loop as the ticks DDL. Add the sqlc schema and `queries/tracks.sql` as above, then run `sqlc generate` in `telemetryService/golang/internal/db/` yourself (decided 2026-10-12). Add `UpsertTrack`, `GetTrack` and `GetLapTrackID` to `adapter/questdb/reader.go`, in the shape of `GetLapTelemetry` (`reader.go:68`), including `observeQuery`. `GetTrack` unmarshals the JSON string into `[]float64`. Map `pgx.ErrNoRows` to a `domain.ErrNotFound`.
 2. **Service API.** Add `domain.Track` and the three methods to `SessionRepository`. Add `handlePutTrack` (validation above) and `handleGetLapTrack` to `handlers.go` in the style of `handleGetLaps` (`handlers.go:32`), and add both routes in `server.go:55`. Put a `fakeSessions` in `fakes_test.go` and write table tests for the PUT validation cases plus GET 200/404.
 3. **Ingest.** New `internal/messaging/track.go` with `PutTrack(ctx, client, cfg, sess *headers.Session) error`. Its URL is `strings.TrimSuffix(cfg.IngestURL, "ingest") + "tracks/" + id`. It skips the call when `TrackID == 0` or there are no sectors. Call it in `file.go` right before `ibt.Process` (`file.go:142`) and only log a failure, because a missing track row must not fail the telemetry ingest. Test it with an `httptest` server like `helpers_test.go`: check the body, the path, and the skip cases.
 4. **Dashboard.** Add `TrackInfo` to `lib/types.ts`. In `$sessionId.tsx`, SWR-fetch `/api/sessions/${sessionId}/laps/${currentLapId}/track` next to the geojson (`:115`) and pass `sector_start_pct` down through `TelemetrySection`. `SectorBar` takes `sectorStartPct?: number[]` instead of hard-coding (×100 to match `LapDistPct`, and the last sector ends at 100). It renders no sector buttons without it and cycles `SECTOR_COLORS` for more than 3 sectors. Clicking the active sector deselects it. New `components/telemetry/SectorZoom.tsx`, built like `RacingLine.tsx`: given the lap points and an optional `[startPct, endPct]`, it builds a `LngLatBounds` from the points in range (all points when null) and calls `map.fitBounds(bounds, { padding: 40, duration: 200 })`. Render it inside `MapUI` in `TelemetrySection.tsx`.
@@ -128,4 +130,4 @@ Manual (yours; needs the stack, not `restart-dev`):
 - `fitBounds` runs during a style transition: wrap it in try/catch like `RacingLine.tsx:39`.
 
 ## Open questions
-- `plans/README.md` lists `sqlc generate` as your stop point, but `sprint/README.md` lets the loop run it. Should the worker run `sqlc generate` in step 1, or block until you do?
+none

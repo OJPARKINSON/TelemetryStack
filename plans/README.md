@@ -6,11 +6,12 @@
 
 ## Open
 
+- [0001-dash-sector-zoom](open/0001-dash-sector-zoom.md): Zoom on a sector, plus a per-track sectors table
+
 ## Blocked on
 
 ## Drafts
 
-- [0001-dash-sector-zoom](drafts/0001-dash-sector-zoom.md): Zoom on a sector, plus a per-track geometry table
 
 
 ## Gates
@@ -25,5 +26,4 @@
 
 - e2e: `cd e2e && go test ./tests/ -v -short` (Docker/testcontainers), at review only
 - `make restart-dev` / any docker compose (`down -v` wipes the QuestDB volume)
-- `sqlc generate` in `telemetryService/golang/internal/db/` after editing `queries/*.sql`
 - `ingest/go/ibt` submodule: never edited or committed
