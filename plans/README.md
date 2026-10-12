@@ -13,10 +13,19 @@
 
 ## Blocked on
 
+<<<<<<< HEAD
 - 0001-dash-sector-zoom: you (review findings in the plan, manual stack checks, merge PR #31)
 
 ## Drafts
 
+=======
+- 0002-columnar-data: BLOCKED on you running step 3 (QuestDB Parquet on the M4 podman stack); commands in learnings/columnar.md
+
+## Drafts
+
+- [0001-dash-sector-zoom](drafts/0001-dash-sector-zoom.md): Zoom on a sector, plus a per-track geometry table
+- [0003-columnar-lap-api](drafts/0003-columnar-lap-api.md): serve a lap as a columnar blob and decode it in the dashboard (from 0002)
+>>>>>>> a61ed0a (columnar: opt-in wire/storage/api measurement test, dashboard bench, 0003 draft)
 
 
 ## Gates
