@@ -5,6 +5,7 @@ opened: 2026-10-12
 base: 5dda901c395ced84a31b0ff5f797f4f1fe9ca840
 branch: 0001-dash-sector-zoom
 pr: https://github.com/OJPARKINSON/TelemetryStack/pull/31
+blocked-on: you (review findings below, manual stack checks, merge)
 ---
 # 0001-dash-sector-zoom
 
@@ -132,3 +133,27 @@ Manual (yours; needs the stack, not `restart-dev`):
 
 ## Open questions
 none
+
+## Changes after dispatch (asked for by you, 2026-10-12)
+- Short white lines across the track at each sector start (`dashboard/lib/sectorTicks.ts`, drawn with `MapRoute`). This replaces the "Not doing" line about sector ticks.
+- Full Lap button removed. Clicking the active sector again zooms back out.
+- `telemetryService/golang/Dockerfile` builds with `golang:1.27.1-alpine` to match `go.mod`.
+
+## Review findings (2026-10-12, PR #31, not fixed yet)
+Spec:
+- [ ] **Stale sector buttons after a 404.** `$sessionId.tsx` fetches the track with `keepPreviousData: true`, so moving to a lap with no track row keeps the old boundaries and the map zooms to the wrong sectors. Fix: drop `keepPreviousData` on that fetch.
+- [ ] **Non-numeric lapId returns 500 instead of 404.** `GetLapTrackID` returns a plain parse error. Fix: return `domain.ErrNotFound`, or a 400, for a bad lapId.
+- [ ] (minor) `activeSector` is not reset when the lap or track changes. It falls back to the whole lap, so nothing breaks.
+
+Standards (judgement calls):
+- [ ] **A failed track PUT is invisible by default.** `log.Printf` is discarded without `-v` (`ingest/go/CLAUDE.md`: "failures are loud"), and there is no retry. Surface it in the progress view or the zap logger.
+- [ ] **Track URL derivation is fragile.** `strings.TrimSuffix(cfg.IngestURL, "ingest")` breaks silently on an `INGEST_URL` override with a trailing slash. Parse it with `net/url`, or document the assumption.
+- [ ] (smell) `GetLapTrackID` duplicates `GetLapTelemetry`'s lapId parse and the `ErrNoRows` → `ErrNotFound` mapping.
+- [ ] (smell) The 0–1 → 0–100 conversion is repeated in `SectorBar`, `TelemetrySection` and `sectorTicks`. Convert once at the fetch.
+- [ ] (smell) `sectorTicks` and `SectorBar` repeat the same nearest-point search.
+- [ ] (smell) `sectorTicks`: `halfLengthM` is never passed, so make it a constant; rename `b`.
+- [ ] (smell) `validTrackID` could be `strconv.ParseUint`.
+
+## Manual checks status
+Not run against the stack yet: the first local run used the old ingest from the main folder (an Oct 4 binary with no track code), so `Tracks` stayed empty. To redo it, run the ingest from this worktree: `cd ingest/go && go run ./cmd/ingest --telemetryPath ~/Documents/personal/IRacing-Display/ingest/ibt_files`. With no `.env` it uses the default `localhost:8010`; main's `.env` points at the Pi. Then check for `PUT /api/tracks/<id> 204` in `docker logs telemetry-service`, one row per track in `Tracks`, and the sector buttons and lines in the browser.
+

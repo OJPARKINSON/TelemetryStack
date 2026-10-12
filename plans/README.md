@@ -10,6 +10,8 @@
 
 ## Blocked on
 
+- 0001-dash-sector-zoom: you (review findings in the plan, manual stack checks, merge PR #31)
+
 ## Drafts
 
 
