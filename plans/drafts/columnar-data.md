@@ -18,8 +18,10 @@ opened: 2026-10-12
 - Four `telemetry.proto` copies (ingest/go, telemetryService messaging, e2e publisher, legacy C#) — a wire change touches all live ones
 - No open PRs or issues in this area (open PRs are dependabot only)
 
-## Open questions
+## Answered
 
-- Which layer does "columnar" mean: the wire format only, QuestDB storage / the read path, or end to end?
-- "Verify this": what should the verification confirm? That columnar beats the current row-wise proto+zstd, or that the earlier wire-format.md numbers still hold?
-- Which systems besides the ATLAS data server go into the comparison ("etc")?
+- Which layer? > the whole pipeline including and or excluding questdb
+- What to verify? > That columnar still beats what we do now
+- Which systems to compare? > Any top level motorsports teams use (wec, f1)
+
+## Open questions
