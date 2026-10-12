@@ -1,6 +1,7 @@
 import type { FeatureCollection } from "geojson";
 import React, { useMemo, useState } from "react";
 
+import { sectorTicks } from "../../lib/sectorTicks";
 import type { TelemetryDataPoint } from "../../lib/types";
 import { HoverMarker } from "../telemetry/HoverMarker";
 import { MemoizedRacingLine } from "../telemetry/RacingLine";
@@ -70,6 +71,12 @@ export default function TelemetrySection({
 		if (activeSector === null || start === undefined) return null;
 		return [start * 100, (sectorStartPct?.[activeSector + 1] ?? 1) * 100];
 	}, [activeSector, sectorStartPct]);
+
+	const ticks = useMemo(
+		() =>
+			sectorStartPct ? sectorTicks(dataWithGPSCoordinates, sectorStartPct) : [],
+		[dataWithGPSCoordinates, sectorStartPct],
+	);
 
 	const routeCoordinates = useMemo(
 		() =>
@@ -141,6 +148,18 @@ export default function TelemetrySection({
 							{racingLineData && (
 								<MemoizedRacingLine dataWithGPSCoordinates={racingLineData} />
 							)}
+							{ticks.map((coordinates, i) => (
+								<MapRoute
+									// biome-ignore lint/suspicious/noArrayIndexKey: ticks are positional, one per sector start
+									key={i}
+									id={`sector-tick-${i}`}
+									coordinates={coordinates}
+									color="#ffffff"
+									width={2}
+									opacity={0.9}
+									interactive={false}
+								/>
+							))}
 							<SectorZoom points={dataWithGPSCoordinates} range={sectorRange} />
 							<MapControls showZoom showCompass />
 							{hoverCoordinates && (

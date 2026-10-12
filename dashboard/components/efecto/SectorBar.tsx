@@ -11,7 +11,7 @@ interface SectorTime {
 interface SectorBarProps {
 	data: TelemetryDataPoint[];
 	sectorStartPct?: number[]; // fractions 0..1, first = 0
-	activeSector: number | null; // null = full lap, 0 = S1, ...
+	activeSector: number | null; // null = full lap (click the active sector to return), 0 = S1, ...
 	onSectorChange: (sector: number | null) => void;
 	/** Show placeholder sector buttons so the row keeps its height. */
 	loading?: boolean;
@@ -102,17 +102,6 @@ export function SectorBar({
 	return (
 		<div className="flex items-center justify-between px-6 py-3 border-t border-border">
 			<div className="flex items-center gap-2">
-				<button
-					type="button"
-					onClick={() => onSectorChange(null)}
-					className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-						activeSector === null
-							? "bg-secondary text-foreground border border-border"
-							: "text-muted-foreground hover:text-foreground"
-					}`}
-				>
-					Full Lap
-				</button>
 				{sectors.map((sector, i) => (
 					<button
 						type="button"
