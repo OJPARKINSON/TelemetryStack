@@ -38,10 +38,10 @@ services:
     container_name: questdb
     restart: unless-stopped
     ports:
-      - "9002:9000" 
-      - "8812:8812" 
-      - "9009:9009" 
-      - "9003:9003" 
+      - "9002:9000"
+      - "8812:8812"
+      - "9009:9009"
+      - "9003:9003"
     volumes:
       - questdb-data:/var/lib/questdb
       - ./config/questdb.conf:/var/lib/questdb/conf/server.conf:ro
@@ -61,11 +61,34 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '4'
+          cpus: "4"
           memory: 8g
         reservations:
-          cpus: '1'
+          cpus: "1"
           memory: 1.5g
+
+  telemetry-dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: telemetry-dashboard
+    restart: unless-stopped
+    networks:
+      - telemetry-network
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1g
+    labels:
+      - "traefik.enable=true"
+      # Dashboard main routes
+      - "traefik.http.routers.telemetry-dashboard-local.rule=Host(`${LOCAL_DOMAIN:-localhost}`) && PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.telemetry-dashboard-local.middlewares=dashboard-stripprefix@file,security-headers@file"
+      - "traefik.http.routers.telemetry-dashboard-local.entrypoints=web"
+      # Service configuration
+      - "traefik.http.services.telemetry-dashboard.loadbalancer.server.port=8080"
+      - "com.centurylinklabs.watchtower.enable=true"
 
   telemetry-service:
     build:
@@ -79,11 +102,11 @@ services:
       QUESTDB_URL: questdb:8812;username=admin;password=quest
       QUESTDB_HOST: ${QUESTDB_HOST:-questdb}
       QUESTDB_PORT: ${QUESTDB_HTTP_PORT:-9000}
-      GOMAXPROCS: "0"       # Limit Go scheduler
-      GOGC: "200"           # Less aggressive GC
+      GOMAXPROCS: "0" # Limit Go scheduler
+      GOGC: "200" # Less aggressive GC
     ports:
-      - "9092:9092"  # Prometheus metrics
-      - "8010:8010"  # Prometheus metrics
+      - "9092:9092" # Prometheus metrics
+      - "8010:8010" # Prometheus metrics
     depends_on:
       questdb:
         condition: service_started
@@ -93,29 +116,6 @@ services:
       - "traefik.http.routers.telemetry-api-local.entrypoints=web"
       - "traefik.http.routers.telemetry-api-local.middlewares=api-security@file"
       - "traefik.http.services.telemetry-service.loadbalancer.server.port=8010"
-
-  telemetry-dashboard:
-    build:
-      context: ./dashboard
-      dockerfile: Dockerfile
-    container_name: telemetry-dashboard
-    restart: unless-stopped
-    networks:
-      - telemetry-network
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'      
-          memory: 1g       
-    labels:
-      - "traefik.enable=true"
-      # Dashboard main routes
-      - "traefik.http.routers.telemetry-dashboard-local.rule=Host(`${LOCAL_DOMAIN:-localhost}`) && PathPrefix(`/dashboard`)"
-      - "traefik.http.routers.telemetry-dashboard-local.middlewares=dashboard-stripprefix@file,security-headers@file"
-      - "traefik.http.routers.telemetry-dashboard-local.entrypoints=web"
-      # Service configuration
-      - "traefik.http.services.telemetry-dashboard.loadbalancer.server.port=8080"
-      - "com.centurylinklabs.watchtower.enable=true"
 
   grafana:
     image: dhi.io/grafana:12.3
@@ -135,21 +135,21 @@ services:
       GF_INSTALL_PLUGINS: grafana-clock-panel
       GF_PROVISIONING_AUTO_ASSIGN_ORG: "true"
       GF_PROVISIONING_AUTO_ASSIGN_ORG_ROLE: Admin
-      
+
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/files/system-monitoring.json
       GF_USERS_DEFAULT_THEME: dark
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
-      
+
     networks:
       - telemetry-network
     deploy:
       resources:
         limits:
-          cpus: '0.75'     
-          memory: 1.5g     
+          cpus: "0.75"
+          memory: 1.5g
         reservations:
-          cpus: '0.25'    
+          cpus: "0.25"
           memory: 256m
     labels:
       - "traefik.enable=true"
@@ -176,24 +176,24 @@ services:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=30d'  # Extended retention with 16GB RAM
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--web.enable-lifecycle'
-      - '--web.external-url=https://${LOCAL_DOMAIN:-localhost}/prometheus'
-      - '--web.route-prefix=/'
-      - '--storage.tsdb.retention.size=4GB'   # Use more disk space for metrics
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d" # Extended retention with 16GB RAM
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--web.enable-lifecycle"
+      - "--web.external-url=https://${LOCAL_DOMAIN:-localhost}/prometheus"
+      - "--web.route-prefix=/"
+      - "--storage.tsdb.retention.size=4GB" # Use more disk space for metrics
     networks:
       - telemetry-network
     deploy:
       resources:
         limits:
-          cpus: '0.75'     # More CPU for metrics processing
-          memory: 2g       # Double memory for larger datasets
+          cpus: "0.75" # More CPU for metrics processing
+          memory: 2g # Double memory for larger datasets
         reservations:
-          cpus: '0.25'
+          cpus: "0.25"
           memory: 512m
     labels:
       - "traefik.enable=true"
@@ -214,10 +214,10 @@ services:
       - /sys:/host/sys:ro
       - /:/rootfs:ro
     command:
-      - '--path.procfs=/host/proc'
-      - '--path.rootfs=/rootfs'
-      - '--path.sysfs=/host/sys'
-      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+      - "--path.procfs=/host/proc"
+      - "--path.rootfs=/rootfs"
+      - "--path.sysfs=/host/sys"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
     networks:
       - telemetry-network
     deploy:
