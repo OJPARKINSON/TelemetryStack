@@ -1,14 +1,10 @@
-import React, { useMemo } from "react";
+import React from "react";
+import { CHART_CONFIGS } from "../lib/chartConfigs";
 import type { TelemetryDataPoint } from "../lib/types";
+import { CHART_GRID_CLASS } from "./ChartCard";
 import { TelemetryChart } from "./TelemetryChart";
 
-export type ChartConfig = {
-	title: string;
-	dataKey: string;
-	color: string;
-	unit: string;
-	yDomain: number[];
-};
+export type { ChartConfig } from "../lib/chartConfigs";
 
 interface TelemetryChartsProps {
 	telemetryData: TelemetryDataPoint[];
@@ -21,58 +17,10 @@ const TelemetryCharts = React.memo(function TelemetryCharts({
 	onMouseLeave,
 	onHover,
 }: TelemetryChartsProps) {
-	const chartConfigs = useMemo<ChartConfig[]>(
-		() => [
-			{
-				title: "Speed",
-				dataKey: "Speed",
-				color: "#f97316",
-				unit: "km/h",
-				yDomain: [0, 300],
-			},
-			{
-				title: "Throttle",
-				dataKey: "Throttle",
-				color: "#22c55e",
-				unit: "%",
-				yDomain: [0, 100],
-			},
-			{
-				title: "Brake",
-				dataKey: "Brake",
-				color: "#ef4444",
-				unit: "%",
-				yDomain: [0, 100],
-			},
-			{
-				title: "Gear",
-				dataKey: "Gear",
-				color: "#8b5cf6",
-				unit: "",
-				yDomain: [0, 8],
-			},
-			{
-				title: "RPM",
-				dataKey: "RPM",
-				color: "#06b6d4",
-				unit: "",
-				yDomain: [0, 8000],
-			},
-			{
-				title: "Steering",
-				dataKey: "SteeringWheelAngle",
-				color: "#ec4899",
-				unit: "deg",
-				yDomain: [-3, 3],
-			},
-		],
-		[],
-	);
-
 	return (
 		// biome-ignore lint/a11y/noStaticElementInteractions: na
-		<div className="grid h-full space-y-1" onMouseLeave={onMouseLeave}>
-			{chartConfigs.map((config) => (
+		<div className={CHART_GRID_CLASS} onMouseLeave={onMouseLeave}>
+			{CHART_CONFIGS.map((config) => (
 				<TelemetryChart
 					onHover={onHover}
 					key={config.dataKey}

@@ -3,7 +3,7 @@ import type { TelemetryRes } from "../lib/Fetch";
 import type { TelemetryDataPoint } from "../lib/types";
 
 export function useTelemetryData(
-	initialTelemetryData: TelemetryRes,
+	initialTelemetryData: TelemetryRes | undefined,
 	sessionId: string,
 	hoveredIndex: number | null,
 ) {

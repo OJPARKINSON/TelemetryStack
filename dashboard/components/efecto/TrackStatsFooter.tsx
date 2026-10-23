@@ -1,18 +1,28 @@
 import { useMemo } from "react";
 import type { TelemetryDataPoint } from "../../lib/types";
+import { Bar } from "./Skeleton";
 
 interface TrackStatsFooterProps {
 	data: TelemetryDataPoint[];
+	/** Render the same cells with placeholder values. */
+	loading?: boolean;
 }
+
+const LOADING_STATS = [
+	"Track Length",
+	"Corners",
+	"Speed Range",
+	"GPS Points",
+].map((label) => ({ label, value: undefined, detail: undefined }));
 
 interface TrackStat {
 	label: string;
-	value: string;
+	value?: string;
 	detail?: string;
 }
 
-export function TrackStatsFooter({ data }: TrackStatsFooterProps) {
-	const stats = useMemo((): TrackStat[] => {
+export function TrackStatsFooter({ data, loading }: TrackStatsFooterProps) {
+	const computed = useMemo((): TrackStat[] => {
 		if (data.length === 0) return [];
 
 		const totalDistance = data.reduce(
@@ -54,6 +64,7 @@ export function TrackStatsFooter({ data }: TrackStatsFooterProps) {
 		];
 	}, [data]);
 
+	const stats: TrackStat[] = loading ? LOADING_STATS : computed;
 	if (stats.length === 0) return null;
 
 	return (
@@ -66,7 +77,7 @@ export function TrackStatsFooter({ data }: TrackStatsFooterProps) {
 					<p className="text-muted-foreground text-xs mb-0.5">{stat.label}</p>
 					<div className="flex items-baseline gap-1.5">
 						<p className="text-foreground text-sm font-mono font-semibold">
-							{stat.value}
+							{stat.value ?? <Bar className="w-[8ch]" />}
 						</p>
 						{stat.detail && (
 							<p className="text-muted-foreground text-xs font-mono">

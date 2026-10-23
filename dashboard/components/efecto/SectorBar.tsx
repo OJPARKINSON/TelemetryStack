@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import type { TelemetryDataPoint } from "../../lib/types";
+import { Bar } from "./Skeleton";
 
 interface SectorTime {
-	label: string;
 	time: number;
 	startPct: number;
 	endPct: number;
@@ -12,6 +12,8 @@ interface SectorBarProps {
 	data: TelemetryDataPoint[];
 	activeSector: number | null; // null = full lap, 0/1/2 = S1/S2/S3
 	onSectorChange: (sector: number | null) => void;
+	/** Show placeholder sector buttons so the row keeps its height. */
+	loading?: boolean;
 }
 
 const SECTOR_COLORS = ["#ef4444", "#f59e0b", "#22c55e"];
@@ -30,10 +32,7 @@ function useSectorTimes(data: TelemetryDataPoint[]): SectorTime[] {
 		// After the reset, LapCurrentLapTime increases monotonically.
 		let resetIndex = 0;
 		for (let i = 1; i < data.length; i++) {
-			if (
-				data[i].LapCurrentLapTime <
-				data[i - 1].LapCurrentLapTime - 10
-			) {
+			if (data[i].LapCurrentLapTime < data[i - 1].LapCurrentLapTime - 10) {
 				resetIndex = i;
 				break;
 			}
@@ -44,9 +43,7 @@ function useSectorTimes(data: TelemetryDataPoint[]): SectorTime[] {
 		if (lapData.length < 10) return [];
 
 		// Sort by LapDistPct for boundary lookup
-		const sorted = lapData.toSorted(
-			(a, b) => a.LapDistPct - b.LapDistPct,
-		);
+		const sorted = lapData.toSorted((a, b) => a.LapDistPct - b.LapDistPct);
 
 		const boundaries = [0, 33.33, 66.66, 100];
 		const sectors: SectorTime[] = [];
@@ -77,7 +74,6 @@ function useSectorTimes(data: TelemetryDataPoint[]): SectorTime[] {
 				endPoint.LapCurrentLapTime - startPoint.LapCurrentLapTime;
 
 			sectors.push({
-				label: `S${i + 1}`,
 				time: sectorTime > 0 ? sectorTime : 0,
 				startPct,
 				endPct,
@@ -92,8 +88,12 @@ export function SectorBar({
 	data,
 	activeSector,
 	onSectorChange,
+	loading,
 }: SectorBarProps) {
-	const sectors = useSectorTimes(data);
+	const computed = useSectorTimes(data);
+	const sectors: Array<SectorTime | null> = loading
+		? [null, null, null]
+		: computed;
 
 	if (sectors.length === 0) return null;
 
@@ -114,7 +114,9 @@ export function SectorBar({
 				{sectors.map((sector, i) => (
 					<button
 						type="button"
-						key={sector.label}
+						// biome-ignore lint/suspicious/noArrayIndexKey: always exactly three fixed sectors
+						key={`S${i + 1}`}
+						disabled={!sector}
 						onClick={() => onSectorChange(i)}
 						className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
 							activeSector === i
@@ -126,8 +128,14 @@ export function SectorBar({
 							className="w-2 h-2 rounded-full"
 							style={{ backgroundColor: SECTOR_COLORS[i] }}
 						/>
-						<span className="font-semibold">{sector.label}</span>
-						<span className="font-mono">{formatSectorTime(sector.time)}s</span>
+						<span className="font-semibold">S{i + 1}</span>
+						<span className="font-mono">
+							{sector ? (
+								`${formatSectorTime(sector.time)}s`
+							) : (
+								<Bar className="w-[6ch]" />
+							)}
+						</span>
 					</button>
 				))}
 			</div>

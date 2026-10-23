@@ -1,11 +1,15 @@
 import { Link } from "@tanstack/react-router";
+import { Bar } from "./Skeleton";
 
 interface HeaderProps {
-	trackName: string;
+	/** Undefined while loading. */
+	trackName?: string;
 	sessionNum: string;
 	currentLapId: number;
-	totalLaps: number;
-	lapTime: string;
+	/** Undefined while the lap list loads. */
+	totalLaps?: number;
+	/** Undefined while loading. */
+	lapTime?: string;
 	onPrevLap: () => void;
 	onNextLap: () => void;
 }
@@ -31,12 +35,14 @@ export const Header = ({
 							Telemetry
 						</p>
 						<p className="text-muted-foreground text-sm">/</p>
-						<p className="text-muted-foreground text-sm">{trackName}</p>
+						<p className="text-muted-foreground text-sm">
+							{trackName ?? <Bar className="w-20" />}
+						</p>
 					</div>
 				</Link>
 			</div>
 			<div className="flex items-center gap-4">
-				<div className="flex items-center gap-0 rounded-lg border border-border overflow-hidden bg-card w-full">
+				<div className="flex items-center gap-0 rounded-lg border border-border overflow-hidden bg-card">
 					<button
 						type="button"
 						onClick={onPrevLap}
@@ -53,19 +59,19 @@ export const Header = ({
 									{currentLapId}
 								</p>
 							</div>
-							<p className="text-muted-foreground text-xs font-mono">
-								/ {totalLaps}
+							<p className="text-muted-foreground text-xs font-mono min-w-[4ch]">
+								/ {totalLaps ?? <Bar className="w-[2ch]" />}
 							</p>
 						</div>
 						<div className="h-3 w-px bg-border" />
-						<p className="text-emerald-500 text-xs font-mono font-semibold">
-							{lapTime}
+						<p className="text-emerald-500 text-xs font-mono font-semibold min-w-[7ch]">
+							{lapTime ?? <Bar className="w-[7ch]" />}
 						</p>
 					</div>
 					<button
 						type="button"
 						onClick={onNextLap}
-						disabled={currentLapId >= totalLaps}
+						disabled={currentLapId >= (totalLaps ?? 0)}
 						className="px-2 py-1.5 flex items-center justify-center border-l border-border hover:bg-secondary transition-colors disabled:opacity-30"
 					>
 						<p className="text-muted-foreground text-xs">→</p>
@@ -73,7 +79,9 @@ export const Header = ({
 				</div>
 				<div className="flex items-center gap-2">
 					<div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-					<p className="text-muted-foreground text-xs">Session #{sessionNum}</p>
+					<p className="text-muted-foreground text-xs whitespace-nowrap">
+						Session #{sessionNum}
+					</p>
 				</div>
 			</div>
 		</div>

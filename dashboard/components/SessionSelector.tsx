@@ -1,4 +1,9 @@
 import { Link } from "@tanstack/react-router";
+import { cn } from "../lib/utils";
+import { Bar } from "./efecto/Skeleton";
+
+// Shared by the real rows and the skeleton rows so their height always matches.
+const ROW_CLASS = "flex items-center px-8 py-3.5 border-b border-border";
 
 export interface Session {
 	last_updated: string;
@@ -51,7 +56,10 @@ export default function SessionSelector({ sessions }: SessionSelectorProps) {
 					to="/$sessionId"
 					params={{ sessionId: session.session_id }}
 					search={{ lapId: 1 }}
-					className="group flex items-center px-8 py-3.5 border-b border-border hover:bg-secondary/50 transition-colors"
+					className={cn(
+						ROW_CLASS,
+						"group hover:bg-secondary/50 transition-colors",
+					)}
 				>
 					<div className="flex items-center gap-3 flex-1">
 						<div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center border border-border">
@@ -91,6 +99,46 @@ export default function SessionSelector({ sessions }: SessionSelectorProps) {
 						</div>
 					</div>
 				</Link>
+			))}
+		</div>
+	);
+}
+
+/** Placeholder rows with the same markup and size as the session rows above. */
+export function SessionSelectorSkeleton({ rows = 12 }: { rows?: number }) {
+	return (
+		<div className="flex flex-col" aria-busy>
+			{Array.from({ length: rows }, (_, i) => (
+				<div
+					// biome-ignore lint/suspicious/noArrayIndexKey: static placeholders
+					key={i}
+					className={ROW_CLASS}
+				>
+					<div className="flex items-center gap-3 flex-1">
+						<div className="w-8 h-8 rounded-md bg-secondary border border-border animate-pulse" />
+						<div className="flex flex-col">
+							<span className="text-sm">
+								<Bar className="w-24" />
+							</span>
+							<span className="text-xs">
+								<Bar className="w-32" />
+							</span>
+						</div>
+					</div>
+					<div className="flex items-center gap-8">
+						<span className="text-sm">
+							<Bar className="w-14" />
+						</span>
+						<span className="text-xs">
+							<Bar className="w-40" />
+						</span>
+						<div className="px-3 py-1.5 rounded-md bg-secondary/50 border border-border">
+							<span className="text-muted-foreground/50 text-xs font-medium">
+								Analyze
+							</span>
+						</div>
+					</div>
+				</div>
 			))}
 		</div>
 	);

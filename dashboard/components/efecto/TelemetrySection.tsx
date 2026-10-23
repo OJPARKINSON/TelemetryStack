@@ -9,6 +9,7 @@ import { NewMap as MapUI } from "../ui/map/Map";
 import { MapControls } from "../ui/map/MapControls";
 import { MapRoute } from "../ui/map/MapRoute";
 import { SectorBar } from "./SectorBar";
+import { Bar, TelemetryChartsSkeleton } from "./Skeleton";
 
 const ProfessionalTelemetryCharts = React.lazy(
 	() => import("../TelemetryCharts"),
@@ -43,6 +44,8 @@ interface TelemetrySectionProps {
 	hoveredIndex: number | null;
 	onHover: (index: number | null) => void;
 	onMouseLeave: () => void;
+	/** First load: keep the full layout and show placeholders inside it. */
+	loading?: boolean;
 }
 
 export default function TelemetrySection({
@@ -52,6 +55,7 @@ export default function TelemetrySection({
 	hoveredIndex,
 	onHover,
 	onMouseLeave,
+	loading = false,
 }: TelemetrySectionProps) {
 	const [activeSector, setActiveSector] = useState<number | null>(null);
 
@@ -96,16 +100,18 @@ export default function TelemetrySection({
 					<div className="flex items-center gap-2">
 						<div className="h-1.5 w-20 rounded-full bg-linear-to-r to-emerald-400 via-yellow-400 from-red-500" />
 						<p className="text-muted-foreground text-xs font-mono">
-							{minSpeed.toFixed(0)}
+							{loading ? <Bar className="w-[2ch]" /> : minSpeed.toFixed(0)}
 						</p>
 						<p className="text-muted-foreground text-xs">—</p>
 						<p className="text-muted-foreground text-xs font-mono">
-							{maxSpeed.toFixed(0)}
+							{loading ? <Bar className="w-[3ch]" /> : maxSpeed.toFixed(0)}
 						</p>
 					</div>
 				</div>
 				<div className="flex-1 bg-card relative overflow-hidden min-h-[500px]">
-					{hasData && dataWithGPSCoordinates[0]?.Lon !== undefined ? (
+					{loading ? (
+						<div className="absolute inset-0 bg-secondary/40 animate-pulse" />
+					) : hasData && dataWithGPSCoordinates[0]?.Lon !== undefined ? (
 						<MapUI
 							center={[
 								dataWithGPSCoordinates[0].Lon,
@@ -143,6 +149,7 @@ export default function TelemetrySection({
 					data={dataWithGPSCoordinates}
 					activeSector={activeSector}
 					onSectorChange={setActiveSector}
+					loading={loading}
 				/>
 			</div>
 
@@ -157,16 +164,10 @@ export default function TelemetrySection({
 					)}
 				</div>
 				<div className="h-full overflow-y-auto px-2 py-2">
-					{hasData ? (
-						<React.Suspense
-							fallback={
-								<div className="flex items-center justify-center h-64">
-									<p className="text-muted-foreground text-sm">
-										Loading charts...
-									</p>
-								</div>
-							}
-						>
+					{loading ? (
+						<TelemetryChartsSkeleton />
+					) : hasData ? (
+						<React.Suspense fallback={<TelemetryChartsSkeleton />}>
 							<ProfessionalTelemetryCharts
 								telemetryData={dataWithGPSCoordinates}
 								onMouseLeave={onMouseLeave}

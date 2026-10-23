@@ -10,6 +10,7 @@ import {
 	YAxis,
 } from "recharts";
 import type { TelemetryDataPoint } from "../lib/types";
+import { ChartCard } from "./ChartCard";
 import type { ChartConfig } from "./TelemetryCharts";
 
 interface TelemetryChartProps {
@@ -62,70 +63,55 @@ export const TelemetryChart = memo(function TelemetryChart({
 	);
 
 	return (
-		<div key={config.dataKey} className="rounded-lg bg-secondary/30 px-3">
-			<div className="flex items-center justify-between py-1">
-				<div className="flex items-center gap-1.5">
-					<span
-						className="w-1 h-3 rounded-full"
-						style={{ backgroundColor: config.color }}
+		<ChartCard config={config}>
+			<ResponsiveContainer width="100%" height="100%">
+				<LineChart
+					data={chartData}
+					margin={CHART_MARGIN}
+					syncId="telemetry-charts"
+					onMouseMove={handleMouseMove}
+				>
+					<CartesianGrid
+						strokeDasharray="3 3"
+						stroke="var(--border)"
+						opacity={0.3}
 					/>
-					<span className="font-medium text-xs text-foreground">
-						{config.title}
-					</span>
-				</div>
-				<span className="text-xs text-muted-foreground">{config.unit}</span>
-			</div>
+					<XAxis
+						dataKey="LapDistPct"
+						domain={X_AXIS_DOMAIN}
+						type="number"
+						scale="linear"
+						hide
+					/>
+					<YAxis
+						domain={config.yDomain}
+						tick={Y_AXIS_TICK}
+						axisLine={Y_AXIS_LINE}
+						tickLine={Y_AXIS_LINE}
+						tickFormatter={formatTick}
+						width={40}
+					/>
+					<Tooltip content={CustomTooltip} />
 
-			<div className="h-[65%]">
-				<ResponsiveContainer width="100%" height="100%">
-					<LineChart
-						data={chartData}
-						margin={CHART_MARGIN}
-						syncId="telemetry-charts"
-						onMouseMove={handleMouseMove}
-					>
-						<CartesianGrid
-							strokeDasharray="3 3"
-							stroke="var(--border)"
-							opacity={0.3}
-						/>
-						<XAxis
-							dataKey="LapDistPct"
-							domain={X_AXIS_DOMAIN}
-							type="number"
-							scale="linear"
-							hide
-						/>
-						<YAxis
-							domain={config.yDomain}
-							tick={Y_AXIS_TICK}
-							axisLine={Y_AXIS_LINE}
-							tickLine={Y_AXIS_LINE}
-							tickFormatter={formatTick}
-							width={40}
-						/>
-						<Tooltip content={CustomTooltip} />
+					<Line
+						type="monotone"
+						dataKey={config.dataKey}
+						stroke={config.color}
+						strokeWidth={1.5}
+						dot={false}
+						isAnimationActive={false}
+						connectNulls={false}
+					/>
 
-						<Line
-							type="monotone"
-							dataKey={config.dataKey}
-							stroke={config.color}
-							strokeWidth={1.5}
-							dot={false}
-							isAnimationActive={false}
-							connectNulls={false}
-						/>
-
-						<ReferenceLine
-							x={ReferenceLineX || 0}
-							stroke="var(--foreground)"
-							strokeWidth={1}
-							strokeDasharray="2 2"
-						/>
-					</LineChart>
-				</ResponsiveContainer>
-			</div>
-		</div>
+					<ReferenceLine
+						x={ReferenceLineX || 0}
+						stroke="var(--foreground)"
+						strokeWidth={1}
+						strokeDasharray="2 2"
+					/>
+				</LineChart>
+			</ResponsiveContainer>
+		</ChartCard>
 	);
 });
 

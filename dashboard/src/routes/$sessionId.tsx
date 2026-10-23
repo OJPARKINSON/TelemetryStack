@@ -5,7 +5,6 @@ import useSWR from "swr";
 
 import { DatabaseUnavailableError } from "../../components/efecto/ErrorStates";
 import { Header } from "../../components/efecto/Header";
-import { NewTelemetrySkeleton } from "../../components/efecto/Skeleton";
 import { StatBox } from "../../components/efecto/StatBox";
 import TelemetrySection from "../../components/efecto/TelemetrySection";
 import { TrackStatsFooter } from "../../components/efecto/TrackStatsFooter";
@@ -48,12 +47,13 @@ export default function SessionPage() {
 		{ keepPreviousData: true },
 	);
 
-	const { data: availableLaps } = useSWR<Array<number>, Error>(
-		`/api/sessions/${sessionId}/laps`,
-		fetcher,
-	);
+	const { data: availableLaps, error: lapsError } = useSWR<
+		Array<number>,
+		Error
+	>(`/api/sessions/${sessionId}/laps`, fetcher);
 
-	const totalLaps = availableLaps?.length ?? 0;
+	// Undefined while the lap list loads; 0 if it failed.
+	const totalLaps = lapsError ? 0 : availableLaps?.length;
 
 	const handleLapChange = (newLapId: number) => {
 		nav({
@@ -65,11 +65,11 @@ export default function SessionPage() {
 
 	if (error) return <DatabaseUnavailableError />;
 
-	// First load only — show skeleton
-	if (isLoading || !telemetryData) return <NewTelemetrySkeleton />;
-
+	// First load renders the same layout with placeholders, so nothing moves
+	// when the data arrives.
 	return (
 		<SessionPageInner
+			loading={isLoading || !telemetryData}
 			telemetryData={telemetryData}
 			isValidating={isValidating}
 			sessionId={sessionId}
@@ -81,15 +81,17 @@ export default function SessionPage() {
 }
 
 interface SessionPageInnerProps {
-	telemetryData: TelemetryRes;
+	loading: boolean;
+	telemetryData: TelemetryRes | undefined;
 	isValidating: boolean;
 	sessionId: string;
 	currentLapId: number;
-	totalLaps: number;
+	totalLaps: number | undefined;
 	onLapChange: (lapId: number) => void;
 }
 
 function SessionPageInner({
+	loading,
 	telemetryData,
 	isValidating,
 	sessionId,
@@ -136,21 +138,25 @@ function SessionPageInner({
 	return (
 		<div className="flex flex-col bg-background border border-border w-full mx-auto min-h-screen">
 			<Header
-				trackName={trackInfo?.trackName || "Unknown Track"}
+				trackName={
+					loading ? undefined : trackInfo?.trackName || "Unknown Track"
+				}
 				sessionNum={sessionId}
 				currentLapId={currentLapId}
 				totalLaps={totalLaps}
-				lapTime={formatLapTime(trackInfo?.lapTime)}
+				lapTime={loading ? undefined : formatLapTime(trackInfo?.lapTime)}
 				onPrevLap={() => {
 					if (currentLapId > 1) onLapChange(currentLapId - 1);
 				}}
 				onNextLap={() => {
-					if (currentLapId < totalLaps) onLapChange(currentLapId + 1);
+					if (totalLaps && currentLapId < totalLaps)
+						onLapChange(currentLapId + 1);
 				}}
 			/>
 			<div className="flex items-stretch border-b border-border w-full bg-background">
 				<StatBox
 					title="Lap Time"
+					loading={loading}
 					stat={formatLapTime(trackInfo?.lapTime)}
 					delta={
 						trackInfo?.lapTime
@@ -160,11 +166,13 @@ function SessionPageInner({
 				/>
 				<StatBox
 					title="Max Speed"
+					loading={loading}
 					stat={`${(trackInfo?.maxSpeed ?? 0).toFixed(1)}`}
 					unit="km/h"
 				/>
 				<StatBox
 					title="Position"
+					loading={loading}
 					stat={`P${lastPoint?.PlayerCarPosition || "-"}`}
 					delta={
 						lastPoint?.PlayerCarPosition && lastPoint.PlayerCarPosition > 1
@@ -174,21 +182,26 @@ function SessionPageInner({
 				/>
 				<StatBox
 					title="Avg Speed"
+					loading={loading}
 					stat={`${avgSpeed.toFixed(1)}`}
 					unit="km/h"
 				/>
 				<StatBox
 					title="Fuel Remaining"
+					loading={loading}
 					stat={`${(lastPoint?.FuelLevel ?? 0).toFixed(1)}`}
 					unit="L"
 					delta={fuelLapsEstimate > 0 ? `~${fuelLapsEstimate} laps` : undefined}
 				/>
 			</div>
-			{showLoading && (
-				<div className="h-0.5 w-full bg-border overflow-hidden">
-					<div className="h-full w-1/3 bg-primary animate-slide" />
-				</div>
-			)}
+			{/* Zero-height anchor: the progress bar overlays content instead of pushing it down */}
+			<div className="relative h-0 w-full">
+				{showLoading && (
+					<div className="absolute inset-x-0 top-0 z-10 h-0.5 bg-border overflow-hidden">
+						<div className="h-full w-1/3 bg-primary animate-slide" />
+					</div>
+				)}
+			</div>
 			<div className="flex flex-col flex-1">
 				<TelemetrySection
 					dataWithGPSCoordinates={data}
@@ -197,9 +210,10 @@ function SessionPageInner({
 					hoveredIndex={hoveredIndex}
 					onHover={handleChartHover}
 					onMouseLeave={handleChartMouseLeave}
+					loading={loading}
 				/>
 			</div>
-			<TrackStatsFooter data={data} />
+			<TrackStatsFooter data={data} loading={loading} />
 		</div>
 	);
 }

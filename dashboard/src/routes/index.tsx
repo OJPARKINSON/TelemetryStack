@@ -4,6 +4,7 @@ import useSWR from "swr";
 import { StatBox } from "../../components/efecto/StatBox";
 import SessionSelector, {
 	type Session,
+	SessionSelectorSkeleton,
 } from "../../components/SessionSelector";
 import { fetcher } from "../../lib/Fetch";
 
@@ -13,35 +14,6 @@ function RouteComponent() {
 		fetcher,
 	);
 	const [activeTrack, setActiveTrack] = useState<string | null>(null);
-
-	if (isLoading) {
-		return (
-			<div className="flex flex-col bg-background w-full min-h-screen">
-				<div className="flex items-center justify-between px-8 py-4 border-b border-border bg-background">
-					<div className="flex items-center gap-2.5">
-						<div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center">
-							<span className="text-primary-foreground text-xs font-bold">
-								iR
-							</span>
-						</div>
-						<span className="text-foreground text-sm font-medium tracking-tight">
-							Telemetry
-						</span>
-						<span className="text-muted-foreground text-sm">/</span>
-						<span className="text-muted-foreground text-sm">Sessions</span>
-					</div>
-				</div>
-				<div className="flex-1 flex items-center justify-center">
-					<div className="flex items-center gap-3">
-						<div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-						<span className="text-muted-foreground text-sm">
-							Loading sessions...
-						</span>
-					</div>
-				</div>
-			</div>
-		);
-	}
 
 	const sessions = data ?? [];
 	const sessionsByTrack = sessions.reduce(
@@ -119,27 +91,51 @@ function RouteComponent() {
 				</div>
 				<div className="flex items-center gap-2">
 					<div
-						className={`w-1.5 h-1.5 rounded-full ${error ? "bg-red-500" : "bg-emerald-500"}`}
+						className={`w-1.5 h-1.5 rounded-full ${isLoading ? "bg-muted-foreground/40 animate-pulse" : error ? "bg-red-500" : "bg-emerald-500"}`}
 					/>
-					<span className="text-muted-foreground text-xs">
-						{error ? "Offline" : "Connected"}
+					{/* Widest label reserves the space so the dot never moves */}
+					<span className="grid text-muted-foreground text-xs">
+						<span className="invisible col-start-1 row-start-1">
+							Connecting
+						</span>
+						<span className="col-start-1 row-start-1">
+							{isLoading ? "Connecting" : error ? "Offline" : "Connected"}
+						</span>
 					</span>
 				</div>
 			</div>
 
 			{/* Stats row — matches session page StatBox pattern */}
-			{sessions.length > 0 && (
+			{(isLoading || sessions.length > 0) && (
 				<div className="flex items-stretch border-b border-border w-full bg-background">
-					<StatBox title="Total Sessions" stat={String(sessions.length)} />
-					<StatBox title="Total Laps" stat={totalLaps.toLocaleString()} />
-					<StatBox title="Tracks" stat={String(trackNames.length)} />
-					<StatBox title="Database" stat={error ? "Offline" : "Online"} />
+					<StatBox
+						title="Total Sessions"
+						stat={String(sessions.length)}
+						loading={isLoading}
+					/>
+					<StatBox
+						title="Total Laps"
+						stat={totalLaps.toLocaleString()}
+						loading={isLoading}
+					/>
+					<StatBox
+						title="Tracks"
+						stat={String(trackNames.length)}
+						loading={isLoading}
+					/>
+					<StatBox
+						title="Database"
+						stat={error ? "Offline" : "Online"}
+						loading={isLoading}
+					/>
 				</div>
 			)}
 
 			{/* Content */}
 			<div className="flex-1 overflow-y-auto">
-				{data === undefined ? (
+				{isLoading ? (
+					<SessionSelectorSkeleton />
+				) : data === undefined ? (
 					<div className="p-8">
 						<div className="rounded-lg border border-red-800/50 bg-red-950/50 p-6">
 							<div className="flex items-start gap-3">
