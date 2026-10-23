@@ -4,19 +4,17 @@ import type { TelemetryDataPoint } from "../lib/types";
 import { CHART_GRID_CLASS } from "./ChartCard";
 import { TelemetryChart } from "./TelemetryChart";
 
-export type { ChartConfig } from "../lib/chartConfigs";
-
-interface TelemetryChartsProps {
+interface ChartSectionProps {
 	telemetryData: TelemetryDataPoint[];
 	onMouseLeave?: () => void;
 	onHover?: (index: number | null) => void;
 }
 
-const TelemetryCharts = React.memo(function TelemetryCharts({
+const ChartSection = React.memo(function ChartSection({
 	telemetryData,
 	onMouseLeave,
 	onHover,
-}: TelemetryChartsProps) {
+}: ChartSectionProps) {
 	// One owner for the popover so two charts can never show it at once
 	const [hoveredKey, setHoveredKey] = useState<string | null>(null);
 
@@ -44,6 +42,6 @@ const TelemetryCharts = React.memo(function TelemetryCharts({
 	);
 });
 
-TelemetryCharts.displayName = "TelemetryCharts";
+ChartSection.displayName = "ChartSection";
 
-export default TelemetryCharts;
+export default ChartSection;

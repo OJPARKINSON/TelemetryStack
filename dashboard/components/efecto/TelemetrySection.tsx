@@ -11,9 +11,7 @@ import { MapRoute } from "../ui/map/MapRoute";
 import { SectorBar } from "./SectorBar";
 import { Bar, TelemetryChartsSkeleton } from "./Skeleton";
 
-const ProfessionalTelemetryCharts = React.lazy(
-	() => import("../TelemetryCharts"),
-);
+const ChartSection = React.lazy(() => import("../ChartSection"));
 
 const darkTileStyle: MapStyleOption = {
 	version: 8,
@@ -168,7 +166,7 @@ export default function TelemetrySection({
 						<TelemetryChartsSkeleton />
 					) : hasData ? (
 						<React.Suspense fallback={<TelemetryChartsSkeleton />}>
-							<ProfessionalTelemetryCharts
+							<ChartSection
 								telemetryData={dataWithGPSCoordinates}
 								onMouseLeave={onMouseLeave}
 								onHover={onHover}

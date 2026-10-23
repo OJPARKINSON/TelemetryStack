@@ -12,7 +12,7 @@ import {
 import { formatLapTime } from "../lib/format";
 import type { TelemetryDataPoint } from "../lib/types";
 import { ChartCard } from "./ChartCard";
-import type { ChartConfig } from "./TelemetryCharts";
+import type { ChartConfig } from "../lib/chartConfigs";
 
 interface TelemetryChartProps {
 	config: ChartConfig;
