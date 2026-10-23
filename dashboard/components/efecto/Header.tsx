@@ -12,6 +12,7 @@ interface HeaderProps {
 	lapTime?: string;
 	onPrevLap: () => void;
 	onNextLap: () => void;
+	onLapChange: (lapId: number) => void;
 }
 
 export const Header = ({
@@ -22,7 +23,18 @@ export const Header = ({
 	lapTime,
 	onPrevLap,
 	onNextLap,
+	onLapChange,
 }: HeaderProps) => {
+	// Commit on Enter/blur, not per keystroke, so typing "20" doesn't load lap 2 first
+	const commitLap = (input: HTMLInputElement) => {
+		const lap = Math.round(Number(input.value));
+		if (totalLaps && lap >= 1 && lap <= totalLaps && lap !== currentLapId) {
+			onLapChange(lap);
+		} else {
+			input.value = String(currentLapId);
+		}
+	};
+
 	return (
 		<div className="flex items-center justify-between px-8 py-4 border-b border-border w-full bg-background">
 			<div className="flex items-center gap-6">
@@ -54,11 +66,26 @@ export const Header = ({
 					<div className="flex items-center gap-2.5 px-2.5 py-1">
 						<div className="flex items-baseline gap-1">
 							<p className="text-muted-foreground text-xs">Lap</p>
-							<div className="bg-secondary rounded px-1 py-0.5 border border-border">
-								<p className="text-foreground text-xs font-mono font-semibold">
-									{currentLapId}
-								</p>
-							</div>
+							<input
+								key={currentLapId}
+								type="number"
+								inputMode="numeric"
+								aria-label="Lap number"
+								min={1}
+								max={totalLaps}
+								defaultValue={currentLapId}
+								disabled={!totalLaps}
+								onFocus={(e) => e.currentTarget.select()}
+								onBlur={(e) => commitLap(e.currentTarget)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter") commitLap(e.currentTarget);
+									if (e.key === "Escape") {
+										e.currentTarget.value = String(currentLapId);
+										e.currentTarget.blur();
+									}
+								}}
+								className="w-[4ch] bg-secondary rounded px-1 py-0.5 border border-border text-foreground text-xs font-mono font-semibold text-center outline-none focus:border-primary [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+							/>
 							<p className="text-muted-foreground text-xs font-mono min-w-[4ch]">
 								/ {totalLaps ?? <Bar className="w-[2ch]" />}
 							</p>

@@ -21,7 +21,7 @@ const ChartSection = React.memo(function ChartSection({
 	return (
 		// biome-ignore lint/a11y/noStaticElementInteractions: na
 		<div
-			className={CHART_GRID_CLASS}
+			className={`${CHART_GRID_CLASS} animate-fade-in`}
 			onMouseLeave={() => {
 				setHoveredKey(null);
 				onMouseLeave?.();

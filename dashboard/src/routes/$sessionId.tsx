@@ -144,6 +144,7 @@ function SessionPageInner({
 				sessionNum={sessionId}
 				currentLapId={currentLapId}
 				totalLaps={totalLaps}
+				onLapChange={onLapChange}
 				lapTime={loading ? undefined : formatLapTime(trackInfo?.lapTime)}
 				onPrevLap={() => {
 					if (currentLapId > 1) onLapChange(currentLapId - 1);

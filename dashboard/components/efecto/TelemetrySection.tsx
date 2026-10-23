@@ -11,7 +11,10 @@ import { MapRoute } from "../ui/map/MapRoute";
 import { SectorBar } from "./SectorBar";
 import { Bar, TelemetryChartsSkeleton } from "./Skeleton";
 
-const ChartSection = React.lazy(() => import("../ChartSection"));
+const loadCharts = () => import("../ChartSection");
+// Start the chunk download now, in parallel with the lap data request.
+loadCharts();
+const ChartSection = React.lazy(loadCharts);
 
 const darkTileStyle: MapStyleOption = {
 	version: 8,

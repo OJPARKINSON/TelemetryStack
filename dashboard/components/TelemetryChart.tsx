@@ -116,7 +116,7 @@ export const TelemetryChart = memo(function TelemetryChart({
 					/>
 
 					<Line
-						type="monotone"
+						type="linear"
 						dataKey={config.dataKey}
 						stroke={config.color}
 						strokeWidth={1.5}
