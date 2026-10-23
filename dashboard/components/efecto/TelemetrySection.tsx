@@ -40,6 +40,9 @@ const darkTileStyle: MapStyleOption = {
 
 const mapStyles = { light: darkTileStyle };
 
+// Equal thirds for laps whose track has no sector data (ingested before the Tracks table).
+const DEFAULT_SECTOR_STARTS = [0, 1 / 3, 2 / 3];
+
 interface TelemetrySectionProps {
 	dataWithGPSCoordinates: TelemetryDataPoint[];
 	racingLineData: FeatureCollection | undefined;
@@ -55,26 +58,26 @@ interface TelemetrySectionProps {
 export default function TelemetrySection({
 	dataWithGPSCoordinates,
 	racingLineData,
-	sectorStartPct,
+	sectorStartPct: trackSectorStarts,
 	hoverCoordinates,
 	hoveredIndex,
 	onHover,
 	onMouseLeave,
 	loading = false,
 }: TelemetrySectionProps) {
+	const sectorStartPct = trackSectorStarts ?? DEFAULT_SECTOR_STARTS;
 	const [activeSector, setActiveSector] = useState<number | null>(null);
 
 	// LapDistPct is 0-100, sector_start_pct is 0-1; the last sector ends at 100.
 	const sectorRange = useMemo((): [number, number] | null => {
 		const start =
-			activeSector === null ? undefined : sectorStartPct?.[activeSector];
+			activeSector === null ? undefined : sectorStartPct[activeSector];
 		if (activeSector === null || start === undefined) return null;
-		return [start * 100, (sectorStartPct?.[activeSector + 1] ?? 1) * 100];
+		return [start * 100, (sectorStartPct[activeSector + 1] ?? 1) * 100];
 	}, [activeSector, sectorStartPct]);
 
 	const ticks = useMemo(
-		() =>
-			sectorStartPct ? sectorTicks(dataWithGPSCoordinates, sectorStartPct) : [],
+		() => sectorTicks(dataWithGPSCoordinates, sectorStartPct),
 		[dataWithGPSCoordinates, sectorStartPct],
 	);
 
@@ -205,6 +208,7 @@ export default function TelemetrySection({
 								telemetryData={dataWithGPSCoordinates}
 								onMouseLeave={onMouseLeave}
 								onHover={onHover}
+								xDomain={sectorRange ?? undefined}
 							/>
 						</React.Suspense>
 					) : (
@@ -216,9 +220,13 @@ export default function TelemetrySection({
 					)}
 				</div>
 				<div className="flex items-center justify-between px-5 py-2 border-t border-border">
-					<p className="text-muted-foreground text-xs font-mono">0%</p>
+					<p className="text-muted-foreground text-xs font-mono">
+						{(sectorRange?.[0] ?? 0).toFixed(0)}%
+					</p>
 					<p className="text-muted-foreground text-xs">Lap Distance</p>
-					<p className="text-muted-foreground text-xs font-mono">100%</p>
+					<p className="text-muted-foreground text-xs font-mono">
+						{(sectorRange?.[1] ?? 100).toFixed(0)}%
+					</p>
 				</div>
 			</div>
 		</div>

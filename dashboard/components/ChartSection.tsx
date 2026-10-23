@@ -8,12 +8,14 @@ interface ChartSectionProps {
 	telemetryData: TelemetryDataPoint[];
 	onMouseLeave?: () => void;
 	onHover?: (index: number | null) => void;
+	xDomain?: [number, number];
 }
 
 const ChartSection = React.memo(function ChartSection({
 	telemetryData,
 	onMouseLeave,
 	onHover,
+	xDomain,
 }: ChartSectionProps) {
 	// One owner for the popover so two charts can never show it at once
 	const [hoveredKey, setHoveredKey] = useState<string | null>(null);
@@ -35,6 +37,7 @@ const ChartSection = React.memo(function ChartSection({
 					key={config.dataKey}
 					config={config}
 					chartData={telemetryData}
+					xDomain={xDomain}
 					ReferenceLineX={telemetryData?.[0]?.LapDistPct ?? 0}
 				/>
 			))}

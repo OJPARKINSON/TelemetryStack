@@ -18,6 +18,8 @@ interface TelemetryChartProps {
 	config: ChartConfig;
 	chartData: TelemetryDataPoint[];
 	ReferenceLineX: number;
+	/** LapDistPct range to show; the whole lap when undefined. */
+	xDomain?: [number, number];
 	onHover?: (index: number | null) => void;
 	showTooltip: boolean;
 	onHoverChart: (dataKey: string) => void;
@@ -64,6 +66,7 @@ export const TelemetryChart = memo(function TelemetryChart({
 	config,
 	chartData,
 	ReferenceLineX,
+	xDomain,
 	onHover,
 	showTooltip,
 	onHoverChart,
@@ -94,7 +97,8 @@ export const TelemetryChart = memo(function TelemetryChart({
 					/>
 					<XAxis
 						dataKey="LapDistPct"
-						domain={X_AXIS_DOMAIN}
+						domain={xDomain ?? X_AXIS_DOMAIN}
+						allowDataOverflow
 						type="number"
 						scale="linear"
 						hide

@@ -30,7 +30,7 @@ export const Route = createFileRoute("/$sessionId")({
 	}),
 });
 
-export default function SessionPage() {
+function SessionPage() {
 	const nav = useNavigate();
 	const { sessionId } = Route.useParams();
 	const { lapId } = Route.useSearch();

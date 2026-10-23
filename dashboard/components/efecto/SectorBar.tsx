@@ -10,7 +10,7 @@ interface SectorTime {
 
 interface SectorBarProps {
 	data: TelemetryDataPoint[];
-	sectorStartPct?: number[]; // fractions 0..1, first = 0
+	sectorStartPct: number[]; // fractions 0..1, first = 0
 	activeSector: number | null; // null = full lap (click the active sector to return), 0 = S1, ...
 	onSectorChange: (sector: number | null) => void;
 	/** Show placeholder sector buttons so the row keeps its height. */
@@ -95,7 +95,10 @@ export function SectorBar({
 	onSectorChange,
 	loading,
 }: SectorBarProps) {
-	const sectors = useSectorTimes(data, sectorStartPct);
+	const computed = useSectorTimes(data, sectorStartPct);
+	const sectors: Array<SectorTime | null> = loading
+		? sectorStartPct.map(() => null)
+		: computed;
 
 	if (sectors.length === 0) return null;
 
@@ -105,9 +108,10 @@ export function SectorBar({
 				{sectors.map((sector, i) => (
 					<button
 						type="button"
-						key={sector.time}
+						// biome-ignore lint/suspicious/noArrayIndexKey: sectors are positional
+						key={`S${i + 1}`}
 						disabled={!sector}
-						onClick={() => onSectorChange(i)}
+						onClick={() => onSectorChange(activeSector === i ? null : i)}
 						className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
 							activeSector === i
 								? "bg-secondary text-foreground border border-border"
